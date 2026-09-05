@@ -18,6 +18,12 @@ golden_cases = executable('golden-cases', 'tests/golden/cases.c',
     c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
     install : false)
 fake_rga_env = environment()
+golden_dynamic = executable('golden-cases-dynamic', 'tests/golden/cases.c',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
+    install : false)
 fake_rga_env.set('LD_PRELOAD', fake_rga.full_path())
 golden_shell = find_program('sh')
 shim_contract = executable('shim-contract', 'tests/shim/contract.c',
