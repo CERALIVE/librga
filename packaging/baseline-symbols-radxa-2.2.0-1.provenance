@@ -1,0 +1,48 @@
+# Where packaging/baseline-symbols-radxa-2.2.0-1.txt came from
+#
+# This is a sidecar because the list itself must stay a bare sorted symbol list:
+# package-contract.sh and the acceptance command both feed it straight to comm(1),
+# and a comment line inside it would sort ahead of every symbol and never match.
+#
+# SOURCE          the Radxa librga2 2.2.0-1 shared object as installed on the
+#                 CeraLive Orange Pi 5+ bench board, at
+#                 /usr/lib/aarch64-linux-gnu/librga.so.2.1.0
+# SIZE            266544 bytes
+# SHA256          0b455344259c37fec821955e2de85bb5f76a34e69682217b514c407d8a35c6c3
+# API RELEASE     rga_api version 1.10.1_[4]   (strings, the runtime rendering of
+#                 the four RGA_API_*_VERSION macros — see docs/PROVENANCE.md)
+# CAPTURED BY     the librga history import (docs/PROVENANCE.md, "The board
+#                 cross-check"); the same sha256 is recorded there independently.
+#
+# GENERATED WITH
+#
+#   nm -D --defined-only librga.so.2.1.0 \
+#     | awk '$2!="W" && $2!="V" {print $3}' \
+#     | LC_ALL=C sort -u
+#
+# TWO CHOICES IN THAT COMMAND ARE LOAD-BEARING.
+#
+# 1. WEAK SYMBOLS ARE EXCLUDED ($2!="W" && $2!="V"). The board binary defines 274
+#    dynamic symbols: 254 global and 20 weak. Every weak one is a COMDAT template
+#    instantiation that the compiler emitted into whichever translation unit
+#    happened to use it — three std::_Rb_tree<unsigned int, im_rga_job*> members
+#    among them. They are a property of the toolchain that built the object, not
+#    a promise this library makes: a GCC 14 rebuild of the SAME upstream source
+#    (5a97e650, the R0 tip) emits all 254 global symbols and drops exactly those
+#    three weak ones. Keeping them in the baseline would make the containment
+#    contract fail for a reason that has nothing to do with the library's ABI,
+#    which is the fastest way to teach people to ignore it.
+#
+# 2. LC_ALL=C. comm(1) requires both inputs in the same collation order. A list
+#    sorted under a UTF-8 locale and compared inside a C-locale container reports
+#    hundreds of phantom differences and prints "input is not in sorted order" in
+#    the middle of the output, where it is easy to miss. Every sort and comm in
+#    package-contract.sh is pinned to LC_ALL=C for this reason.
+#
+# WHAT THE LIST IS FOR
+#
+# It is the floor of the export contract: a CeraLive build of this library must
+# never export FEWER symbols than the Radxa build the device already runs.
+# Additions are expected and allowed — the Meson build exports internals Radxa's
+# did not. package-contract.sh enforces the floor; see the SYMBOL CONTAINMENT
+# section there for how it is applied across API releases.

@@ -1,0 +1,39 @@
+# Baseline symbols that a NON-baseline API release legitimately no longer exports.
+#
+# The baseline (packaging/baseline-symbols-radxa-2.2.0-1.txt) was taken from a
+# board binary reporting rga_api version 1.10.1_[4]. When the tree being built
+# reports that same API release, the containment check is a strict superset test
+# and this file is not consulted at all.
+#
+# When the tree reports a DIFFERENT API release — `main` currently builds the
+# 1.10.5-era upstream tip — some baseline symbols are gone because upstream
+# changed the source, not because CeraLive narrowed anything. This file names
+# exactly which, and package-contract.sh requires the measured delta to EQUAL this
+# set. A symbol disappearing that is not listed here fails the build; a symbol
+# listed here that is in fact still exported fails it too. Neither direction is a
+# warning.
+#
+# Every entry was checked against the tree, and none is reachable from an
+# installed header: the API-containment tier of the same check covers that
+# separately and passes on both API releases.
+#
+# Format: <symbol><TAB><reason>. Blank lines and # comments are ignored.
+
+cosa_table	upstream made it `static const int cosa_table[360]` in core/NormalRgaApi.cpp; at 1.10.1 it was an extern table filled in at runtime
+sina_table	same change as cosa_table, same file
+_Z19NormalRgaInitTablesv	NormalRgaInitTables() removed upstream once the sin/cos tables became static const initialisers; no definition remains in the tree
+_Z18rga_log_level_initv	rga_log_level_init() removed upstream; log level is resolved on the logging path now and no definition remains in the tree
+_Z19rga_set_buffer_info12rga_buffer_tP8rga_info	upstream marked rga_set_buffer_info static in im2d_api/src/im2d_impl.cpp
+_Z19rga_set_buffer_info12rga_buffer_tS_P8rga_infoS1_	second rga_set_buffer_info overload, same static-ing
+_Z20get_string_by_formatPci	upstream marked get_string_by_format static in core/RgaUtils.cpp
+_Z21get_buf_size_by_w_h_fiii	upstream marked get_buf_size_by_w_h_f static in core/RgaUtils.cpp
+_Z12rga_get_infoP20rga_info_table_entry	signature changed; the tree exports _Z12rga_get_infoP17rga_hw_versions_tP20rga_info_table_entry
+_Z14rga_check_infoPKc12rga_buffer_t7im_recti	signature changed; the tree exports _Z14rga_check_infoPKc12rga_buffer_t7im_rect21rga_info_resolution_t
+_Z15rga_task_submitj12rga_buffer_tS_S_7im_rectS0_S0_P6im_opti	signature changed; the tree exports _Z15rga_task_submitj12rga_buffer_tS_S_7im_rectS0_S0_iPiP6im_opti
+_Z16rga_check_driverR13rga_version_t	signature changed from reference to value; the tree exports _Z16rga_check_driver13rga_version_t
+_Z16rga_check_rotateiR20rga_info_table_entry	signature changed from reference to pointer; the tree exports _Z16rga_check_rotateiP20rga_info_table_entry
+_Z17rga_import_buffermiP15im_handle_param	signature changed; the tree exports _Z17rga_import_buffermij
+_Z22NormalRgaSetBitbltModeP7rga_req10rga_interphjjjj	signature changed; the tree exports _Z22NormalRgaSetBitbltModeP7rga_reqP10rga_interphjjjj
+_Z35rga_version_table_get_current_indexR13rga_version_tPK30rga_version_bind_table_entry_ti	signature changed from reference to value; the tree exports the same name taking 13rga_version_t
+_Z35rga_version_table_get_minimum_indexR13rga_version_tPK30rga_version_bind_table_entry_ti	same reference-to-value change
+_Z37rga_version_table_check_minimum_rangeR13rga_version_tPK30rga_version_bind_table_entry_tii	same reference-to-value change
