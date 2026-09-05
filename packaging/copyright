@@ -30,6 +30,13 @@ Copyright: 2016-2025 Rockchip Electronics Co., Ltd.
            2020-2025 Yu Qiaowei <cerf.yu@rock-chips.com>
 License: Apache-2.0
 
+Files: README.md
+Copyright: 2016-2025 Rockchip Electronics Co., Ltd.
+           2026 CeraLive contributors
+License: Apache-2.0
+Comment:
+ The CeraLive maintainer documentation precedes the preserved upstream README.
+
 Files: Android.mk
 Copyright: 2018 Fuzhou Rockchip Electronics Co., Ltd.
 License: GPL-3.0-or-later
