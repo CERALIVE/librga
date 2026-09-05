@@ -1,0 +1,18 @@
+version: 2
+
+# `github-actions` only. There is no lockfile of any kind in this repository for
+# Dependabot to scan: librga is C++ built with Meson, so there is no
+# package.json, no Cargo.toml, no bun.lock and no requirements.txt. The build and
+# runtime dependencies are Debian suite packages selected by
+# ci/target-suite.env, and the Radxa librga2 archive ci/transition-test.sh
+# downloads is URL+SHA pinned to the exact artifact the device image ships — a
+# human decision about a device contract, not an ecosystem Dependabot may bump.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"

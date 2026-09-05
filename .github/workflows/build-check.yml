@@ -1,0 +1,281 @@
+name: Build Check
+
+# `push` carries a positive branch/tag selector on purpose: with a bare `push:`
+# every pull-request-branch push would run this workflow twice, and
+# `concurrency:` does NOT dedupe it — refs/heads/<branch> and refs/pull/N/merge
+# hash to different groups, so the trigger filter is the fix.
+on:
+  push:
+    branches: [main, "release/**"]
+    tags: ["*"]
+  pull_request:
+    branches: [main, "release/**", "integration/**"]
+
+concurrency:
+  group: build-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# A container job's default shell is `sh -e`, and dash has no `pipefail`. Every
+# `run:` block here is written as bash; say so once rather than degrading each
+# one to POSIX sh.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  resolve-suite:
+    name: Resolve device target suite
+    runs-on: ubuntu-latest
+    outputs:
+      suite: ${{ steps.read.outputs.suite }}
+      secondary_suite: ${{ steps.read.outputs.secondary_suite }}
+      arch: ${{ steps.read.outputs.arch }}
+      triplet: ${{ steps.read.outputs.triplet }}
+      glibc_floor: ${{ steps.read.outputs.glibc_floor }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # The values reach the build job as OUTPUTS, never `$GITHUB_ENV`. GitHub
+      # selects a job's `container:` before that job's first step runs, so a
+      # same-job export is structurally too late to name the image — which is
+      # exactly what the build matrix needs it for.
+      - name: Read ci/target-suite.env
+        id: read
+        run: |
+          set -euo pipefail
+          # shellcheck source=ci/target-suite.env
+          source ci/target-suite.env
+          for key in TARGET_SUITE SECONDARY_SUITE TARGET_ARCH TARGET_TRIPLET GLIBC_FLOOR; do
+            if [ -z "${!key:-}" ]; then
+              echo "ERROR: $key is not declared in ci/target-suite.env" >&2
+              exit 1
+            fi
+          done
+          {
+            echo "suite=${TARGET_SUITE}"
+            echo "secondary_suite=${SECONDARY_SUITE}"
+            echo "arch=${TARGET_ARCH}"
+            echo "triplet=${TARGET_TRIPLET}"
+            echo "glibc_floor=${GLIBC_FLOOR}"
+          } >> "$GITHUB_OUTPUT"
+          echo "target ${TARGET_SUITE} · secondary ${SECONDARY_SUITE} · ${TARGET_ARCH} · glibc floor ${GLIBC_FLOOR}"
+
+      # Without this, flipping TARGET_SUITE to a suite the matrix does not build
+      # would silently retire the ABI floor gate: its step condition would match
+      # no leg and the workflow would stay green having checked nothing.
+      - name: Assert both declared suites are matrix legs
+        run: |
+          set -euo pipefail
+          for suite in '${{ steps.read.outputs.suite }}' '${{ steps.read.outputs.secondary_suite }}'; do
+            if ! grep -qE "^ +- suite: ${suite}\$" .github/workflows/build-check.yml; then
+              echo "ERROR: ci/target-suite.env names ${suite}, but the build matrix has" >&2
+              echo "       no '- suite: ${suite}' leg, so nothing would be built for it." >&2
+              exit 1
+            fi
+          done
+          echo "matrix covers ${{ steps.read.outputs.suite }} and ${{ steps.read.outputs.secondary_suite }}"
+
+  build:
+    name: ${{ matrix.suite }} · arm64
+    needs: resolve-suite
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ matrix.suite }}-slim
+    strategy:
+      # Both legs always report. A secondary-suite failure is a real portability
+      # problem and must be seen, not hidden behind a cancelled sibling.
+      fail-fast: false
+      matrix:
+        include:
+          - suite: bookworm
+          - suite: trixie
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
+    steps:
+      # The slim image has no git, and `actions/checkout` silently degrades to a
+      # history-less REST tarball without it. Base tooling therefore installs
+      # BEFORE the checkout, not after.
+      - name: Install base tooling
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git
+
+      # fetch-depth 0 is load-bearing. packaging/build-deb.sh derives
+      # SOURCE_DATE_EPOCH from the last commit that touched a PACKAGED INPUT, and
+      # a depth-1 checkout answers that query with nothing whenever HEAD happens
+      # to be a docs or test commit — which is most of them.
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.suite }}-arm64-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.suite }}-arm64-
+
+      # ONE step, on purpose. Everything this leg does lives in the script, so
+      # `docker run --rm --platform linux/arm64 -v "$PWD":/src -w /src
+      # debian:${{ matrix.suite }}-slim bash ci/build-check-steps.sh` reproduces
+      # it exactly, without a pull request and without this file.
+      - name: Build check (deps · contract · meson · test · package)
+        run: bash ci/build-check-steps.sh
+
+      # Enforced only on the TARGET leg, and the condition reads the declared
+      # suite rather than a literal. The secondary leg builds against an OLDER
+      # glibc by construction, so its imports say nothing about the device.
+      #
+      # This gates the unstripped library in the meson tree; ci/build-check-steps.sh
+      # has already gated the stripped one the runtime package ships. They are two
+      # different binaries and both are worth refusing.
+      - name: ABI floor gate (target suite only)
+        if: matrix.suite == needs.resolve-suite.outputs.suite
+        run: bash ci/check-abi-floors.sh build/librga.so.2.1.0
+
+      - name: Note the secondary-suite leg
+        if: matrix.suite != needs.resolve-suite.outputs.suite
+        run: |
+          echo "${{ matrix.suite }} is the secondary suite, not the device target"
+          echo "(${{ needs.resolve-suite.outputs.suite }}). It proves the source still"
+          echo "configures, compiles and passes its tests on an older toolchain. The"
+          echo ".deb and the ABI floors are properties of the target suite and are"
+          echo "checked on that leg."
+
+      # The R0/R1 release branches consume these: the board gate installs the
+      # exact archives a build-check run produced rather than rebuilding them.
+      # Only the target leg produces a shippable package.
+      - name: Upload the built packages
+        if: matrix.suite == needs.resolve-suite.outputs.suite
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+
+      - name: Save ccache
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.suite }}-arm64-${{ github.sha }}
+
+      - name: Build summary
+        if: always()
+        run: |
+          {
+            echo "## ${{ matrix.suite }} · arm64"
+            echo
+            echo "- device target suite: \`${{ needs.resolve-suite.outputs.suite }}\` (GLIBC floor \`${{ needs.resolve-suite.outputs.glibc_floor }}\`)"
+            echo "- ABI floor gate: ${{ matrix.suite == needs.resolve-suite.outputs.suite && 'enforced' || 'not applicable (secondary suite)' }}"
+            echo "- packaging: ${{ matrix.suite == needs.resolve-suite.outputs.suite && 'librga2-ceralive + librga-ceralive-dev built and contract-checked' || 'not applicable (secondary suite)' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  analyzer:
+    name: GCC -fanalyzer (advisory)
+    needs: resolve-suite
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
+    # ADVISORY for the R0 release line. The findings are read, triaged and
+    # recorded; they do not block a merge yet. Promoting this job to a gate is a
+    # separate, deliberate step once the backlog it surfaces is at zero.
+    continue-on-error: true
+    steps:
+      - name: Install base tooling
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git g++
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # meson.build compiles the library with `-w`, which inhibits ALL warnings
+      # including every analyzer diagnostic. So the analyzer cannot be run
+      # through meson at all: `-w` is global and wins wherever it appears on the
+      # command line. The source and include lists are read out of meson.build
+      # rather than duplicated here, so a new source file cannot quietly escape
+      # the analyzer.
+      - name: Analyze every library source
+        run: |
+          set -euo pipefail
+          mapfile -t srcs < <(sed -n '/^librga_srcs = \[/,/^\]/p' meson.build \
+            | grep -oE "'[^']+\.cpp'" | tr -d "'")
+          mapfile -t incs < <(sed -n '/^incdir = include_directories(/,/)$/p' meson.build \
+            | grep -oE "'[^']+'" | tr -d "'")
+          if [ "${#srcs[@]}" -lt 15 ] || [ "${#incs[@]}" -lt 5 ]; then
+            echo "ERROR: read ${#srcs[@]} sources and ${#incs[@]} include dirs out of" >&2
+            echo "       meson.build; its shape changed and this extraction is stale." >&2
+            exit 1
+          fi
+          # `-I.` is not in meson.build's incdir list and is still required:
+          # meson puts the project source root on the include path for every
+          # target implicitly, and im2d.cpp reaches core/rga_sync.h through it.
+          args=(-std=c++14 -DLINUX=1 -I. -fanalyzer -c -o /dev/null)
+          for inc in "${incs[@]}"; do args+=("-I${inc}"); done
+          rc=0
+          : > analyzer.log
+          for src in "${srcs[@]}"; do
+            echo "--- ${src}" | tee -a analyzer.log
+            g++ "${args[@]}" "${src}" 2>&1 | tee -a analyzer.log || rc=1
+          done
+          echo "analyzed ${#srcs[@]} sources (exit ${rc})"
+          exit "${rc}"
+
+      - name: Analyzer summary
+        if: always()
+        run: |
+          set -euo pipefail
+          count=0
+          if [ -f analyzer.log ]; then
+            count="$(grep -c 'analyzer' analyzer.log || true)"
+          fi
+          {
+            echo "## GCC -fanalyzer — ADVISORY"
+            echo
+            echo "This job does not gate a merge. It reports what the GCC static"
+            echo "analyzer sees in the library sources, which meson.build's \`-w\`"
+            echo "hides from every other build in this repository."
+            echo
+            echo "- diagnostic lines mentioning the analyzer: \`${count}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the analyzer log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: analyzer-log
+          path: analyzer.log
+          if-no-files-found: warn
+
+  sanitizers:
+    name: Sanitizers (placeholder — no coverage claimed)
+    runs-on: ubuntu-latest
+    steps:
+      # Deliberately a no-op that says so. AddressSanitizer/UBSan/ThreadSanitizer
+      # coverage needs the host shim to stand in for /dev/rga, and that shim is
+      # not on this branch yet. A green job here proves NOTHING about memory or
+      # thread safety, and this step exists so nobody reads it as if it did.
+      - name: Declare that no sanitizer ran
+        run: |
+          set -euo pipefail
+          {
+            echo "## Sanitizers — NOT RUN"
+            echo
+            echo "No sanitizer executed and no sanitizer coverage is claimed by this"
+            echo "run. The suite needs the host \`/dev/rga\` shim to reach any library"
+            echo "code path at all, so wiring it before the shim exists would produce"
+            echo "a job that passes without executing anything."
+            echo
+            echo "When the shim lands, this job builds \`-fsanitize=address,undefined\`"
+            echo "against it and becomes a real leg."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
