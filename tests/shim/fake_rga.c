@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+/* Modified by CeraLive 2026-09-05: model fence outputs and sync-wait failures. */
 #ifdef FORWARD_TIMING
 #include "forward_timing.c"
 #else
@@ -8,6 +9,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -22,6 +24,7 @@ static int (*next_open)(const char *, int, ...);
 static int (*next_openat)(int, const char *, int, ...);
 static int (*next_ioctl)(int, unsigned long, ...);
 static int (*next_close)(int);
+static int (*next_poll)(struct pollfd *, nfds_t, int);
 static char *(*next_getenv)(const char *);
 static pthread_once_t symbols_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -42,6 +45,7 @@ static void resolve_symbols(void)
     RESOLVE(openat);
     RESOLVE(ioctl);
     RESOLVE(close);
+    RESOLVE(poll);
     RESOLVE(getenv);
 #undef RESOLVE
     resolving = false;
@@ -87,6 +91,23 @@ static void record(const char *text)
 {
     const char *path = next_getenv("FAKE_RGA_LOG");
     write_file(path ? path : "interposed.log", text, strlen(text), O_APPEND);
+}
+
+int poll(struct pollfd *fds, nfds_t count, int timeout)
+{
+    pthread_once(&symbols_once, resolve_symbols);
+    const char *fail = next_getenv("FAKE_RGA_SYNC_FAIL");
+    /* Exercise rga_sync_wait itself, not a replacement of the library function. */
+    if (fail && !strcmp(fail, "1") && count == 1 && timeout == -1 &&
+        fds && fds[0].fd >= 0 && fds[0].events == POLLIN) {
+        char text[96];
+        snprintf(text, sizeof(text), "poll sync-wait fd=%d ret=-1 errno=%d\n",
+                 fds[0].fd, EIO);
+        record(text);
+        errno = EIO;
+        return -1;
+    }
+    return next_poll(fds, count, timeout);
 }
 
 __attribute__((destructor)) static void save_getenv_count(void)
@@ -219,6 +240,8 @@ static int handle_ioctl(unsigned long command, void *arg)
     }
 
     int normal_result = 0;
+    const char *fence = next_getenv("FAKE_RGA_OUT_FENCE");
+    int out_fence = fence ? (int)strtol(fence, NULL, 0) : -1;
     switch (command) {
     case RGA_IOC_GET_DRVIER_VERSION:
         version(arg, 1, 3, 11, "1.3.11");
@@ -250,11 +273,11 @@ static int handle_ioctl(unsigned long command, void *arg)
         break;
     case RGA_IOC_REQUEST_SUBMIT:
     case RGA_IOC_REQUEST_CONFIG:
-        ((struct rga_user_request *)arg)->release_fence_fd = (uint32_t)-1;
+        ((struct rga_user_request *)arg)->release_fence_fd = (uint32_t)out_fence;
         break;
     case RGA_BLIT_SYNC:
     case RGA_BLIT_ASYNC:
-        ((struct rga_req *)arg)->out_fence_fd = -1;
+        ((struct rga_req *)arg)->out_fence_fd = out_fence;
         break;
     case RGA_IOC_RELEASE_BUFFER:
     case RGA_IOC_REQUEST_CANCEL:

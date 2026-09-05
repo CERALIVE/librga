@@ -124,6 +124,19 @@ FAKE_RGA_ERRNO=<integer>
     values, e.g. 22 for EINVAL. Persistent EINTR/512 injection deliberately
     makes librga retry indefinitely: use a timeout for such reproducers.
 
+FAKE_RGA_OUT_FENCE=<integer>
+    Successful BLIT_SYNC/ASYNC writes out_fence_fd; REQUEST_SUBMIT/CONFIG writes
+    release_fence_fd. Default -1; 0 and positive values are copied verbatim.
+    The shim does not allocate, duplicate or close this fd: a caller that tests
+    ownership must supply a real fd. Failed ioctls leave output fields untouched.
+
+FAKE_RGA_SYNC_FAIL=1
+    Inject -1/EIO at poll for exactly one nonnegative fd, events=POLLIN and
+    timeout=-1 (the imsync -> rga_sync_wait shape), without closing the fd.
+    Logged as `poll sync-wait`. Other poll calls, and all polls when unset or
+    not equal to 1, forward to RTLD_NEXT. This opt-in affects any matching poll,
+    not just RGA descriptors; use it only in an isolated host test process.
+
 FAKE_RGA_GETENV_COUNT=<path>
     At normal process exit, overwrite with a decimal count plus newline of
     external getenv calls observed by this shim. Atomic process-wide counter;
@@ -156,3 +169,10 @@ no actual image work, DMA import, completion fence, or request-lifetime
 validation is performed. Legacy version queries are available for fault-path
 tests; blit dumps model the multi-RGA rga_req ABI used by the 1.3.11 island,
 including G7 (legacy userspace API, NOT the obsolete rga2_req driver ABI).
+Fence lifetime/error-path reproduction is separate from byte goldens:
+`bash tests/repro/run-h6.sh` runs C2/C3/C4 for 200 iterations each against the
+uninstrumented shared library, recording test-results/h6/cases.csv and the
+per-iteration fd census. Exit 1 means a defect was reproduced, not a build
+failure; exit 2 means a harness/precondition failure. H6a positive-success
+polarity is WITHDRAWN, not a test: no real positive-success submit path exists
+on the island. See docs/fix-audit.d/h6.md for the observations and limits.
