@@ -1,0 +1,26 @@
+# Append verbatim to the root meson.build, AFTER tests/meson-fragments/goldens.build.
+# This fragment deliberately declares no library targets of its own: it reuses
+# golden_librga (built with -ftrivial-auto-var-init=zero, which the CSC request
+# inspection below needs), fake_rga and golden_dl from that fragment. Declaring
+# them again would collide on the target names.
+unit_warnings = ['-Wall', '-Wextra', '-Werror', '-Wno-pedantic']
+unit_incdir = include_directories('im2d_api/src')
+unit_pure = executable('unit-pure', 'tests/unit/unit_pure.cpp',
+    include_directories : [incdir, unit_incdir],
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings,
+    install : false)
+# No env: this group must prove it needs no /dev/rga, and it refuses to run if
+# the shim is preloaded anyway.
+test('unit-pure', unit_pure, timeout : 30)
+unit_session = executable('unit-session', 'tests/unit/unit_session.cpp',
+    include_directories : [incdir, unit_incdir],
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings,
+    install : false)
+unit_session_env = environment()
+unit_session_env.set('LD_PRELOAD', fake_rga.full_path())
+unit_session_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'unit-session-interposed.log')
+test('unit-session', unit_session, env : unit_session_env, depends : fake_rga, timeout : 30)

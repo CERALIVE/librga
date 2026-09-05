@@ -1,0 +1,101 @@
+Hardware-independent unit tests
+===============================
+
+Two Meson tests, `unit-pure` and `unit-session`, characterize the librga paths
+that need no RGA hardware. They pin CURRENT behaviour, not desired behaviour:
+where a value is wrong today it is asserted as it is and marked, so a later fix
+has to change the assertion on purpose rather than discover the change by
+accident. No table is loosened, and no expectation was guessed -- every literal
+was read out of the source at this commit and confirmed against a run.
+
+Why two groups
+--------------
+
+`rga_check()` calls `get_rga_session()` (im2d_impl.cpp:1293), which opens
+/dev/rga (im2d_context.cpp:112-164). So `imcheck`, the colour-space plumbing
+and anything that builds a request are NOT host-pure, however arithmetic they
+look. The split follows that fact, not the subject matter:
+
+  unit-pure     no session, no device, NO shim
+                (a) core/RgaUtils.cpp format -> bpp and format -> per-pixel
+                    stride tables, for the twelve formats the CeraLive
+                    GStreamer path declares
+                (d) rga_version_compare() and the ">= 1.3.0" user-close-fence
+                    predicate from im2d_context.cpp:39-44
+                (e) rga_set_rect() field population
+
+  unit-session  runs under the todo-12 LD_PRELOAD shim
+                (b) the imcheck validation matrix
+                (c) default colour-space resolution, read out of the
+                    constructed rga_req
+                (f) the RT-1 imconfig(IM_CONFIG_SCHEDULER_CORE,
+                    IM_SCHEDULER_DEFAULT) reproducer
+
+Each binary guards its own group: `unit-pure` REFUSES to run if the shim is
+preloaded (its purity claim would be vacuous), and `unit-session` refuses to run
+if it is not (it would otherwise reach for real hardware).
+
+Both link the non-installed `rga-golden-host` static library from
+tests/meson-fragments/goldens.build, which is compiled with
+-ftrivial-auto-var-init=zero. That matters for the (c) assertions: they read
+rga_req fields the library fills from a stack-allocated full_csc_t that upstream
+leaves partly uninitialized (NormalRgaApi.cpp:825, :913).
+
+Notes on what is asserted
+-------------------------
+
+get_perPixel_stride_from_format() returns BITS per pixel, not bytes. The tests
+pin the bit values so a "tidy-up" to bytes is caught: rga_check_align()
+consumes the result as a bit count (im2d_impl.cpp:1141-1148).
+
+get_bpp_from_format() and get_perPixel_stride_from_format() cannot report
+failure -- an unmapped format returns 0 after a printf, indistinguishable from a
+legitimate zero. That is asserted and marked "KNOWN: validation gap".
+
+The (f) assertion expects IM_STATUS_ILLEGAL_PARAM. IM_SCHEDULER_DEFAULT is 0 and
+imconfig() gates on "value & IM_SCHEDULER_MASK", so the documented "let the
+driver choose" value is the one value the setter refuses. That is the RT-1 bug.
+The assertion flips to a success expectation in the D20 fix todo and NOWHERE
+ELSE; do not soften it in the meantime.
+
+The shim declares a three-core RK3588-shaped device, so the resolution and
+scale limits in (b) are the MERGED multi-core table (8192 input, 8128 output,
+byte stride 16, scale limit 16). The per-core 8192-in / 4096-out arithmetic is
+exercised separately by calling rga_check_info() with an explicit
+resolution_usage. Note that the RGA3 row of hw_info_table at this commit is
+{8176, 8176} in and {8128, 8128} out, not 8192/4096; the table row is asserted
+as imported.
+
+Build and run
+-------------
+
+The parallel-todo contract forbids editing the shared root meson.build here.
+The coordinator appends tests/meson-fragments/unit.build verbatim to its end,
+AFTER tests/meson-fragments/goldens.build -- this fragment reuses that one's
+golden_librga, fake_rga and golden_dl targets and would collide if it declared
+its own. Until that wiring lands, make a disposable repo-local scratch copy:
+
+    mkdir -p build/scratch
+    git archive HEAD | tar -x -C build/scratch
+    cp -R tests build/scratch/
+    cat tests/meson-fragments/goldens.build tests/meson-fragments/unit.build \
+        >> build/scratch/meson.build
+    meson setup build/scratch/build build/scratch -Dcpp_args=-fpermissive
+    meson test -C build/scratch/build unit-pure unit-session --verbose
+
+Use a new/empty scratch directory, not one with already-appended wiring.
+-fpermissive is the same temporary option the goldens need for the imported
+upstream's pointer-to-unsigned-int casts on 64-bit hosts; it changes no source.
+The test sources themselves build with -Wall -Wextra -Werror -Wno-pedantic.
+
+Each binary prints "<group>: N assertions, M failures" and exits non-zero if M
+is not 0. Failures name their subject (for example "NV16 bpp"), so a report
+identifies the damaged table row without a line number.
+
+Negative control
+----------------
+
+Edit ONLY build/scratch/tests/unit/unit_pure.cpp: change the NV16 row's bpp from
+2.0f to 3.0f, re-run, require a failure naming NV16, then restore the file from
+the original and rebuild. Never adjust an expectation to make an unexplained
+failure green.
