@@ -135,9 +135,19 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
+          def test_name(name):
+              return name.rsplit(' / ', 1)[-1].rsplit(':', 1)[-1]
+          for raw, expected in [
+              ('librga / unit-pure', 'unit-pure'),
+              ('librga:uapi / uapi-parity', 'uapi-parity'),
+              ('librga:goldens', 'goldens'),
+              ('unit-session', 'unit-session'),
+          ]:
+              if test_name(raw) != expected:
+                  raise SystemExit(f'Meson result-name regression: {raw}')
           results = [json.loads(line) for line in Path('build/meson-logs/testlog.json').read_text().splitlines()]
           Path('build/test-results.json').write_text(json.dumps([
-              {'name': row['name'].split(':')[-1], 'result': row['result']}
+              {'name': test_name(row['name']), 'result': row['result']}
               for row in results
           ]))
           PY
