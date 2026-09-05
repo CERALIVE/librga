@@ -1,0 +1,101 @@
+# --- uapi-parity: assert librga's ioctl ABI still matches the island driver ---
+#
+# Fragment contract: this file is appended to the project's top-level
+# meson.build, so every path below is relative to the project root.
+#
+# What it wires up:
+#   * a custom target that fetches the pinned island driver header over HTTPS
+#     and refuses it unless the bytes hash to tests/uapi-parity/island-pin.env
+#   * two freestanding C emitters, one per side, that print {kind, name, value}
+#     tables of ioctl numbers, struct sizes and member offsets
+#   * the uapi-parity-stubs test --- the anti-cheat gate on the compile
+#     environment that lets the kernel header build in userspace
+#   * the uapi-parity test --- the comparator, which also regenerates
+#     docs/UAPI-PARITY.md so a stale doc shows up as a git diff
+#
+# The emitters are linked -static so qemu-aarch64 needs no sysroot, and they
+# pull in nothing from librga itself: each is a pure statement of what its own
+# headers say the ABI is.
+
+add_languages('c', required : true)
+
+uapi_parity_python = find_program('python3', required : true)
+
+uapi_parity_fetch = find_program(
+    'tests/uapi-parity/fetch-island-header.sh',
+    required : true,
+)
+
+# Fail-closed: the script verifies the SHA-256 before it writes @OUTPUT@, so a
+# substituted or truncated header can never reach the compiler.
+uapi_parity_island_header = custom_target(
+    'island-rga-h',
+    output : 'island-rga.h',
+    command : [uapi_parity_fetch, '@OUTPUT@'],
+    build_by_default : false,
+)
+
+# '.' resolves to BOTH the source root and the build root, which is how
+# island_side.c finds the fetched header without naming a build path.
+uapi_parity_island_inc = include_directories(
+    '.',
+    'tests/uapi-parity/kstubs',
+)
+
+uapi_parity_librga_inc = include_directories(
+    'include',
+    'core/hardware',
+)
+
+uapi_parity_island = executable(
+    'uapi-parity-island-side',
+    ['tests/uapi-parity/island_side.c', uapi_parity_island_header],
+    include_directories : uapi_parity_island_inc,
+    c_args : [
+        '-std=gnu11',
+        '-Wall',
+        '-Wextra',
+        # The island header is a kernel header. The forced preinclude supplies
+        # the primitives and opaque declarations it uses but does not include;
+        # tests/uapi-parity/check-stubs.sh proves it supplies nothing else.
+        '-include',
+        join_paths(
+            meson.source_root(),
+            'tests/uapi-parity/kstubs/preinclude.h',
+        ),
+    ],
+    link_args : ['-static'],
+    build_by_default : false,
+    install : false,
+)
+
+uapi_parity_librga = executable(
+    'uapi-parity-librga-side',
+    ['tests/uapi-parity/librga_side.c'],
+    include_directories : uapi_parity_librga_inc,
+    c_args : ['-std=gnu11', '-Wall', '-Wextra'],
+    link_args : ['-static'],
+    build_by_default : false,
+    install : false,
+)
+
+test(
+    'uapi-parity-stubs',
+    find_program('tests/uapi-parity/check-stubs.sh', required : true),
+    suite : ['uapi'],
+    timeout : 60,
+)
+
+test('uapi-parity',
+    uapi_parity_python,
+    args : [
+        files('tests/uapi-parity/compare.py'),
+        '--island-exe', uapi_parity_island,
+        '--librga-exe', uapi_parity_librga,
+        '--pin-env', files('tests/uapi-parity/island-pin.env'),
+        '--emit-doc', join_paths(meson.source_root(), 'docs/UAPI-PARITY.md'),
+    ],
+    depends : [uapi_parity_island, uapi_parity_librga],
+    suite : ['uapi'],
+    timeout : 300,
+)
