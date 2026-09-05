@@ -258,59 +258,41 @@ jobs:
         run: |
           set -euo pipefail
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates curl git g++
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git g++ meson ninja-build pkg-config python3
 
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # meson.build compiles the library with `-w`, which inhibits ALL warnings
-      # including every analyzer diagnostic. So the analyzer cannot be run
-      # through meson at all: `-w` is global and wins wherever it appears on the
-      # command line. The source and include lists are read out of meson.build
-      # rather than duplicated here, so a new source file cannot quietly escape
-      # the analyzer.
-      - name: Analyze every library source
-        run: |
-          set -euo pipefail
-          mapfile -t srcs < <(sed -n '/^librga_srcs = \[/,/^\]/p' meson.build \
-            | grep -oE "'[^']+\.cpp'" | tr -d "'")
-          mapfile -t incs < <(sed -n '/^incdir = include_directories(/,/)$/p' meson.build \
-            | grep -oE "'[^']+'" | tr -d "'")
-          if [ "${#srcs[@]}" -lt 15 ] || [ "${#incs[@]}" -lt 5 ]; then
-            echo "ERROR: read ${#srcs[@]} sources and ${#incs[@]} include dirs out of" >&2
-            echo "       meson.build; its shape changed and this extraction is stale." >&2
-            exit 1
-          fi
-          # `-I.` is not in meson.build's incdir list and is still required:
-          # meson puts the project source root on the include path for every
-          # target implicitly, and im2d.cpp reaches core/rga_sync.h through it.
-          args=(-std=c++14 -DLINUX=1 -I. -fanalyzer -c -o /dev/null)
-          for inc in "${incs[@]}"; do args+=("-I${inc}"); done
-          rc=0
-          : > analyzer.log
-          for src in "${srcs[@]}"; do
-            echo "--- ${src}" | tee -a analyzer.log
-            g++ "${args[@]}" "${src}" 2>&1 | tee -a analyzer.log || rc=1
-          done
-          echo "analyzed ${#srcs[@]} sources (exit ${rc})"
-          exit "${rc}"
+      # ONE step, on purpose, for the same reason the build leg is one step:
+      # `docker run --rm --platform linux/arm64 -v "$PWD":/src -w /src
+      # debian:trixie-slim bash scripts/run-analyzer.sh` reproduces it exactly.
+      #
+      # The script configures with `-Danalyzer=true`, which is what drops
+      # meson.build's blanket `-w`. GCC's `-w` sets a global inhibit flag checked
+      # when a diagnostic is emitted, so with it on the command line no
+      # -Wanalyzer-* finding is ever reported no matter where `-fanalyzer` sits.
+      - name: Run the analyzer and reconcile against docs/ANALYZER-TRIAGE.md
+        run: bash scripts/run-analyzer.sh
 
       - name: Analyzer summary
         if: always()
         run: |
           set -euo pipefail
           count=0
-          if [ -f analyzer.log ]; then
-            count="$(grep -c 'analyzer' analyzer.log || true)"
+          if [ -f test-results/analyzer-hits.txt ]; then
+            count="$(wc -l < test-results/analyzer-hits.txt)"
           fi
           {
             echo "## GCC -fanalyzer — ADVISORY"
             echo
             echo "This job does not gate a merge. It reports what the GCC static"
             echo "analyzer sees in the library sources, which meson.build's \`-w\`"
-            echo "hides from every other build in this repository."
+            echo "hides from every other build in this repository. Every finding"
+            echo "is dispositioned in \`docs/ANALYZER-TRIAGE.md\`; an untriaged one"
+            echo "is printed above."
             echo
-            echo "- diagnostic lines mentioning the analyzer: \`${count}\`"
+            echo "- unique \`-Wanalyzer-*\` hits: \`${count}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the analyzer log
@@ -318,28 +300,59 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: analyzer-log
-          path: analyzer.log
+          path: test-results/
           if-no-files-found: warn
 
   sanitizers:
-    name: Sanitizers (placeholder — no coverage claimed)
-    runs-on: ubuntu-latest
+    name: ASan/UBSan + TSan (host shim)
+    needs: resolve-suite
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
     steps:
-      # Deliberately a no-op that says so. AddressSanitizer/UBSan/ThreadSanitizer
-      # coverage needs the host shim to stand in for /dev/rga, and that shim is
-      # not on this branch yet. A green job here proves NOTHING about memory or
-      # thread safety, and this step exists so nobody reads it as if it did.
-      - name: Declare that no sanitizer ran
+      - name: Install base tooling
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # ONE step, on purpose. `docker run --rm --platform linux/arm64
+      # -v "$PWD":/src -w /src debian:trixie-slim bash ci/sanitizers-steps.sh`
+      # reproduces this leg exactly, without a pull request and without this file.
+      - name: Sanitizers (build · canaries · meson test)
+        run: bash ci/sanitizers-steps.sh
+
+      - name: Upload sanitizer logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sanitizer-logs
+          path: test-results/
+          if-no-files-found: warn
+
+      # HOST SHIM ONLY, and the summary says so on every run. A sanitizer report
+      # from this job describes librga's behaviour against the shim's model of
+      # the driver. It is never evidence about the RGA hardware, and no board
+      # drill or fix-audit row may cite it as such.
+      - name: Sanitizer summary
+        if: always()
         run: |
           set -euo pipefail
           {
-            echo "## Sanitizers — NOT RUN"
+            echo "## Sanitizers — host shim only"
             echo
-            echo "No sanitizer executed and no sanitizer coverage is claimed by this"
-            echo "run. The suite needs the host \`/dev/rga\` shim to reach any library"
-            echo "code path at all, so wiring it before the shim exists would produce"
-            echo "a job that passes without executing anything."
+            if [ -f test-results/sanitizers-summary.txt ]; then
+              echo '```'
+              cat test-results/sanitizers-summary.txt
+              echo '```'
+            else
+              echo "The run did not reach its summary; read the job log."
+            fi
             echo
-            echo "When the shim lands, this job builds \`-fsanitize=address,undefined\`"
-            echo "against it and becomes a real leg."
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "No board sanitizer coverage is claimed. TSan is host-only"
+            echo "permanently — it cannot be statically linked, so there is no"
+            echo "board-side equivalent."
+          } >> "$GITHUB_STEP_SUMMARY"

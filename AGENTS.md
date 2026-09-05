@@ -43,6 +43,8 @@ Two releases exist, versioned upstream-style rather than CalVer:
 | Import coordinate, licence census, credits | `docs/PROVENANCE.md` |
 | API usability traps every caller trips over | `docs/API-TRAPS.md` |
 | Per-fix evidence ledger | `docs/fix-audit.md` |
+| Sanitizer/analyzer recipes and their proof boundary | `docs/SANITIZERS.md` |
+| Disposition of every `-Wanalyzer-*` finding | `docs/ANALYZER-TRIAGE.md` |
 | Debian package build and contract | `packaging/` |
 | Island-UAPI parity, host shim, goldens, unit tests | `tests/` |
 | Board-gated drills | `tests/board/` |
@@ -159,6 +161,12 @@ are documented in [`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md).
 | **Host shim** | Island-UAPI parity gate (struct sizes, member offsets, ioctl numbers against the island's pinned `rga.h`), request-byte goldens, hardware-independent unit tests, TSan/ASan/UBSan legs, GCC-14 `-fanalyzer`, `nm` containment and `abidiff`. |
 | **Board** | Package install/removal, library-level PSNR and colour oracle, DMA-BUF behaviour, fd census, and the A/B rows against the Radxa package. Both boards: Orange Pi 5+ and Rock 5B+. |
 
+The sanitizer and analyzer recipes, the flags that are load-bearing, the canaries
+that prove a runtime is intercepting rather than merely linked, and the discovery
+contracts a new reproducer registers itself through are in
+[`docs/SANITIZERS.md`](docs/SANITIZERS.md). Every `-Wanalyzer-*` finding carries a
+disposition in [`docs/ANALYZER-TRIAGE.md`](docs/ANALYZER-TRIAGE.md).
+
 ### The suite proves
 
 - That the request bytes this library writes for the CeraLive call set are
@@ -177,6 +185,14 @@ are documented in [`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md).
   ASan and UBSan. No board drill claims sanitizer coverage, and no ledger row may
   imply one. A host-shim sanitizer report is evidence about the shim's model of
   the driver, not about silicon.
+  TSan is host-only **permanently** — it cannot be statically linked reliably, so
+  no board-side equivalent can exist. ASan *could* reach a board via
+  `-static-libasan`, and `scripts/cross-build-harness.sh --asan` gates that on a
+  preflight. As of 2026-09-05 the verdict is **NOT-AVAILABLE**:
+  `aarch64-linux-gnu-gcc -print-file-name=libasan.a` echoes the bare name, so the
+  cross toolchain carries no static ASan runtime and the board-ASan leg does not
+  exist. Reproducer rows record `host-shim-only` until a toolchain that has it is
+  in use.
 - That the host shim reproduces RGA hardware. It models ioctl return values; it
   does not execute a blit, does not produce pixels, and cannot detect a
   hardware-side correctness fault.

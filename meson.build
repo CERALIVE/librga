@@ -41,13 +41,21 @@ incdir = include_directories(
     'core/3rdparty/libdrm/include/drm',
     'core/3rdparty/android_hal')
 
+# Upstream silences every warning on the library sources. Keep that by default —
+# this tree is imported and re-linting it is merge friction — but let
+# scripts/run-analyzer.sh turn it off. GCC's `-w` is global and order-independent,
+# so with it on the command line NO -Wanalyzer-* diagnostic is ever emitted, no
+# matter where -fanalyzer appears. Dropping it is the only way to run the analyzer
+# through meson at all.
+librga_quiet_args = get_option('analyzer') ? [] : ['-w']
+
 librga = shared_library(
     'rga',
     librga_srcs,
     dependencies : [libthreads_dep],
     include_directories : incdir,
     version : meson.project_version(),
-    cpp_args : ['-w'],
+    cpp_args : librga_quiet_args,
     install : true,
 )
 
@@ -57,7 +65,7 @@ librga = static_library(
     librga_srcs,
     dependencies : [libthreads_dep],
     include_directories : incdir,
-    cpp_args : ['-w'],
+    cpp_args : librga_quiet_args,
     install : true,
 )
 
