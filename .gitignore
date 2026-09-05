@@ -8,6 +8,10 @@ rgaImDemo
 .vscode/
 *.patch
 build/
+build-aarch64/
+build-aarch64-source/
+build-host/
+build-cross.log
 build_linux/
 build_android_ndk/
 .DS_Store

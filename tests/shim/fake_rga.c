@@ -1,4 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+#ifdef FORWARD_TIMING
+#include "forward_timing.c"
+#else
 #define _GNU_SOURCE
 #undef _FILE_OFFSET_BITS
 #include <dlfcn.h>
@@ -289,3 +292,4 @@ int ioctl(int fd, unsigned long command, ...)
     errno = saved_errno;
     return ret;
 }
+#endif
