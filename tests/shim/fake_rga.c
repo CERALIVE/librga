@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+/* Modified by CeraLive 2026-09-05: model H3 init failures without census saturation. */
 #ifdef FORWARD_TIMING
 #include "forward_timing.c"
 #else
@@ -27,7 +28,7 @@ static pthread_once_t symbols_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static _Thread_local bool resolving;
 static atomic_ulong getenv_calls;
-static int device_fds[256];
+static int device_fds[4096];
 static size_t device_count;
 static uint32_t next_handle = 1, next_request = 1;
 
@@ -208,6 +209,8 @@ static int handle_ioctl(unsigned long command, void *arg)
 
     const char *name = ioctl_name(command);
     const char *fail = next_getenv("FAKE_RGA_FAIL");
+    if (fail && !strcmp(fail, "hwversion")) fail = "RGA_IOC_GET_HW_VERSION";
+    if (fail && !strcmp(fail, "driverversion")) fail = "RGA_IOC_GET_DRVIER_VERSION";
     char variable[96];
     snprintf(variable, sizeof(variable), "FAKE_RGA_RET_%s", name);
     const char *override = next_getenv(variable);
@@ -227,6 +230,14 @@ static int handle_ioctl(unsigned long command, void *arg)
     case RGA_IOC_GET_HW_VERSION: {
         struct rga_hw_versions_t *hw = arg;
         memset(hw, 0, sizeof(*hw));
+        /* rga_get_info is a userspace lookup, not an ioctl. An unknown core
+         * exercises that lookup's failure AFTER the device fd is published. */
+        if (fail && !strcmp(fail, "getinfo")) {
+            hw->size = 1;
+            version(&hw->version[0], 99, 0, 0, "99.0.0");
+            normal_result = 1;
+            break;
+        }
         hw->size = 3;
         version(&hw->version[0], 3, 0, 0x76831, "3.0.76831");
         version(&hw->version[1], 3, 0, 0x76831, "3.0.76831");
