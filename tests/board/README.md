@@ -1,6 +1,7 @@
 # Board harness
 
-This is non-installed Apache-2.0 test infrastructure. It never installs packages.
+This is non-installed Apache-2.0 test infrastructure. The G-A drill temporarily
+swaps runtime packages; the standalone bench and staging helper do not.
 Run `bash scripts/cross-build-harness.sh` to build every available Meson fragment
 with aarch64 GCC/G++, including the inherited host shim/goldens. Unwired fragments
 are appended only in the disposable `build-aarch64-source/` copy; a fully wired
@@ -9,7 +10,7 @@ must preserve `librga_so = librga` before upstream reassigns `librga` to its sta
 archive. The board probe and bench link the shared library so `LD_LIBRARY_PATH`
 can select either release. The inherited golden executable deliberately retains
 todo 12's instrumented static library; it is not a shared-library comparison tool.
-No unit-pure/unit-session sources exist on this stacked branch.
+Both unit-pure and unit-session are present on the integrated R0 branch.
 
 `QEMU_LD_PREFIX` defaults to `/usr/aarch64-linux-gnu`. This is a build-host sysroot,
 not a promise of board ABI compatibility: use a target-suite-compatible cross
@@ -95,3 +96,35 @@ result, errno preservation, CSV fields, and a userspace delay in the total scope
 
 See [COUNTERS.md](COUNTERS.md) for actual access status and the outstanding hardware
 checks; see [the oracle](../oracle/README.md) for the independent numerical model.
+
+## R0 neutrality gate [EXISTS]
+
+Run `bash tests/board/g-a-neutrality.sh` once per board with `CERALIVE_BOARD_TEST=1`
+and the credential environment above. Also supply `R0_DEB`, `RADXA_DEB`,
+`HARNESS_DIR`, `PR_RUN_ID`, and a fresh repo-local `RESULT_DIR` under `build/`.
+Download `dist` with `gh run download <run> --repo CERALIVE/librga --name dist`
+from the latest successful Build Check run of the open R0 PR; record its head SHA.
+Build the harness with a Trixie arm64 toolchain. Only the runtime CI artifact is
+installed, never the development package or the locally built library.
+
+The script checks reachability separately from the kernel/driver precondition,
+holds lib.sh's lock and marker, verifies staged hashes, and registers the proven
+Radxa rollback before apt installation. Every SSH/SCP call is timeout-bounded;
+the soak runs a single process with a 295-second deadline and a 299-second outer
+timeout. The fd census remains strict: any increase fails, even if pixels agree.
+`--routing --core 1|2|4` submits 1,000 exact 128x64 NV12 copies using `imconfig`;
+`--soak` exercises 4K NV16→NV12; `--improcess-only` excludes legacy pixel rows.
+No oracle threshold or pre-existing fd assertion is relaxed for G-A.
+
+RGB16 is the smoke format: canonical gstmpp.c maps it to `MPP_FMT_BUTT` to force
+RGA conversion, and gstmppenc.c selects NV12 for unsupported input. Required log:
+`converted with RGA` from the canonical c_RkRgaBlit path. Registration alone or
+`RGA enabled` is insufficient. No rgaconvert/rgacompositor dependency exists.
+
+R3 scores exact per-core counter deltas; R5 requires all nine default/supplemental
+cells and the same-session 0.01 dB bound. A nonzero command, missing counter,
+missing conversion log, fd increase, or rollback failure returns nonzero. A zero
+exit covers this board only; overall PASS requires both boards and review of
+[DRILL-RESULTS.md](DRILL-RESULTS.md). Interrupted SSH or power loss can prevent a
+host EXIT trap reaching the board: inspect the retained marker and restore Radxa
+manually before any next run in that case.

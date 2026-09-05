@@ -146,6 +146,11 @@ not the newer imported implementation. Its test adaptations and outstanding
 neutrality blockers are recorded in [`docs/R0-NEUTRALITY.md`](docs/R0-NEUTRALITY.md).
 Do not merge or publish this candidate while those blockers remain unresolved.
 
+G-A's executable package-swap drill is `tests/board/g-a-neutrality.sh` [EXISTS].
+Its measured R0 verdict is **BLOCKED**, with reachable Rock 5B+ failing the driver
+precondition and Orange Pi's full sequence restored to Radxa. Read
+`tests/board/DRILL-RESULTS.md` before interpreting pixel equality as acceptance.
+
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
 It preserves the shared-library alias before the static-library reassignment and
 appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
