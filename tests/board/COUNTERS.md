@@ -1,5 +1,35 @@
 # Board counter discovery — 2026-09-05
 
+## G-A measured update
+
+Orange Pi at 192.168.78.151 is reachable using the supplied verified known-hosts
+file. `/proc/rkrga/load` reports three schedulers and instantaneous load, not a
+completed-task counter. The read-only completed counters actually used are:
+
+- `/sys/kernel/debug/rockchip-rga/cores/0/tasks` — imconfig mask 1, RGA3 core 1.
+- `/sys/kernel/debug/rockchip-rga/cores/1/tasks` — imconfig mask 2, RGA3 core 2.
+- `/sys/kernel/debug/rockchip-rga/cores/2/tasks` — imconfig mask 4, RGA2.
+
+Each directory also exposes `busy_ns`, `errors`, and `resets`. No counter was
+reset or debugfs control written. The final real R0 run measured:
+
+| Requested mask | Before (core 0,1,2) | After (core 0,1,2) | Delta |
+|---|---|---|---|
+| 1 | 5206,1000,1005 | 6206,1000,1005 | 1000,0,0 |
+| 2 | 6206,1000,1005 | 6206,2000,1005 | 0,1000,0 |
+| 4 | 6206,2000,1005 | 6206,2000,2005 | 0,0,1000 |
+
+All 3000 submitted copies returned exact pixels; the separate fd census failed
+4→5 in every process, so this is routing proof, not an overall R3 PASS.
+Probe reports driver 1.3.11; hardware reports 3.0.76831 twice and 3.2.63318.
+
+Rock 5B+ is reachable at **192.168.78.131**, with stock `rockchip_rga`, no `/dev/rga`,
+and therefore **PRECONDITION-FAIL**. No counters or package drill were attempted
+there. The historical .132 access finding below is superseded, not current truth.
+Full row and rollback results: [DRILL-RESULTS.md](DRILL-RESULTS.md).
+
+## Historical todo-20 attempt (superseded access findings)
+
 No counter paths or values have been verified by this task. Do not interpret the
 commands below as discovered paths or infer a driver version from the host shim.
 
