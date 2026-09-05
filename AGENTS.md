@@ -141,8 +141,18 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
+It preserves the shared-library alias before the static-library reassignment and
+appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
+after editing a fragment; a second invocation changes nothing. It also assembles
+the fix-audit rows from `docs/fix-audit.d/*.md` beneath the existing six-field schema.
+
 Two environments, and they prove different things. Keeping them apart is the
 point of this section.
+
+QEMU user-mode has a measured invalid-fd RGA ioctl limitation, not a shim bug.
+The two narrowly scoped, opt-in emulation skips and native mandatory coverage
+are documented in [`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md).
 
 | Environment | What runs there |
 |---|---|

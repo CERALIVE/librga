@@ -8,8 +8,8 @@ set -euo pipefail
 #
 #   ci/install-smoke.sh [<dist-dir>]
 #
-# Runs in whichever suite container it is invoked in — the build legs run it in
-# bookworm and in trixie, each against the packages that leg built.
+# Trixie verifies its own packages; Bookworm invokes this as an expected-refusal
+# check because the Trixie package requires a newer glibc than Bookworm provides.
 
 dist="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/dist}"
 [ -d "${dist}" ] || { echo "no dist directory: ${dist}" >&2; exit 2; }
