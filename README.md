@@ -49,6 +49,10 @@ cares about is the im2d API release it corresponds to:
 
 ## Build
 
+R0 is currently an unreleased integration candidate. See
+[`docs/R0-NEUTRALITY.md`](docs/R0-NEUTRALITY.md) for the measured export and real-board
+request-byte results; build success alone is not release approval.
+
 CeraLive builds with **Meson**, targeting Debian **Trixie** on arm64. The CMake,
 Android, and RT-Thread build files upstream ships are preserved but unused.
 
@@ -240,4 +244,3 @@ $ ./meson.sh
   [RGA_FAQ【中文】](docs/Rockchip_FAQ_RGA_CN.md)
 
   [RGA_FAQ【英文】](docs/Rockchip_FAQ_RGA_EN.md)
-

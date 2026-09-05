@@ -141,6 +141,11 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+The R0 integration branch carries the bootstrap infrastructure on `5a97e650`,
+not the newer imported implementation. Its test adaptations and outstanding
+neutrality blockers are recorded in [`docs/R0-NEUTRALITY.md`](docs/R0-NEUTRALITY.md).
+Do not merge or publish this candidate while those blockers remain unresolved.
+
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
 It preserves the shared-library alias before the static-library reassignment and
 appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
