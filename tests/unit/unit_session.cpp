@@ -30,7 +30,10 @@
 
 #include "im2d.h"
 #include "im2d_impl.h"
+#include "im2d_version.h"
+#if RGA_API_REVISION_VERSION > 1 || RGA_API_MINOR_VERSION > 10 || RGA_API_MAJOR_VERSION > 1
 #include "im2d_context.h"
+#endif
 #include "rga.h"
 #include "rga_ioctl.h"
 
@@ -41,8 +44,10 @@
  * the per-core resolution limits can be exercised against an explicit table
  * entry instead of only the merged one.
  */
+#if RGA_API_REVISION_VERSION > 1 || RGA_API_MINOR_VERSION > 10 || RGA_API_MAJOR_VERSION > 1
 IM_STATUS rga_check_info(const char *name, const rga_buffer_t info, const im_rect rect,
                          rga_info_resolution_t resolution_usage);
+#endif
 
 static const int SRC_FD = 100;
 static const int DST_FD = 101;
@@ -180,7 +185,11 @@ static void check_imcheck_matrix(void)
                 check_pair(1920, 1080, 1920, 1080, RGBA, 1280, 720, 1280, 720, RGBA, crop_ok, 0));
     unit_eq_int("crop x+width past wstride rejected as INVALID_PARAM", IM_STATUS_INVALID_PARAM,
                 check_pair(1920, 1080, 1920, 1080, RGBA, 1280, 720, 1280, 720, RGBA, crop_past_ws, 0));
+#if RGA_API_REVISION_VERSION > 1 || RGA_API_MINOR_VERSION > 10 || RGA_API_MAJOR_VERSION > 1
     unit_eq_int("crop height 0 with width > 0 rejected as ILLEGAL_PARAM", IM_STATUS_ILLEGAL_PARAM,
+#else
+    unit_eq_int("1.10.1 accepts a zero-height crop", IM_STATUS_NOERROR,
+#endif
                 check_pair(1920, 1080, 1920, 1080, RGBA, 1280, 720, 1280, 720, RGBA, crop_zero_h, 0));
     unit_eq_int("crop negative origin rejected as ILLEGAL_PARAM", IM_STATUS_ILLEGAL_PARAM,
                 check_pair(1920, 1080, 1920, 1080, RGBA, 1280, 720, 1280, 720, RGBA, crop_negative, 0));
@@ -188,6 +197,7 @@ static void check_imcheck_matrix(void)
 
 static void check_resolution_limits(void)
 {
+#if RGA_API_REVISION_VERSION > 1 || RGA_API_MINOR_VERSION > 10 || RGA_API_MAJOR_VERSION > 1
     unit_begin("(b2) input/output resolution limits");
 
     /*
@@ -266,6 +276,9 @@ static void check_resolution_limits(void)
     unit_eq_int("hw_info_table RGA3 output height", 8128, rga3->output_resolution.height);
     unit_eq_int("hw_info_table RGA3 byte_stride", 16, (int)rga3->byte_stride);
     unit_eq_int("hw_info_table RGA3 scale_limit", 8, (int)rga3->scale_limit);
+#else
+    puts("NOT APPLICABLE: post-1.10.1 session/context and rectangular resolution API");
+#endif
 }
 
 /* ---------------------------------------------------------------- (c) ---- */
@@ -391,7 +404,11 @@ static void check_csc_defaults(void)
                 legacy_709_limit.status);
     unit_eq_hex("legacy IM_RGB_TO_YUV_BT709_LIMIT maps to the same mode",
                 (unsigned long)IM_RGB_TO_YUV_BT709_LIMIT, legacy_709_limit.yuv2rgb_mode);
+#if RGA_API_REVISION_VERSION > 1 || RGA_API_MINOR_VERSION > 10 || RGA_API_MAJOR_VERSION > 1
     unit_eq_int("legacy IM_RGB_TO_YUV_BT709_LIMIT loads a full-CSC matrix", 1,
+#else
+    unit_eq_int("1.10.1 legacy 709 selector uses no full-CSC matrix", 0,
+#endif
                 (int)legacy_709_limit.full_csc_flag);
 
     /*
