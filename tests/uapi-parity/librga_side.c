@@ -189,7 +189,7 @@ int main(void)
     EMIT_MEMBER("rga_req", struct rga_req, feature);
     EMIT_MEMBER("rga_req", struct rga_req, full_csc_clip);
     EMIT_MEMBER("rga_req", struct rga_req, rgba5551_alpha);
-    EMIT_MEMBER("rga_req", struct rga_req, gauss_config);
+    /* 1.10.1 reserves these bytes; it has no Gaussian API or member. */
     EMIT_MEMBER("rga_req", struct rga_req, reservr);
 
     /* ---- nested types reached through struct rga_req ---- */
@@ -249,9 +249,6 @@ int main(void)
     EMIT_MEMBER("rga_mosaic_info", rga_mosaic_info_t, enable);
     EMIT_MEMBER("rga_mosaic_info", rga_mosaic_info_t, mode);
 
-    EMIT_SIZE("rga_gauss_config", rga_gauss_config_t);
-    EMIT_MEMBER("rga_gauss_config", rga_gauss_config_t, size);
-    EMIT_MEMBER("rga_gauss_config", rga_gauss_config_t, coe_ptr);
 
     EMIT_SIZE("rga_osd_invert_factor", rga_osd_invert_factor_t);
     EMIT_MEMBER("rga_osd_invert_factor", rga_osd_invert_factor_t, alpha_max);

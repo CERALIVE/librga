@@ -75,6 +75,13 @@ TYPE_ALIASES = {
 #: librga never issues these, so its headers legitimately omit them --- but an
 #: island renumber is still ABI drift, so the numbers are asserted here.
 ISLAND_ONLY_EXPECTED = {
+    ("msize", "rga_gauss_config.coe_ptr"): (8, "post-1.10.1 Gaussian API"),
+    ("msize", "rga_gauss_config.size"): (4, "post-1.10.1 Gaussian API"),
+    ("msize", "rga_req.gauss_config"): (16, "post-1.10.1 Gaussian API"),
+    ("off", "rga_gauss_config.coe_ptr"): (8, "post-1.10.1 Gaussian API"),
+    ("off", "rga_gauss_config.size"): (0, "post-1.10.1 Gaussian API"),
+    ("off", "rga_req.gauss_config"): (464, "post-1.10.1 Gaussian API"),
+    ("size", "rga_gauss_config"): (16, "post-1.10.1 Gaussian API"),
     ("ioctl", "RGA_CACHE_FLUSH"): (
         0x501C,
         "legacy RGA1 cache-flush command; librga has no caller",
@@ -114,6 +121,8 @@ LIBRGA_ONLY_EXPECTED = {
 #: moves again. Adding to this table is a deliberate act that must come with a
 #: filed finding, never a convenience.
 DECLARED_DIVERGENCES = {
+    ("msize", "rga_req.reservr"): (24, 39, "1.10.1 predates Gaussian use of reserved bytes"),
+    ("off", "rga_req.reservr"): (480, 460, "1.10.1 predates Gaussian use of reserved bytes"),
     ("off", "rga_osd_info.last_flags0"): (
         40,
         44,

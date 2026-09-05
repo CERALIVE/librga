@@ -18,10 +18,10 @@ The ref is a published release tag, never a branch: a branch would move under th
 ## This run
 
 - Target ABI: **aarch64**
-- Emitters executed via: meson-exe-wrapper: /usr/bin/qemu-aarch64
+- Emitters executed via: native (aarch64)
 - ioctl values compared: **21**
-- struct sizes compared: **29**
-- member offsets compared: **170**
+- struct sizes compared: **28**
+- member offsets compared: **167**
 - Result: **PASS**
 
 ## ioctl numbers
@@ -66,7 +66,6 @@ Sizes are bytes at the target ABI. `sizeof(struct rga_req)` is the load-bearing 
 | `rga_fading_t` (librga `FADING`) | 4 | 4 |
 | `rga_feature` | 4 | 0 |
 | `rga_full_csc` (librga `full_csc_t`) | 40 | 4 |
-| `rga_gauss_config` (librga `rga_gauss_config_t`) | 16 | 2 |
 | `rga_hw_versions_t` | 144 | 2 |
 | `rga_img_info_t` | 56 | 17 |
 | `rga_interp` | 1 | 0 |
@@ -102,10 +101,12 @@ Real disagreements, recorded with both sides' current values. These are findings
 
 | Entry | island | librga | Why it is recorded |
 | --- | --- | --- | --- |
+| `msize rga_req.reservr` | 24 | 39 | 1.10.1 predates Gaussian use of reserved bytes |
 | `off rga_osd_info.cur_flags0` | 48 | 52 | island declares cur_flags0 before cur_flags1 inside the u64 union; librga declares them the other way round |
 | `off rga_osd_info.cur_flags1` | 52 | 48 | mirror of rga_osd_info.cur_flags0 |
 | `off rga_osd_info.last_flags0` | 40 | 44 | island declares last_flags0 before last_flags1 inside the u64 union; librga declares them the other way round, so on little-endian the two sides disagree about which half of last_flags each name addresses |
 | `off rga_osd_info.last_flags1` | 44 | 40 | mirror of rga_osd_info.last_flags0 |
+| `off rga_req.reservr` | 480 | 460 | 1.10.1 predates Gaussian use of reserved bytes |
 
 ## Symbols present on one side only
 
@@ -115,6 +116,13 @@ Real disagreements, recorded with both sides' current values. These are findings
 | `RGA_CACHE_FLUSH` | island | `0x501c` | legacy RGA1 cache-flush command; librga has no caller |
 | `RGA_IMPORT_DMA` | island | `0x601d` | legacy RGA2 dma import; librga uses RGA_IOC_IMPORT_BUFFER instead |
 | `RGA_RELEASE_DMA` | island | `0x601e` | legacy RGA2 dma release; librga uses RGA_IOC_RELEASE_BUFFER instead |
+| `rga_gauss_config.coe_ptr` | island | `0x8` | post-1.10.1 Gaussian API |
+| `rga_gauss_config.size` | island | `0x4` | post-1.10.1 Gaussian API |
+| `rga_req.gauss_config` | island | `0x10` | post-1.10.1 Gaussian API |
+| `rga_gauss_config.coe_ptr` | island | `0x8` | post-1.10.1 Gaussian API |
+| `rga_gauss_config.size` | island | `0x0` | post-1.10.1 Gaussian API |
+| `rga_req.gauss_config` | island | `0x1d0` | post-1.10.1 Gaussian API |
+| `rga_gauss_config` | island | `0x10` | post-1.10.1 Gaussian API |
 | `RGA2_BLIT_ASYNC` | librga | `0x6018` | legacy RGA2 blit command retained for pre-multi_rga drivers |
 | `RGA2_BLIT_SYNC` | librga | `0x6017` | legacy RGA2 blit command retained for pre-multi_rga drivers |
 | `RGA2_FLUSH` | librga | `0x6019` | legacy RGA2 flush command retained for pre-multi_rga drivers |
