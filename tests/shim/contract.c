@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+/* Modified by CeraLive 2026-09-05: report the QEMU-only invalid-fd ioctl limit. */
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
@@ -9,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "rga_ioctl.h"
+#include "qemu_ioctl_limit.h"
 
 #define CHECK(expr) do { if (!(expr)) { \
     fprintf(stderr, "shim contract line %d: %s (errno %d)\n", __LINE__, #expr, errno); \
@@ -79,7 +81,12 @@ int main(void)
     CHECK(!unsetenv("FAKE_RGA_DUMP") && !close(dump_fd) && !unlink(dump_path));
     CHECK(ioctl(fd, 0xdeadUL, NULL) == -1 && errno == ENOTTY);
     CHECK(!close(second));
-    CHECK(ioctl(second, RGA_IOC_GET_HW_VERSION, &hw) == -1 && errno == EBADF);
+    CHECK(fcntl(second, F_GETFD) == -1 && errno == EBADF);
+    int skipped = qemu_ioctl_limit(RGA_IOC_GET_HW_VERSION);
+    if (skipped)
+        puts("SKIP: closed-fd RGA errno assertion under QEMU user-mode (raw ioctl returns ENOTTY before fd validation)");
+    else
+        CHECK(ioctl(second, RGA_IOC_GET_HW_VERSION, &hw) == -1 && errno == EBADF);
     int dir = open(".", O_RDONLY | O_DIRECTORY);
     CHECK(dir >= 0);
     int plain = openat(dir, "forwarded", O_RDWR | O_CREAT | O_EXCL, 0600);
@@ -88,6 +95,7 @@ int main(void)
     CHECK(!close(plain) && !unlinkat(dir, "forwarded", 0) && !close(dir));
     CHECK(!close(fd));
     CHECK(getenv("PATH") != NULL);
-    puts("shim contract: PASS (forwarding, close, per-ioctl returns, faults, verbatim request + task capture)");
-    return 0;
+    puts(skipped ? "shim contract: remaining assertions PASS; closed-fd RGA errno SKIPPED"
+                 : "shim contract: PASS (forwarding, close, per-ioctl returns, faults, verbatim request + task capture)");
+    return skipped ? 77 : 0;
 }

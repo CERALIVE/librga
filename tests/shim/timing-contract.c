@@ -1,3 +1,4 @@
+/* Modified by CeraLive 2026-09-05: report the QEMU-only invalid-fd ioctl limit. */
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
@@ -6,6 +7,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "qemu_ioctl_limit.h"
 #define CHECK(x) do { if (!(x)) { fprintf(stderr,"timing check failed line %d\n",__LINE__); return 1; } } while (0)
 /* Emulate only fd-path discovery; the forwarding shim must reach libc's real ioctl. */
 ssize_t readlink(const char *path, char *buf, size_t size)
@@ -23,6 +25,10 @@ int main(void)
     *(void **)(&begin)=dlsym(RTLD_DEFAULT,"rga_timing_begin");
     *(void **)(&end)=dlsym(RTLD_DEFAULT,"rga_timing_end");
     CHECK(begin && end);
+    if (qemu_ioctl_limit(0x5017UL)) {
+        puts("SKIP: invalid-fd RGA timing case under QEMU user-mode (raw ioctl returns ENOTTY before fd validation)");
+        return 77;
+    }
     char path[]="/tmp/rga-timing-contract-XXXXXX";
     int fd=mkstemp(path); CHECK(fd>=0); close(fd);
     CHECK(setenv("RGA_TIMING_CSV",path,1)==0);
