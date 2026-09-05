@@ -130,6 +130,25 @@ jobs:
       - name: Build check (deps · contract · meson · test · package)
         run: bash ci/build-check-steps.sh
 
+      - name: Export unit-pure, unit-session, goldens and uapi-parity results
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          results = [json.loads(line) for line in Path('build/meson-logs/testlog.json').read_text().splitlines()]
+          Path('build/test-results.json').write_text(json.dumps([
+              {'name': row['name'].split(':')[-1], 'result': row['result']}
+              for row in results
+          ]))
+          PY
+
+      - name: Upload suite test results
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.suite }}
+          path: build/test-results.json
+          if-no-files-found: error
+
       # Enforced only on the TARGET leg, and the condition reads the declared
       # suite rather than a literal. The secondary leg builds against an OLDER
       # glibc by construction, so its imports say nothing about the device.
@@ -178,6 +197,41 @@ jobs:
             echo "- ABI floor gate: ${{ matrix.suite == needs.resolve-suite.outputs.suite && 'enforced' || 'not applicable (secondary suite)' }}"
             echo "- packaging: ${{ matrix.suite == needs.resolve-suite.outputs.suite && 'librga2-ceralive + librga-ceralive-dev built and contract-checked' || 'not applicable (secondary suite)' }}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  test-results:
+    name: ${{ matrix.group }} · ${{ matrix.suite }} results
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [bookworm, trixie]
+        group: [unit, goldens, uapi-parity]
+    steps:
+      - name: Download suite test results
+        uses: actions/download-artifact@v8
+        with:
+          name: test-results-${{ matrix.suite }}
+      - name: Require every test in the group to have run successfully
+        env:
+          GROUP: ${{ matrix.group }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          expected = {
+              'unit': {'unit-pure': 1, 'unit-session': 1},
+              'goldens': {'goldens': 8},
+              'uapi-parity': {'uapi-parity': 1, 'uapi-parity-stubs': 1},
+          }[os.environ['GROUP']]
+          results = json.loads(Path('test-results.json').read_text())
+          for name, count in expected.items():
+              rows = [row for row in results if row['name'] == name]
+              if len(rows) != count or any(row['result'] != 'OK' for row in rows):
+                  raise SystemExit(f'{name}: expected {count} OK results, got {rows}')
+              print(f'{name}: {count} OK')
+          PY
 
   analyzer:
     name: GCC -fanalyzer (advisory)
