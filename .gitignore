@@ -13,3 +13,9 @@ build_android_ndk/
 .DS_Store
 local_*
 *.cpp.*
+
+# packaging/build-deb.sh working directories and its output
+build-deb-*/
+install-deb-*/
+stage-deb-*/
+dist/
