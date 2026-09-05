@@ -51,6 +51,7 @@ Package contract, staged contract, and ABI floor checks passed.
    310, 311, 312, 319, 320, 343, 344. Both APIs support G6 and G8, so neither
    can be excluded. Uninitialized CSC padding is a known source-golden concern,
    but this measurement alone does not prove the cause of every differing byte.
+   A `pahole`/GCC debug-layout probe on this aarch64-compatible ABI reports `full_csc` at zero-based offset 308 with size 40 (covering offsets 308–347), with `dither_mode` at 306, one byte of padding at 307, and `in_fence_fd` at 348; therefore every reported byte offset 310, 311, 312, 319, 320, 343, and 344 is inside `full_csc`, not neighboring padding or another field (and the corresponding one-based `cmp` positions are likewise inside it).
    No byte masking, installed package changes, or actual RGA ioctl occurred.
 4. **Reproducibility: PASS at a fixed build path and epoch.** Two complete
    package builds at `/src`, `SOURCE_DATE_EPOCH=1788618000`, gave identical files:
