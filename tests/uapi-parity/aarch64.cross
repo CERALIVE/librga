@@ -1,0 +1,37 @@
+# Minimal aarch64 cross file for the UAPI parity gate.
+#
+# Struct layout is an ABI property, so parity has to be measured at the ABI the
+# device actually runs. An x86_64 build is allowed as a smoke test and the
+# generated doc labels it as one, but only this cross build proves anything
+# about RK3588.
+#
+# This file belongs to the parity gate alone. It is deliberately not shared with
+# any other cross build in the repository: it names only what two freestanding
+# table emitters need, and nothing about librga's own dependencies.
+#
+# The emitters are linked -static by the parity Meson fragment, so qemu-aarch64
+# needs no sysroot argument here. Meson's own configure-time sanity binary is
+# NOT static, though, so `meson setup` wants a sysroot: export
+# QEMU_LD_PREFIX=/usr/aarch64-linux-gnu (or wherever your cross libc lives)
+# before configuring. That stays an environment variable rather than an
+# exe_wrapper argument precisely so this file names no host-specific path.
+#
+# If you have no qemu, either point
+# LIBRGA_PARITY_RUNNER at your own runner or set LIBRGA_PARITY_BOARD=user@host
+# and compare.py will stage the emitters in /tmp/librga-parity/ on the board and
+# run them over ssh; in that case, drop the exe_wrapper line below so Meson does
+# not insist on finding qemu at configure time.
+
+[binaries]
+c = 'aarch64-linux-gnu-gcc'
+cpp = 'aarch64-linux-gnu-g++'
+ar = 'aarch64-linux-gnu-ar'
+strip = 'aarch64-linux-gnu-strip'
+pkg-config = 'pkg-config'
+exe_wrapper = 'qemu-aarch64'
+
+[host_machine]
+system = 'linux'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
