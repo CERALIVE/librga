@@ -1,0 +1,35 @@
+# Append verbatim to the root meson.build; no demo dependency.
+add_languages('c')
+golden_dl = meson.get_compiler('c').find_library('dl')
+golden_librga = static_library('rga-golden-host', librga_srcs,
+    include_directories : incdir,
+    dependencies : [libthreads_dep],
+    cpp_args : ['-w', '-ftrivial-auto-var-init=zero'],
+    install : false)
+fake_rga = shared_library('fake_rga', 'tests/shim/fake_rga.c',
+    include_directories : incdir,
+    dependencies : [libthreads_dep, golden_dl],
+    c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
+    install : false)
+golden_cases = executable('golden-cases', 'tests/golden/cases.c',
+    include_directories : incdir,
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
+    install : false)
+fake_rga_env = environment()
+fake_rga_env.set('LD_PRELOAD', fake_rga.full_path())
+golden_shell = find_program('sh')
+shim_contract = executable('shim-contract', 'tests/shim/contract.c',
+    include_directories : incdir,
+    dependencies : [golden_dl],
+    c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
+    install : false)
+test('shim-contract', shim_contract, env : fake_rga_env, depends : fake_rga)
+foreach golden_case : ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8']
+    test('goldens', golden_shell,
+        args : [files('tests/golden/run.sh'), golden_cases.full_path(),
+                fake_rga.full_path(), meson.current_source_dir() / 'tests/golden', golden_case],
+        depends : [fake_rga, golden_cases],
+        timeout : 30)
+endforeach
