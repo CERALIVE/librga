@@ -1,0 +1,7 @@
+-xc++
+-std=c++14
+-I../../include
+-I../../im2d_api
+-I../../im2d_api/src
+-I../../core
+-I../../core/hardware

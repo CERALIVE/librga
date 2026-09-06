@@ -74,6 +74,33 @@ Before reaching for the im2d API, read
 status-code surprises that this library's callers hit first, and most of them are
 silent.
 
+### Job and buffer-handle QA (H10)
+
+The host-only bookkeeping reproducer is available separately from the normal
+passing test suite:
+
+```bash
+bash tests/repro/run-h10.sh asan
+bash tests/repro/run-h10.sh tsan
+```
+
+Each command builds through the existing sanitizer recipe, checks its runtime
+canary, and runs unknown-job cancellation, concurrent config/end versus cancel,
+and repeated buffer release against the unchanged fake device. Serial lifecycle
+controls run first. Exit `1` means an observed finding, `2` means an invalid run,
+and `0` means no finding in that finite run. These are characterization runs, not
+expected-pass CI tests. They do not change the library or access a board.
+
+Fresh logs and request dumps go under `test-results/h10/`; the
+[H10 audit fragment](docs/fix-audit.d/h10.md) records the measured results and their
+limits. Race runs request 2000 iterations twice, but halt on the first sanitizer
+finding; an early report is not a completed 2000-iteration run. Reports keep raw
+module offsets (`symbolize=0`), because online symbolization stalled under the
+preloaded shim on the QA host. Resolve those offsets offline with `addr2line`
+against the matching build before rebuilding it. The shim models ioctl handling,
+not hardware or driver-side ownership, so a forwarded second release is not
+evidence of a kernel double-free.
+
 ## Credits
 
 This repository descends from Rockchip's `linux-rga` through JeffyCN's
@@ -247,4 +274,3 @@ $ ./meson.sh
   [RGA_FAQ【中文】](docs/Rockchip_FAQ_RGA_CN.md)
 
   [RGA_FAQ【英文】](docs/Rockchip_FAQ_RGA_EN.md)
-
