@@ -74,6 +74,12 @@ Before reaching for the im2d API, read
 status-code surprises that this library's callers hit first, and most of them are
 silent.
 
+The host-only H3 initialization-failure census is [EXISTS]: run
+`bash tests/repro/run-h3.sh` to build the unchanged shared library and measure
+1,000 calls per API/fault pair. Exit 1 means a reproduced leak, not a harness
+failure. Results, caveats and the shim fault mappings are recorded in
+[`docs/fix-audit.d/h3.md`](docs/fix-audit.d/h3.md).
+
 ## Credits
 
 This repository descends from Rockchip's `linux-rga` through JeffyCN's
@@ -247,4 +253,3 @@ $ ./meson.sh
   [RGA_FAQ【中文】](docs/Rockchip_FAQ_RGA_CN.md)
 
   [RGA_FAQ【英文】](docs/Rockchip_FAQ_RGA_EN.md)
-

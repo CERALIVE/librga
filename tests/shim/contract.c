@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Modified by CeraLive 2026-09-05: report the QEMU-only invalid-fd ioctl limit. */
+/* Modified by CeraLive 2026-09-05: check H3 aliases, unknown-core response and fd capacity. */
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
@@ -64,6 +65,28 @@ int main(void)
     CHECK(!setenv("FAKE_RGA_RET_RGA_IOC_GET_DRVIER_VERSION", "0", 1));
     CHECK(ioctl(fd, RGA_IOC_GET_DRVIER_VERSION, &v) == 0 && v.revision == 11);
     CHECK(!unsetenv("FAKE_RGA_RET_RGA_IOC_GET_DRVIER_VERSION"));
+    CHECK(!setenv("FAKE_RGA_FAIL", "hwversion", 1));
+    struct rga_hw_versions_t saved_hw = hw;
+    CHECK(ioctl(fd, RGA_IOC_GET_HW_VERSION, &hw) == -1 && errno == EINVAL);
+    CHECK(!memcmp(&saved_hw, &hw, sizeof(hw)));
+    CHECK(ioctl(fd, RGA_IOC_GET_DRVIER_VERSION, &v) == 1);
+    CHECK(!setenv("FAKE_RGA_FAIL", "driverversion", 1));
+    CHECK(ioctl(fd, RGA_IOC_GET_DRVIER_VERSION, &v) == -1 && errno == EINVAL);
+    CHECK(ioctl(fd, RGA2_GET_VERSION, legacy) == 1);
+    CHECK(ioctl(fd, RGA_IOC_GET_HW_VERSION, &hw) == 1);
+    CHECK(!setenv("FAKE_RGA_FAIL", "getinfo", 1));
+    CHECK(ioctl(fd, RGA_IOC_GET_DRVIER_VERSION, &v) == 1);
+    CHECK(ioctl(fd, RGA_IOC_GET_HW_VERSION, &hw) == 1);
+    CHECK(hw.size == 1 && hw.version[0].major == 99 &&
+          hw.version[0].minor == 0 && hw.version[0].revision == 0 &&
+          !strcmp((char *)hw.version[0].str, "99.0.0"));
+    CHECK(!unsetenv("FAKE_RGA_FAIL"));
+    CHECK(ioctl(fd, RGA_IOC_GET_HW_VERSION, &hw) == 1 && hw.size == 3);
+    int census_fds[1000];
+    for (size_t i = 0; i < sizeof(census_fds) / sizeof(census_fds[0]); ++i)
+        CHECK((census_fds[i] = open("/dev/rga", O_RDWR | O_CLOEXEC)) >= 0);
+    for (size_t i = 0; i < sizeof(census_fds) / sizeof(census_fds[0]); ++i)
+        CHECK(!close(census_fds[i]));
     char dump_path[] = "shim-bytes-XXXXXX";
     int dump_fd = mkstemp(dump_path);
     CHECK(dump_fd >= 0 && !setenv("FAKE_RGA_DUMP", dump_path, 1));

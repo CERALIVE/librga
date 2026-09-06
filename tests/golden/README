@@ -87,7 +87,7 @@ LD_PRELOAD=/absolute/path/libfake_rga.so enables interposition. open/openat and
 their glibc open64/openat64 aliases fake ONLY the literal path /dev/rga with a
 memfd; all other paths, modes and directory fds are forwarded through RTLD_NEXT.
 close removes fake-fd tracking. Non-fake ioctls go to RTLD_NEXT. Unknown ioctls
-on a fake fd return -1/ENOTTY, never reach hardware. Capacity is 256 concurrently
+on a fake fd return -1/ENOTTY, never reach hardware. Capacity is 4096 concurrently
 open fake device fds. This host shim is not intended for 32-bit large-file ABIs,
 device-fd duplication, or fork-shared driver state.
 
@@ -118,6 +118,14 @@ FAKE_RGA_FAIL=<IOCTL>
     Exact full symbolic name, e.g. RGA_IOC_GET_DRVIER_VERSION (the UAPI's
     DRVIER spelling is intentional). Matching calls return -1, take precedence
     over RET overrides, and skip output writes. Persistent, not one-shot.
+
+    H3 aliases: hwversion = RGA_IOC_GET_HW_VERSION;
+    driverversion = RGA_IOC_GET_DRVIER_VERSION (legacy version fallback remains
+    successful). getinfo is NOT an ioctl failure: the HW_VERSION ioctl succeeds
+    with one unsupported core, 99.0.0, to fail the userspace rga_get_info lookup.
+    Negative RET overrides still take precedence over that response injection.
+    Defaults and existing full-name failures are unchanged. See
+    docs/fix-audit.d/h3.md and bash tests/repro/run-h3.sh for the fd census.
 
 FAKE_RGA_ERRNO=<integer>
     errno for FAIL or a negative RET override; default EIO (5). Use numeric
