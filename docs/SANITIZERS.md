@@ -157,6 +157,56 @@ Until a `concurrency` test exists the TSan leg runs the canary and **says** that
 zero concurrency tests ran. A green leg that executed nothing is the failure mode
 this job was rebuilt to remove.
 
+### H2 concurrent teardown probe
+
+`tests/repro/h2_teardown_race.cpp` [EXISTS] is a manual characterization probe,
+not a registered passing Meson test. It links the recipe's shared library, not
+the zero-initialized golden-test library. Run both sanitizer legs independently
+(a finding exits 1, so do not chain the two driver commands with `&&`):
+
+```sh
+bash scripts/build-sanitized.sh asan
+bash tests/repro/run-h2.sh asan 200
+bash scripts/build-sanitized.sh tsan
+bash tests/repro/run-h2.sh tsan 200
+```
+
+Each driver invocation checks the existing sanitizer canary under the same mock
+preload, then starts 200 fresh processes for **each** of `deinit` and `exit`.
+The binary refuses to initialize the library without `fake_rga_active`. It uses
+64×64 RGBA memfd buffers, warms the singleton before starting the two threads,
+and waits for 32 successful worker blits before thread B's 1 ms delay. Thread A
+continues calling `c_RkRgaBlit` during thread B's action. In `deinit`, B calls the
+real `RgaDeInit(void **)` once, then stops A; a clean completion requires a null
+context and a closed device fd. In `exit`, B calls `exit(0)` without stopping A.
+
+Two source traps are deliberately avoided: the public `RgaDeInit` macro calls an
+empty compatibility function, and an additional `RgaInit` would retain a second
+reference so one deinit would not free the context. The test borrows the
+singleton's context instead. It neither deletes the singleton nor installs an
+artificial exit handler. On this Linux implementation the singleton itself is
+not automatically deleted; its static mutex does have exit-time destruction.
+
+Results, canary output, binary hashes and every process's stderr/stdout plus mock
+ioctl log are retained under `test-results/h2/<sanitizer>/run.*/`. Nothing is
+overwritten between invocations. Exit codes are 0 for no finding, 1 for a
+sanitizer report or other runtime failure, and 2 for an invalid run. A missing
+action marker or fewer than 33 successful mock blit ioctls (warmup plus worker)
+cannot count as clean. The parent bounds every child to 10 seconds.
+
+TSan uses `halt_on_error=1:exitcode=66:symbolize=0`. An initial online-symbolized
+batch stalled in some processes; the complete batch with offline symbolization
+had no timeouts. This does not diagnose the stalls' root cause. Detection remains
+enabled with no suppressions, and raw module offsets are retained for
+`addr2line -a -C -f -i -e build-tsan/librga.so.2.1.0 <offset>`. ASan/UBSan retain
+the CI recipe's leak detection and fail-fast settings. Canaries are excluded from
+the scenario counts.
+
+The measured 2026-09-06 results are in [`fix-audit.d/h2.md`](fix-audit.d/h2.md),
+with representative diagnostics and offline symbol mappings attached in
+[`repro/h2-sanitizers.txt`](repro/h2-sanitizers.txt). These are x86_64 host-shim
+observations, not a fix, a two-run GREEN claim, or hardware acceptance.
+
 ## The analyzer
 
 `scripts/run-analyzer.sh` writes the raw compiler output to
