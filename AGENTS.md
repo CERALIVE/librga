@@ -167,6 +167,11 @@ contracts a new reproducer registers itself through are in
 [`docs/SANITIZERS.md`](docs/SANITIZERS.md). Every `-Wanalyzer-*` finding carries a
 disposition in [`docs/ANALYZER-TRIAGE.md`](docs/ANALYZER-TRIAGE.md).
 
+The manual H2 teardown probe [EXISTS] is `tests/repro/run-h2.sh`: 200 fresh
+processes per scenario and sanitizer, with its six-field ledger fragment in
+`docs/fix-audit.d/h2.md`. Invocation and diagnostic-output settings are documented
+in [`docs/SANITIZERS.md`](docs/SANITIZERS.md#h2-concurrent-teardown-probe).
+
 ### The suite proves
 
 - That the request bytes this library writes for the CeraLive call set are

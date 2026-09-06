@@ -1,0 +1,160 @@
+H2 teardown QA — 2026-09-06, Linux x86_64, GCC 16.2.1 20260810
+
+Execution base: 96c9a53ba94c487f9fae938c73347f5bc00e624d
+Library source: 57a1067a246c71fa6c9a355d1668884fda155dd5, unchanged
+Mock device: tests/shim/fake_rga.c, unchanged; no real hardware
+
+Commands actually run:
+  bash scripts/build-sanitized.sh asan
+  bash scripts/build-sanitized.sh tsan
+  bash tests/repro/run-h2.sh asan 200
+  bash tests/repro/run-h2.sh tsan 200
+
+Complete-batch results (canaries excluded):
+mode,scenario,iterations,clean,sanitizer,other_failure,invalid
+asan,deinit,200,44,156,0,0
+asan,exit,200,200,0,0,0
+tsan,deinit,200,0,200,0,0
+tsan,exit,200,0,200,0,0
+
+The asan recipe enables BOTH address and undefined sanitizers. Its 156 deinit
+reports are UBSan null-context accesses, not ASan heap-use-after-free reports.
+The exit scenario was clean under ASan/UBSan, but not under TSan. No library
+fix, GREEN rerun, board result, ABI check, or independent-review claim is made.
+
+Full raw files and per-process result CSVs:
+  test-results/h2/asan/run.YGzimL/   started 2026-09-06T18:17:01Z
+  test-results/h2/tsan/run.a6eMUN/   started 2026-09-06T18:22:02Z
+Each directory includes environment.txt, compile.log, canary.log, results.csv,
+summary.csv, and a .log plus .shim.log for each scenario/iteration.
+
+Initial TSan attempt: test-results/h2/tsan/run.7p1lCF/, interrupted by the outer
+120-second command timeout, not included in the complete-batch counts. Some
+children timed out after the action marker without a diagnostic, while others
+reported the rgaCtx race with online symbolization. The final batch changed only
+the TSan output setting to symbolize=0; all 400 processes then emitted reports
+without a timeout. The initial stalls' root cause is not established here.
+The two bounded diagnostic probes are retained as
+test-results/h2/tsan-nosymbol-{deinit,exit}.{log,shim.log}.
+
+Runtime settings:
+  ASAN_OPTIONS=detect_leaks=1:verify_asan_link_order=0:abort_on_error=1
+  UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+  TSAN_OPTIONS=halt_on_error=1:exitcode=66:symbolize=0
+  LD_PRELOAD=<matching build tree>/libfake_rga.so
+Canaries passed the interception checks: ASan heap overflow plus UBSan signed
+overflow (canary exit 134), TSan deliberate data race (canary exit 66). Only the
+ASan canary uses UBSAN halt_on_error=0 so that both runtimes can report.
+
+SHA-256 of the tested shared libraries:
+  ASan librga: a75dea0cf27b4f422e4057b16f49e49a5487aa61e7d715d970036f6df6ea3c9e
+  ASan shim:   d3af8d206e36e7cd6d34f00c7b39406fef78fd72f406475aa80651c5a0a4873c
+  TSan librga: 6cdf536fe1c1a6f6ec394bafc42ed989698c13e2a333d54295dac5390cff27f4
+  TSan shim:   29e38f7821e0c34982db22a2e3c50343c405880453565b602c7220b29b9352ce
+
+Representative diagnostic excerpts follow. Frames not shown are marked [...].
+Only the absolute checkout prefix is removed; raw logs retain original paths.
+
+=== ASan/UBSan deinit: run.YGzimL/deinit-2.log ===
+H2 action=deinit successful_blits=320
+../core/NormalRga.cpp:1494:17: runtime error: member access within null pointer of type 'struct rgaContext'
+    #0 0x7fada7103da9 in RgaBlit(rga_info*, rga_info*, rga_info*) ../core/NormalRga.cpp:1494
+    #1 0x7fada7111d89 in RockchipRga::RkRgaBlit(rga_info*, rga_info*, rga_info*) ../core/RockchipRga.cpp:278
+    #2 0x7fada711346c in c_RkRgaBlit ../core/RgaApi.cpp:42
+    #3 0x55bce5af39c1 in operator() tests/repro/h2_teardown_race.cpp:73
+[...]
+
+=== TSan deinit: run.a6eMUN/deinit-1.log ===
+H2 action=deinit successful_blits=279
+==================
+WARNING: ThreadSanitizer: data race (pid=228962)
+  Write of size 8 at 0x7f62fa6db390 by thread T2:
+    #0 <null> <null> (librga.so.2+0x22197) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #1 <null> <null> (librga.so.2+0x222f7) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #2 <null> <null> (h2-teardown-race+0x2c0b) (BuildId: 6e3d0f2959acb28d7b09bf532785ea784ab21118)
+[...]
+  Previous read of size 8 at 0x7f62fa6db390 by thread T1:
+    #0 <null> <null> (librga.so.2+0x2236e) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #1 <null> <null> (librga.so.2+0x2df9e) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #2 <null> <null> (librga.so.2+0x2e971) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #3 <null> <null> (h2-teardown-race+0x25ec) (BuildId: 6e3d0f2959acb28d7b09bf532785ea784ab21118)
+[...]
+SUMMARY: ThreadSanitizer: data race (build-tsan/librga.so.2+0x22197) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+==================
+
+=== TSan exit: run.a6eMUN/exit-2.log ===
+H2 action=exit successful_blits=182
+==================
+WARNING: ThreadSanitizer: use of an invalid mutex (e.g. uninitialized or destroyed) (pid=231121)
+    #0 <null> <null> (libtsan.so.2+0x64f3f) (BuildId: 9e28e7e410124a7cba1cf885d44991c1982f860d)
+    #1 <null> <null> (librga.so.2+0x2e67e) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #2 <null> <null> (librga.so.2+0x2e530) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #3 <null> <null> (librga.so.2+0x2e6fc) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #4 <null> <null> (librga.so.2+0x2ecac) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #5 <null> <null> (librga.so.2+0x2e955) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+[...]
+  Mutex M0 (0x7fb0e9c953a0) created at:
+    [failed to restore the stack]
+SUMMARY: ThreadSanitizer: use of an invalid mutex (e.g. uninitialized or destroyed) (build-tsan/librga.so.2+0x2e67e) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+==================
+
+=== TSan exit, destruction/use pair: run.a6eMUN/exit-5.log ===
+H2 action=exit successful_blits=125
+==================
+WARNING: ThreadSanitizer: data race (pid=231153)
+  Write of size 1 at 0x7f78af5ff3a0 by thread T2:
+    #0 <null> <null> (libtsan.so.2+0x64d76) (BuildId: 9e28e7e410124a7cba1cf885d44991c1982f860d)
+    #1 <null> <null> (librga.so.2+0x2e651) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #2 <null> <null> (libtsan.so.2+0x50c20) (BuildId: 9e28e7e410124a7cba1cf885d44991c1982f860d)
+    #3 <null> <null> (librga.so.2+0x2e4b1) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+[...]
+  Previous atomic read of size 1 at 0x7f78af5ff3a0 by thread T1:
+    #0 <null> <null> (libtsan.so.2+0x64f3f) (BuildId: 9e28e7e410124a7cba1cf885d44991c1982f860d)
+    #1 <null> <null> (librga.so.2+0x2e67e) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #2 <null> <null> (librga.so.2+0x2e530) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #3 <null> <null> (librga.so.2+0x2e6fc) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #4 <null> <null> (librga.so.2+0x2ecac) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #5 <null> <null> (librga.so.2+0x2e955) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+[...]
+SUMMARY: ThreadSanitizer: data race (build-tsan/librga.so.2+0x2e651) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+==================
+
+=== TSan exit, alternate warning: run.a6eMUN/exit-1.log ===
+H2 action=exit successful_blits=212
+WARNING: ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread) (pid=231112)
+    #0 <null> <null> (libtsan.so.2+0x654cf) (BuildId: 9e28e7e410124a7cba1cf885d44991c1982f860d)
+    #1 <null> <null> (librga.so.2+0x2e6b3) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #2 <null> <null> (librga.so.2+0x2e584) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+    #3 <null> <null> (librga.so.2+0x2e783) (BuildId: bd77722c16fa04ae1aa8350d28b5a610e8cf1221)
+[...]
+
+=== Offline symbol mappings, resolved against the SAME binaries ===
+Command: addr2line -a -C -f -i -e build-tsan/librga.so.2.1.0 <offsets below>
+Module offsets -> function -> checkout-relative source line:
+0x22197 NormalRgaClose(void**)                            core/NormalRga.cpp:203
+0x222f7 RgaDeInit(void**)                                 core/NormalRga.cpp:229
+0x2236e RgaBlit(rga_info*, rga_info*, rga_info*)           core/NormalRga.cpp:375
+0x2df9e RockchipRga::RkRgaBlit(rga_info*, rga_info*, rga_info*) core/RockchipRga.cpp:278
+0x2e971 c_RkRgaBlit                                      core/RgaApi.cpp:42
+0x2e651 Mutex::~Mutex()                                  include/RgaMutex.h:161
+0x2e4b1 __static_initialization_and_destruction_0()       core/RockchipRga.cpp:96 (discriminator 1)
+0x2e67e Mutex::lock()                                    include/RgaMutex.h:164
+0x2e530 Mutex::Autolock::Autolock(Mutex&)                 include/RgaMutex.h:116
+0x2e6fc Singleton<RockchipRga>::getInstance()             include/RgaSingleton.h:34
+0x2e6b3 Mutex::unlock()                                  include/RgaMutex.h:167
+0x2e584 Mutex::Autolock::~Autolock()                      include/RgaMutex.h:122
+0x2e783 Singleton<RockchipRga>::getInstance()             include/RgaSingleton.h:41
+0x2ecac RockchipRga::get()                               include/RockchipRga.h:55
+0x2e955 c_RkRgaBlit                                      core/RgaApi.cpp:40
+
+Command: addr2line -a -C -f -i -e /usr/lib/libtsan.so.2 0x64d76 0x64f3f 0x654cf
+0x64d76 ___interceptor_pthread_mutex_destroy              ??:?
+0x64f3f ___interceptor_pthread_mutex_lock                 ??:?
+0x654cf ___interceptor_pthread_mutex_unlock               ??:?
+
+The exit-time write resolves to the static mutex destructor, not to
+RockchipRga::~RockchipRga(). RgaSingleton.h:33-40 allocates the singleton with
+new; :63-67 defines a static mutex and a raw singleton pointer, with no owner
+that deletes the pointed-to object. The normal-exit scenario was not altered
+to force deletion. Joining the worker before shutdown is outside this probe's
+deliberately concurrent workload.
