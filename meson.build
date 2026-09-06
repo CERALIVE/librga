@@ -293,6 +293,10 @@ unit_session_env = environment()
 unit_session_env.set('LD_PRELOAD', fake_rga.full_path())
 unit_session_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'unit-session-interposed.log')
 test('unit-session', unit_session, env : unit_session_env, depends : fake_rga, timeout : 30)
+
+# Modified by CeraLive 2026-09-06: gate evidence assembly alongside the host tests.
+test('wire-bootstrap', find_program('bash'),
+    args : [meson.current_source_dir() / 'tests/test-wire-bootstrap.sh'], timeout : 30)
 # >>> fragment: board.build
 add_languages('c')
 board_cc = meson.get_compiler('c')

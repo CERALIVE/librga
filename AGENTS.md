@@ -75,6 +75,13 @@ history those tiers exist to keep. The same rule covers upstream-sync PRs: a
 squash discards the second parent, the merge-base stops advancing, and every
 later sync replays already-merged commits as phantom conflicts.
 
+`integration/1.10.5-ceralive.1` is integrated by **merge, never rebase**. It carries
+eight two-parent Wave-D investigation merges; rebasing linearizes that history
+and replays conflicts in `tests/shim/contract.c` and `tests/shim/fake_rga.c` that
+were already resolved by union. Do not apply the generic pre-work rebase rule to
+this branch. The fix-audit structural repair is authorized directly on
+`0011d44f074508dd5d8533a77496a593211b9e85`, without any pre-work branch sync.
+
 No commit in this repository may carry a `Co-authored-by:` trailer or any AI or
 tool attribution. Such trailers are **forbidden**. A clean cherry-pick's
 preserved upstream Author field and its `-x` provenance line are not trailers;
@@ -147,7 +154,17 @@ Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS]
 It preserves the shared-library alias before the static-library reassignment and
 appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
 after editing a fragment; a second invocation changes nothing. It also assembles
-the fix-audit rows from `docs/fix-audit.d/*.md` beneath the existing six-field schema.
+`docs/fix-audit.d/*.md` into one continuous six-field D21 table in
+`docs/fix-audit.md`, with verbatim supporting prose in fragment-labelled appendices.
+Fragments may begin with bare D21 rows or introduce them with the canonical D21
+header. Duplicate ledger headers/separators are omitted from the generated file;
+the source fragments remain unchanged. Subsidiary tables, fenced transcripts and
+comments stay with the prose, not in the ledger. Malformed D21 rows fail assembly
+without overwriting the ledger. Edit evidence in the fragments, then regenerate;
+do not hand-edit the generated table or appendices. The introduction still records
+characterization of the unchanged upstream base, not landed library fixes.
+`bash tests/test-wire-bootstrap.sh` checks preservation, structure and idempotency
+in an isolated repo-local fixture; it also runs as the Meson `wire-bootstrap` test.
 
 Two environments, and they prove different things. Keeping them apart is the
 point of this section.
