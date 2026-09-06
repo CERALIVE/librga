@@ -156,6 +156,16 @@ QEMU user-mode has a measured invalid-fd RGA ioctl limitation, not a shim bug.
 The two narrowly scoped, opt-in emulation skips and native mandatory coverage
 are documented in [`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md).
 
+H6 fence ownership reproduction [EXISTS] runs separately from the green baseline
+suite: `bash tests/repro/run-h6.sh` builds the unchanged shared library and runs
+200 iterations each of C2/C3/C4, with controls and fd census under
+`test-results/h6/`. Exit 1 records RED, not a harness success hidden as a green
+test. H6a is WITHDRAWN because no real positive-success submit path exists on
+the island. The test-only fence/poll knobs are documented in
+[`tests/golden/README`](tests/golden/README); the findings are in
+[`docs/fix-audit.d/h6.md`](docs/fix-audit.d/h6.md). No hardware or sanitizer
+coverage is claimed by this reproducer.
+
 | Environment | What runs there |
 |---|---|
 | **Host shim** | Island-UAPI parity gate (struct sizes, member offsets, ioctl numbers against the island's pinned `rga.h`), request-byte goldens, hardware-independent unit tests, TSan/ASan/UBSan legs, GCC-14 `-fanalyzer`, `nm` containment and `abidiff`. |
