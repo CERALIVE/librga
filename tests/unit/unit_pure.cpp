@@ -229,5 +229,10 @@ int main(void)
     check_version_predicates();
     check_rga_set_rect();
 
+    /* Deliberately failing check. Proves the CI summary job reports RED when a
+     * `meson test` unit assertion fails. Never merged. */
+    unit_begin("non-vacuity probe");
+    unit_eq_int("the summary job must go red on a failing unit assertion", 1, 2);
+
     return unit_report("unit-pure");
 }
