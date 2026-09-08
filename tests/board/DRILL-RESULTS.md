@@ -421,3 +421,35 @@ finding in [R0-NEUTRALITY.md](../../docs/R0-NEUTRALITY.md). The original `.1`
 R4 silence remains historical evidence, not retroactively green. **Do not merge
 or release R0 on this rerun.** Independent review and release authorization are
 separate; no merge, approval, release dispatch, or release-branch update was made.
+
+---
+
+## R6 duration correction — Orange Pi 5+ — 2026-09-08
+
+This is the genuine one-hour R6 rerun requested to close the harness defect. It
+used the fixed aarch64 `rga-convert-bench` from this worktree and the R0 runtime
+artifact from successful Build Check run **34232406507**, head
+`386f40c32e469c6a218190e96f6ed11ab5bebd7e`.
+
+- **Board:** Orange Pi 5+, idle before the run; kernel `7.2.0-ceralive-rk3588`.
+- **Driver:** `1.3.11`; island tag remains unverified.
+- **Candidate package SHA-256:**
+  `a1774e08cefa7a77847f9bcc9e5d7fcbf9f45c4b88801f07bd59748383a076b2`.
+- **Soak:** 14:20:31Z–15:20:31Z, **3600 seconds elapsed**; fixed bench
+  deadline `3600e6`, with the `3605` second outer timeout available.
+- **Workload:** 4K `NV16 → NV12`, `3840×2160`, one `rga-convert-bench`
+  process, `48227` successful iterations.
+- **Failures:** zero conversion failures and zero oracle failures; R6 exit `0`.
+- **Bench fd census:** `before=5 after=5`.
+- **Live fd monitor:** 58 one-minute samples during the active soak, all at
+  **6** descriptors for the bench process (the two post-exit probes are excluded).
+  No growth or transient increase was observed.
+- **Restoration:** EXIT rollback exit `0`; Radxa `librga2 2.2.0-1` restored,
+  candidate absent, restored library SHA-256
+  `0b455344259c37fec821955e2de85bb5f76a34e69682217b514c407d8a35c6c3`.
+
+### R6 verdict
+
+**PASS for the R6 one-hour soak requirement.** The overall G-A verdict remains
+**FAIL / release BLOCKED** solely because the separately tracked R5 rotation row
+still fails; R5 was not changed or re-run as part of this correction.

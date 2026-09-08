@@ -114,7 +114,7 @@ installed, never the development package or the locally built library.
 The script checks reachability separately from the kernel/driver precondition,
 holds lib.sh's lock and marker, verifies staged hashes, and registers the proven
 Radxa rollback before apt installation. Every SSH/SCP call is timeout-bounded;
-the soak runs a single process with a 295-second deadline and a 299-second outer
+the soak runs a single process with a 3600-second deadline and a 3605-second outer
 timeout. The fd census remains strict: any increase fails, even if pixels agree.
 `--routing --core 1|2|4` submits 1,000 exact 128x64 NV12 copies using `imconfig`;
 `--soak` exercises 4K NV16→NV12; `--improcess-only` excludes legacy pixel rows.
