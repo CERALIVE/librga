@@ -189,7 +189,7 @@ int main(int argc, char **argv)
     puts("cell,api,iteration,mean_total_us,psnr_db");
     if (session_selftest) { void *context=NULL; c_RkRgaGetContext(&context); rc=context==NULL; }
     else if (routing) { const struct cell c={"routing-copy",128,64,128,64,RK_FORMAT_YCbCr_420_SP,0,0,0}; rc=run_cell(&c,1000,0,filter,INFINITY); }
-    else if (soak) { const struct cell c={"soak-4k-nv16",3840,2160,3840,2160,RK_FORMAT_YCbCr_422_SP,0,0,0}; deadline=now_us()+295e6; rc=run_cell(&c,iterations,0,filter,minimum); }
+    else if (soak) { const struct cell c={"soak-4k-nv16",3840,2160,3840,2160,RK_FORMAT_YCbCr_422_SP,0,0,0}; deadline=now_us()+3600e6; rc=run_cell(&c,iterations,0,filter,minimum); }
     else if (selftest) { const struct cell c={"copy-selftest",64,64,64,64,RK_FORMAT_YCbCr_420_SP,0,0,0}; rc=run_cell(&c,1,0,filter,minimum); }
     else {
         for (size_t i=0;i<sizeof cells/sizeof cells[0];i++) for (int api=0;api<(imonly ? 1 : 2);api++) rc|=run_cell(&cells[i],iterations,api,filter,minimum);
