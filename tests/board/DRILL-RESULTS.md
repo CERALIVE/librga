@@ -167,3 +167,257 @@ G-A additionally proves nothing about `rgaconvert`, `rgacompositor`, or
 canonical gstreamer-rockchip main's nine-factory set. Every pixel row here uses
 this fork's DMA-BUF improcess harness and independent software oracle. TSan,
 ASan, and UBSan are host-shim-only, never claimed as board coverage.
+
+---
+
+## G-A rerun — 2026-09-08: FAIL, release remains BLOCKED
+
+This is a fresh package-level run on **both** boards, not a reclassification of
+the September 5 evidence. Rock's driver precondition now passes. The corrected
+fd census and cross-release conversion-log assertion pass on both boards.
+**R5 still fails on both: NV12 rotate-90 returns `EINVAL` with both the
+same-session Radxa baseline and the candidate.** Both full script invocations
+exit 1, and both EXIT rollbacks and final functional checks succeed.
+
+There is also an explicit procedure gap: the written G-A requirement calls for
+a **one-hour R6 soak**, whereas this branch's unmodified `--soak` implementation
+sets a **295-second deadline**, with a 299-second outer timeout in the script.
+The bounded runs below pass, but **the one-hour R6 requirement is NOT MET**.
+Neither a short run nor a baseline-identical rotation failure is waived here.
+
+### Fresh artifact identity and method
+
+- PR: <https://github.com/CERALIVE/librga/pull/2>, still OPEN; target
+  `release/1.10.1`, head `integration/1.10.1-ceralive.1`.
+- Latest green Build Check at download:
+  <https://github.com/CERALIVE/librga/actions/runs/34224662759>, head
+  `33f774c177da0ccca7fcc5b77eba1d87f27c8f28`. This contains both harness fixes
+  (`772f9ec`, `2f6033e`) and their investigation record (`33f774c`).
+- Downloaded with `gh run download 34224662759 --repo CERALIVE/librga
+  --name dist --dir test-results/todo42/dist`; artifact ID `10055193621`.
+- `dpkg-deb -f` verifies runtime `librga2-ceralive`, development
+  `librga-ceralive-dev`, both version `1.10.1+ceralive.1`, architecture `arm64`.
+  The development package was downloaded and hashed, **not installed**.
+- No R0 release exists at this measurement (`gh release view
+  '1.10.1+ceralive.1' --repo CERALIVE/librga`: `release not found`). These are
+  PR CI artifacts, not release assets or locally rebuilt replacements.
+
+| Artifact | SHA-256 |
+|---|---|
+| Runtime CI `.deb` | `a1774e08cefa7a77847f9bcc9e5d7fcbf9f45c4b88801f07bd59748383a076b2` |
+| Development CI `.deb` | `b0eba393b056b68f6bca346c4d6e18edcd91cd44066e5a69630435752bed6e11` |
+| Extracted runtime `librga.so.2.1.0` | `b5de45ca349b96317f119a42846546b5fc9b448a262878daab0d320b9cde319f` |
+| Pinned Radxa rollback `.deb` | `ca4f18666f6c5d5290c7e41e5901350ecf76530f24364e37b81fa6be4ab5f344` |
+| Restored Radxa library, both boards | `0b455344259c37fec821955e2de85bb5f76a34e69682217b514c407d8a35c6c3` |
+| Corrected `rga-convert-bench` | `602b3e0e739ba1e802b0b15b93b06e2de7f78966c9fef9cdef4144503b0d4449` |
+| Fork `probe-version` | `41e58b7b5a8231b537fd4328ddf3843bd9abd96f8a65c199aba144a56c3fe94d` |
+
+The harness was compiled/checked in `librga-trixie-arm64:latest`, GCC 14.2,
+against this branch. Only the two aarch64 executables were staged in
+`/tmp/librga-g-a`; **no shared library** was staged there. The final directory
+inventory and `ldd` confirm resolution through the installed system SONAME.
+No `LD_LIBRARY_PATH` or shim substitution was used for the board rows.
+
+Rock's first board operation was its fresh kernel/module/device/probe precheck.
+The rollback archive from [ROLLBACK.md](../../docs/ROLLBACK.md) was then staged
+and SHA-verified on **both boards before either candidate installation**:
+Rock at 13:08:46Z, Orange Pi at 13:08:48Z. Each run additionally re-staged and
+verified both archives under its own lock. The outer board harness enforced
+idle state and exclusive ownership; `lib.sh` held its separate descriptor lock
+and marker throughout G-A and executed the registered cleanup stack.
+
+The unmodified invocation, with credentials supplied only through environment:
+
+```sh
+CERALIVE_BOARD_TEST=1 PR_RUN_ID=34224662759 \
+R0_DEB="$PWD/test-results/todo42/dist/librga2-ceralive_1.10.1+ceralive.1_arm64.deb" \
+RADXA_DEB="$PWD/test-results/todo42/librga2_2.2.0-1_arm64.deb" \
+HARNESS_DIR="$PWD/build" RESULT_DIR="$PWD/build/g-a-todo42-<board>" \
+bash tests/board/g-a-neutrality.sh
+```
+
+The script registers `restore` before the first apt install. Forward install
+uses `apt-get install --yes /tmp/librga2-ceralive_1.10.1+ceralive.1_arm64.deb`;
+EXIT uses `apt-get install --yes --allow-downgrades
+/tmp/librga2_2.2.0-1_arm64.deb`. No bare `dpkg -i`, kernel/module configuration,
+service restart, boot-slot operation, or healthcheck-marker operation occurred.
+The outer lock stayed held for the fresh-process post-restore selftest.
+
+### Rock 5B+ — fresh R0 run
+
+- **Package SHA-256:** `a1774e08cefa7a77847f9bcc9e5d7fcbf9f45c4b88801f07bd59748383a076b2`.
+- **Kernel:** `7.2.0-ceralive-rk3588 #ceralive1 SMP PREEMPT @1788765300`.
+- **Island tag:** installed tag **UNVERIFIED**; `v2026.9.2` remains only the
+  harness's pinned UAPI reference. Driver `1.3.11` is measured, not inferred.
+- **Run:** 13:09:49Z–13:15:03Z, followed by successful final functional check.
+- **Precondition PASS:** at 13:07:29Z `rga_multicore 208896 0`, `/dev/rga`
+  character device, and fork probe `driver=1.3.11 text=1.3.11`. Both RGA3 node
+  driver links (`fdb60000`, `fdb70000`) resolve to `rga3`; RGA2 (`fdb80000`)
+  resolves to `rga2`. No module reload or binding repair was attempted.
+
+| Row | Verdict | Fresh observation |
+|---|---|---|
+| R1 package replacement | PASS | R0 installed; real `librga2` not installed; dpkg library ownership and ldconfig SONAME resolve correctly. |
+| R2 plugin registration | PASS | Installed `gstreamer1.0-rockchip-ceralive 1.14.4+ceralive.2` retained; `mpph264enc` registers. |
+| R3 per-core routing | PASS | Three 1000/1000 exact-copy runs; selected core +1000 and others +0; each fd census 5→5. |
+| R4 encode smoke | PASS | RGB16 1920×1080, 300 buffers, EOS/exit 0; 300 `using RGA converted buffer` lines; no `RGA_BLIT fail`. |
+| R5 pixel matrix | **FAIL** | Rotation rejected with Radxa and R0; only eight of nine PSNR cells emitted. All emitted cells equal, both fd counts 5→5. |
+| R6 soak | **PARTIAL — one-hour requirement unmet** | Unmodified bounded harness exits 0: 3814 successful 4K NV16→NV12 iterations over its 295-second deadline, no bench failures, fd 5→5. |
+| R7 rollback | PASS | EXIT apt rollback/status/hash checks exit 0; fresh Radxa exact-copy selftest and plugin registration pass. |
+
+R3 counter tuples are ordered debugfs core indices 0/1/2:
+
+| Mask | Before | After | Delta |
+|---|---|---|---|
+| 1 | 124423,1000,2005 | 125423,1000,2005 | 1000,0,0 |
+| 2 | 125423,1000,2005 | 125423,2000,2005 | 0,1000,0 |
+| 4 | 125423,2000,2005 | 125423,2000,3005 | 0,0,1000 |
+
+Selected transcript (verbatim result lines; board address omitted):
+
+```text
+driver=1.3.11 text=1.3.11
+baseline exit=1
+R1 exit=0
+R2 exit=0
+R3-core-1 exit=0
+R3-core-2 exit=0
+R3-core-4 exit=0
+R4 exit=0
+R5 exit=1
+R5 PSNR neutrality FAIL
+R6 exit=0
+R1-R6 scored; failures=1; R7 follows in EXIT cleanup
+R7 restore exit=0
+GATE-EXIT=1 UTC=2026-09-08T13:15:03Z
+Status: install ok installed
+Version: 2.2.0-1
+copy-selftest,improcess,0,520.346,inf
+completed=1 cell=copy-selftest
+fd_census_before=5 after=5
+RESTORED-FUNCTIONAL=PASS
+FINAL-FUNCTIONAL-EXIT=0
+```
+
+### Orange Pi 5+ — fresh R0 run
+
+- **Package SHA-256:** `a1774e08cefa7a77847f9bcc9e5d7fcbf9f45c4b88801f07bd59748383a076b2`.
+- **Kernel:** `7.2.0-ceralive-rk3588 #ceralive1 SMP PREEMPT @1788765300`.
+- **Island tag:** installed tag **UNVERIFIED**; `v2026.9.2` is the UAPI
+  reference, not installed-image provenance. Measured driver is `1.3.11`.
+- **Run:** 13:17:20Z–13:22:35Z, followed by successful final functional check.
+- **Precondition PASS:** expected kernel, `rga_multicore 208896 1`, `/dev/rga`,
+  fork probe `driver=1.3.11 text=1.3.11`, installed Radxa `2.2.0-1` and baseline
+  library SHA match before swapping.
+
+| Row | Verdict | Fresh observation |
+|---|---|---|
+| R1 package replacement | PASS | R0 installed; real `librga2` not installed; dpkg ownership and ldconfig checks pass. |
+| R2 plugin registration | PASS | Installed `gstreamer1.0-rockchip-ceralive 1.14.4+ceralive.2` retained; `mpph264enc` registers. |
+| R3 per-core routing | PASS | Three 1000/1000 exact-copy runs; exact selected-core deltas; each fd census 5→5. |
+| R4 encode smoke | PASS | 300 RGB16 input buffers, EOS/exit 0; 300 `using RGA converted buffer` lines; no `RGA_BLIT fail`. |
+| R5 pixel matrix | **FAIL** | Radxa and R0 both reject rotation; eight equal PSNR cells do not satisfy the nine-cell requirement. Both fd counts 5→5. |
+| R6 soak | **PARTIAL — one-hour requirement unmet** | Bounded harness exits 0: 3935 successful 4K NV16→NV12 iterations over its 295-second deadline, no bench failures, fd 5→5. |
+| R7 rollback | PASS | EXIT apt rollback/status/hash checks exit 0; fresh Radxa exact-copy selftest and plugin registration pass. |
+
+| Mask | Before (cores 0/1/2) | After (cores 0/1/2) | Delta |
+|---|---|---|---|
+| 1 | 8547,37,11 | 9547,37,11 | 1000,0,0 |
+| 2 | 9547,37,11 | 9547,1037,11 | 0,1000,0 |
+| 4 | 9547,1037,11 | 9547,1037,1011 | 0,0,1000 |
+
+Selected transcript:
+
+```text
+driver=1.3.11 text=1.3.11
+baseline exit=1
+R1 exit=0
+R2 exit=0
+R3-core-1 exit=0
+R3-core-2 exit=0
+R3-core-4 exit=0
+R4 exit=0
+R5 exit=1
+R5 PSNR neutrality FAIL
+R6 exit=0
+R1-R6 scored; failures=1; R7 follows in EXIT cleanup
+R7 restore exit=0
+GATE-EXIT=1 UTC=2026-09-08T13:22:35Z
+Status: install ok installed
+Version: 2.2.0-1
+copy-selftest,improcess,0,310.622,inf
+completed=1 cell=copy-selftest
+fd_census_before=5 after=5
+RESTORED-FUNCTIONAL=PASS
+FINAL-FUNCTIONAL-EXIT=0
+```
+
+### R5 same-session matrix and remaining failure
+
+All four columns are freshly measured, not copied from the prior run. The bar
+remains 30 dB and the per-board neutrality bound remains 0.01 dB.
+
+| Cell | Rock Radxa | Rock R0 | Orange Pi Radxa | Orange Pi R0 |
+|---|---:|---:|---:|---:|
+| NV16→NV12 | 61.607624 | 61.607624 | 61.607624 | 61.607624 |
+| BGR→NV12 | 52.776426 | 52.776426 | 52.776426 | 52.776426 |
+| NV12 4K→1080p | 59.677191 | 59.677191 | 59.677191 | 59.677191 |
+| NV12 crop | infinity | infinity | infinity | infinity |
+| NV12 rotate 90 | **EINVAL, no pixels** | **EINVAL, no pixels** | **EINVAL, no pixels** | **EINVAL, no pixels** |
+| Explicit BT.601 limited | 52.776426 | 52.776426 | 52.776426 | 52.776426 |
+| Explicit BT.601 full | 53.481074 | 53.481074 | 53.481074 | 53.481074 |
+| Explicit BT.709 limited | 52.904279 | 52.904279 | 52.904279 | 52.904279 |
+| Explicit BT.709 full | 50.687602 | 50.687602 | 50.687602 | 50.687602 |
+
+Absolute per-board delta is **0.000000 dB for every finite emitted cell**;
+crop is exact on both libraries. Rotation has no PSNR, not zero delta. The
+strict nine-cell scorer correctly rejects both boards.
+
+The bench submits NV12 1280×720 → 720×1280 with 90-degree rotation through
+`improcess`. All four processes report `RGA_BLIT fail: Invalid argument`.
+The corresponding current-kernel journal records are:
+
+```text
+Rock Radxa: 13:09:53 rga: 586577 586577: ID[127431]: request validation failed before mapping
+Rock R0:   13:10:03 rga: 587080 587080: ID[130740]: request validation failed before mapping
+OPi Radxa: 13:17:25 rga: 1779392 1779392: ID[8598]: request validation failed before mapping
+OPi R0:    13:17:35 rga: 1779906 1779906: ID[11907]: request validation failed before mapping
+```
+
+These matching PIDs establish a real rejected request, not a log-assertion or
+fd-census failure. It also occurs **before installing R0**, so this A/B does
+not support attributing it to the R0 package swap. The precise failing kernel
+predicate and historical regression-introducing commit remain **undiagnosed**;
+no driver fix or neutrality waiver was attempted. Rock additionally records
+two `Failed to map attachment, ret[-5]` lines under each matrix PID one second
+later; their association with a particular subsequent CSC cell is unproven.
+They are retained, not conflated with the rotation's pre-mapping rejection or
+the old DT/IOMMU driver-binding gap.
+
+### Verification, retained evidence, and release boundary
+
+- Both boards finish on the pinned Radxa library hash above, with R0 absent.
+  Each fresh 64×64 NV12 copy matches the oracle exactly; fd census is 5→5.
+  `gst-inspect-1.0 mpph264enc` also succeeds after rollback.
+- Local aarch64 Trixie build succeeds. Complete Meson suite with the documented
+  `LIBRGA_TEST_QEMU_USER=1` opt-in: **15 OK, two established emulation SKIPs,
+  zero failures**. An initial invocation used incorrect opt-in variable names
+  and exposed the two documented invalid-fd ioctl failures; that failed log
+  is retained. Native arm64 CI at the tested head is green without those skips.
+- No-opt-in control exits 77. Reserved unreachable-address control returns
+  `SKIPPED-unreachable`, exit 77; neither real board was unreachable.
+- The raw per-row logs live in `build/g-a-todo42-rock/` and
+  `build/g-a-todo42-opi/`. Prechecks, stage receipts, complete session logs,
+  final functional proofs, diagnostic journal excerpts, and scratch wrappers
+  live in repo-local, ignored `test-results/todo42/`.
+- `test-results/todo42/board-evidence.tar.gz` retains those logs and wrappers;
+  SHA-256 `f138e0263f8145fc526a778f834aeee476a3162f6ddc9b14adb7d27ed93cb150`.
+
+This rerun **does not prove** a one-hour soak, rotation neutrality, the installed
+island tag, `rgaconvert`/`rgacompositor` behavior, sanitizer cleanliness on boards,
+long-term thermal/suspend/OTA behavior, every capture path, or any untested
+hardware. It neither changes raw G8 byte equality nor waives the ELF-export
+finding in [R0-NEUTRALITY.md](../../docs/R0-NEUTRALITY.md). The original `.1`
+R4 silence remains historical evidence, not retroactively green. **Do not merge
+or release R0 on this rerun.** Independent review and release authorization are
+separate; no merge, approval, release dispatch, or release-branch update was made.
