@@ -2,6 +2,14 @@
 
 **Overall verdict: BLOCKED. Do not merge or release R0 on this evidence.**
 
+**2026-09-08 investigation update:**
+[`R0-NEUTRALITY.md`](../../docs/R0-NEUTRALITY.md#owner-q1-investigation-2026-09-08)
+now identifies the internal CSC padding and delayed `/dev/rga` session open,
+records the fd-census harness fix and the cross-release R4 assertion fix, and
+preserves their RED/GREEN evidence. This September 5 table is historical: it is
+not a fresh G-A result, its original `.1` R4 silence is still unexplained, and
+no row below is promoted to PASS by the narrower investigation.
+
 Both boards were reached at their current addresses. Rock 5B+ failed the driver
 precondition. Orange Pi ran R1–R7, including a bounded 4K soak, and was restored
 to Radxa by the EXIT cleanup. Pixel neutrality alone is not an overall PASS.

@@ -146,6 +146,13 @@ not the newer imported implementation. Its test adaptations and outstanding
 neutrality blockers are recorded in [`docs/R0-NEUTRALITY.md`](docs/R0-NEUTRALITY.md).
 Do not merge or publish this candidate while those blockers remain unresolved.
 
+Owner Q1's investigation in `docs/R0-NEUTRALITY.md` proves G8's differing bytes
+are internal CSC padding in both packaged binaries, without changing the strict
+golden comparator. The G-A harness now acquires the real session before its fd
+census and recognizes the `.1` and `.2`/`.3` plugin success logs. The original
+`.1` R4 transcript remains RED; these diagnostics do not replace the next
+both-board package gate or waive raw byte equality.
+
 G-A's executable package-swap drill is `tests/board/g-a-neutrality.sh` [EXISTS].
 Its measured R0 verdict is **BLOCKED**, with reachable Rock 5B+ failing the driver
 precondition and Orange Pi's full sequence restored to Radxa. Read
