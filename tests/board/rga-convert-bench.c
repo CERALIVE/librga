@@ -1,4 +1,5 @@
 // Modified by CeraLive 2026-09-05: bounded G-A routing and soak modes.
+// Modified by CeraLive 2026-09-08: test the session boundary used by the fd census.
 #define _GNU_SOURCE
 #include <dirent.h>
 #include <dlfcn.h>
@@ -157,9 +158,11 @@ done:
 int main(int argc, char **argv)
 {
     int iterations=10,selftest=0,explicit_csc=0,core=0,routing=0,soak=0,imonly=0; double minimum=30;
+    int session_selftest=0;
     enum oracle_filter filter=ORACLE_BOX;
     for (int i=1;i<argc;i++) {
         if (!strcmp(argv[i],"--selftest")) { selftest=1; iterations=1; minimum=INFINITY; }
+        else if (!strcmp(argv[i],"--session-selftest")) session_selftest=1;
         else if (!strcmp(argv[i],"--explicit-csc")) explicit_csc=1;
         else if (!strcmp(argv[i],"--bilinear")) filter=ORACLE_BILINEAR;
         else if (!strcmp(argv[i],"--improcess-only")) imonly=1;
@@ -167,11 +170,14 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i],"--soak")) { soak=1; iterations=1000000; }
         else if (!strcmp(argv[i],"--core") && i+1<argc) { char *end; long n=strtol(argv[++i],&end,10); if (*end || (n!=1 && n!=2 && n!=4)) return 2; core=(int)n; }
         else if (!strcmp(argv[i],"--iterations") && i+1<argc) { char *end; long n=strtol(argv[++i],&end,10); if (*end || n<1 || n>1000000) return 2; iterations=(int)n; }
-        else { fprintf(stderr,"usage: %s [--selftest] [--iterations N] [--explicit-csc] [--bilinear]\n",argv[0]); return 2; }
+        else { fprintf(stderr,"usage: %s [--selftest|--session-selftest] [--iterations N] [--explicit-csc] [--bilinear]\n",argv[0]); return 2; }
     }
-    if (dlsym(RTLD_DEFAULT,"fake_rga_active")) { fprintf(stderr,"refusing fake RGA for hardware bench\n"); return 1; }
-    if (access("/dev/rga",R_OK|W_OK) || access("/dev/dma_heap/system",R_OK|W_OK)) { perror("hardware preflight"); return 77; }
+    if (!session_selftest && dlsym(RTLD_DEFAULT,"fake_rga_active")) { fprintf(stderr,"refusing fake RGA for hardware bench\n"); return 1; }
+    if (!session_selftest && (access("/dev/rga",R_OK|W_OK) || access("/dev/dma_heap/system",R_OK|W_OK))) { perror("hardware preflight"); return 77; }
     if (c_RkRgaInit()) return 1;
+    void *context=NULL;
+    c_RkRgaGetContext(&context);
+    if (!context) { fprintf(stderr,"RGA session initialization failed\n"); return 1; }
     if (core && imconfig(IM_CONFIG_SCHEDULER_CORE,core)!=IM_STATUS_SUCCESS) return 1;
     int before=census(),rc=0;
     const struct cell cells[]={
@@ -181,7 +187,8 @@ int main(int argc, char **argv)
         {"crop",1280,720,640,352,RK_FORMAT_YCbCr_420_SP,1,0,0},
         {"rotate-90",1280,720,720,1280,RK_FORMAT_YCbCr_420_SP,0,1,0}};
     puts("cell,api,iteration,mean_total_us,psnr_db");
-    if (routing) { const struct cell c={"routing-copy",128,64,128,64,RK_FORMAT_YCbCr_420_SP,0,0,0}; rc=run_cell(&c,1000,0,filter,INFINITY); }
+    if (session_selftest) { void *context=NULL; c_RkRgaGetContext(&context); rc=context==NULL; }
+    else if (routing) { const struct cell c={"routing-copy",128,64,128,64,RK_FORMAT_YCbCr_420_SP,0,0,0}; rc=run_cell(&c,1000,0,filter,INFINITY); }
     else if (soak) { const struct cell c={"soak-4k-nv16",3840,2160,3840,2160,RK_FORMAT_YCbCr_422_SP,0,0,0}; deadline=now_us()+295e6; rc=run_cell(&c,iterations,0,filter,minimum); }
     else if (selftest) { const struct cell c={"copy-selftest",64,64,64,64,RK_FORMAT_YCbCr_420_SP,0,0,0}; rc=run_cell(&c,1,0,filter,minimum); }
     else {

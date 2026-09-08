@@ -295,9 +295,11 @@ test('board-oracle', oracle_test)
 executable('probe-version', 'tests/board/probe-version.c',
     include_directories : incdir, link_with : librga_so,
     c_args : board_cargs, install : false)
-executable('rga-convert-bench', 'tests/board/rga-convert-bench.c',
+board_bench = executable('rga-convert-bench', 'tests/board/rga-convert-bench.c',
     include_directories : incdir, link_with : [librga_so, board_oracle],
     dependencies : [board_math, board_dl], c_args : board_cargs, install : false)
+test('board-session-baseline', board_bench, args : ['--session-selftest'],
+    env : fake_rga_env, depends : fake_rga)
 board_timing = shared_library('rga_timing', 'tests/shim/fake_rga.c',
     include_directories : incdir, dependencies : [board_dl, libthreads_dep],
     c_args : board_cargs + ['-DFORWARD_TIMING'], install : false)
