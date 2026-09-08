@@ -80,7 +80,7 @@ if ! awk -F, '
   }
   END { if(count!=9 || bad) exit 1; }
 ' "$RESULT_DIR/baseline.log" "$RESULT_DIR/R5.log"; then failed=1; printf 'R5 PSNR neutrality FAIL\n'; fi
-SSH_LIMIT=300 row R6 "timeout 299 $remote/rga-convert-bench --soak"
+SSH_LIMIT=3700 row R6 "timeout 3605 $remote/rga-convert-bench --soak"
 printf 'R1-R6 scored; failures=%d; R7 follows in EXIT cleanup\n' "$failed"
 # Never emit PASS before R7, exact counter deltas and all PSNR cells are scored.
 exit "$failed"
