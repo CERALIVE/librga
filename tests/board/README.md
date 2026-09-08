@@ -73,7 +73,11 @@ fail below 30 dB; copy selftest requires exact bytes. Box is the default referen
 resampler; `--bilinear` selects pixel-centred bilinear. This selection changes the
 reference only, not driver interpolation. FD census spans allocation/release after
 library initialization and before deinitialization so the persistent RGA session
-is not mistaken for a leak. No hardware result may be inferred from host tests.
+is not mistaken for a leak. `c_RkRgaInit()` is a compatibility no-op on R0; the
+bench calls `c_RkRgaGetContext()` before the first census to acquire the actual
+session. `--session-selftest` checks this boundary under the host shim without
+allocating DMA-BUFs or claiming pixel coverage. The before/after equality remains
+strict. No hardware result may be inferred from host tests.
 
 `fake_rga.c -DFORWARD_TIMING` builds a separate forwarding-only implementation:
 no fake device opens, fake version data, or failure injection. All ioctls reach
@@ -118,8 +122,12 @@ No oracle threshold or pre-existing fd assertion is relaxed for G-A.
 
 RGB16 is the smoke format: canonical gstmpp.c maps it to `MPP_FMT_BUTT` to force
 RGA conversion, and gstmppenc.c selects NV12 for unsupported input. Required log:
-`converted with RGA` from the canonical c_RkRgaBlit path. Registration alone or
-`RGA enabled` is insufficient. No rgaconvert/rgacompositor dependency exists.
+`converted with RGA` from the `.1` c_RkRgaBlit path, or
+`using RGA converted buffer` from the `.2`/`.3` encoder conversion path. Both
+`mpp:5` and `mppenc:5` debug categories are enabled. The executable assertion is
+`conversion-evidence.sh` (also registered with `--selftest` in Meson).
+Registration alone or `RGA enabled` is insufficient. No
+rgaconvert/rgacompositor dependency exists.
 
 R3 scores exact per-core counter deltas; R5 requires all nine default/supplemental
 cells and the same-session 0.01 dB bound. A nonzero command, missing counter,

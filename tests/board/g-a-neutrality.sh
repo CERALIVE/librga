@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
+# Modified by CeraLive 2026-09-08: track conversion evidence across plugin releases.
 # Remote shell expressions and EXIT callbacks are deliberately indirect; lib.sh's selftest uses subshell credentials.
 # shellcheck disable=SC2016,SC2031,SC2317
 set -euo pipefail
@@ -65,8 +66,8 @@ for core in 1 2 4; do
       END { for(i=0;i<3;i++) if(n[i]!=2 || after[i]-before[i]!=(i==selected ? 1000 : 0)) exit 1; }
     ' "$RESULT_DIR/R3-core-$core.log"; then failed=1; printf 'R3-core-%s counter proof FAIL\n' "$core"; fi
 done
-SSH_LIMIT=120 row R4 "GST_DEBUG_NO_COLOR=1 GST_DEBUG=mpp:5 timeout 110 gst-launch-1.0 videotestsrc num-buffers=300 ! video/x-raw,format=RGB16,width=1920,height=1080 ! mpph264enc ! fakesink"
-if ! grep -q 'converted with RGA' "$RESULT_DIR/R4.log" || grep -q 'RGA_BLIT fail' "$RESULT_DIR/R4.log"; then failed=1; printf 'R4 conversion evidence FAIL\n'; fi
+SSH_LIMIT=120 row R4 "GST_DEBUG_NO_COLOR=1 GST_DEBUG=mpp:5,mppenc:5 timeout 110 gst-launch-1.0 videotestsrc num-buffers=300 ! video/x-raw,format=RGB16,width=1920,height=1080 ! mpph264enc ! fakesink"
+if ! bash "$here/conversion-evidence.sh" "$RESULT_DIR/R4.log"; then failed=1; printf 'R4 conversion evidence FAIL\n'; fi
 SSH_LIMIT=60 row R5 "timeout 50 $remote/rga-convert-bench --improcess-only --iterations 1 --explicit-csc"
 if ! awk -F, '
   $2=="improcess" && $3==0 {
