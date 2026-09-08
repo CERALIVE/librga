@@ -154,9 +154,13 @@ census and recognizes the `.1` and `.2`/`.3` plugin success logs. The original
 both-board package gate or waive raw byte equality.
 
 G-A's executable package-swap drill is `tests/board/g-a-neutrality.sh` [EXISTS].
-Its measured R0 verdict is **BLOCKED**, with reachable Rock 5B+ failing the driver
-precondition and Orange Pi's full sequence restored to Radxa. Read
-`tests/board/DRILL-RESULTS.md` before interpreting pixel equality as acceptance.
+The **2026-09-08 rerun supersedes the September 5 current-board findings**, not
+the archived transcripts: both driver preconditions and R3/R4 pass, but R5 rotation fails with
+both Radxa and R0 on both boards (`EINVAL`, kernel validation before mapping).
+Both boards are restored and functionally checked on Radxa. G-A remains
+**FAIL / release BLOCKED**; the harness's 295-second R6 also does not satisfy
+the written one-hour requirement. Read `tests/board/DRILL-RESULTS.md` for exact
+artifacts, counter/PSNR evidence and the still-unverified installed island tag.
 
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
 It preserves the shared-library alias before the static-library reassignment and

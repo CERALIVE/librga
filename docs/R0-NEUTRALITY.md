@@ -246,3 +246,20 @@ is still RED.** This is not permission to mask padding or call that gate PASS.
 The weak-symbol `abidiff` result also remains as recorded. Independent review,
 the outstanding literal-gate disposition and a fresh both-board G-A remain
 required before merge/release; this investigation alone does not authorize them.
+
+## Fresh both-board G-A, 2026-09-08: FAIL
+
+The [appended board rerun](../tests/board/DRILL-RESULTS.md#g-a-rerun--2026-09-08-fail-release-remains-blocked)
+uses PR #2 Build Check `34224662759` at `33f774c177da0ccca7fcc5b77eba1d87f27c8f28`.
+Both boards now pass the driver precondition, exact per-core routing with fd
+5→5, and the 300-buffer conversion-log smoke. **R5 still fails on both boards:**
+NV12 rotate-90 is rejected before mapping by the current kernel, with `EINVAL`
+on the same-session Radxa baseline as well as R0. The other eight cells match
+exactly. Baseline-identical failure is not a neutrality PASS or a driver fix.
+
+Both boards were restored to SHA-verified Radxa `librga2 2.2.0-1`, followed by
+successful fresh-process exact-copy and plugin-registration checks. The bounded
+295-second R6 runs pass with fd 5→5, but the written one-hour requirement remains
+unmet. Installed island tags were not verified. G-A therefore remains blocked;
+this evidence does not waive raw G8 equality, the weak-symbol export finding,
+or independent review and release authorization.
