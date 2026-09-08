@@ -26,9 +26,55 @@ defaults:
     shell: bash
 
 jobs:
+  # Change detection. A documentation-only pull request has nothing for the
+  # build below to prove, so it skips rather than run to a vacuous green.
+  #
+  # The gating is a JOB-LEVEL `if:`, never a trigger-level `paths:`/
+  # `paths-ignore:`. A trigger filter stops the workflow from starting at all,
+  # and a required check that never reports blocks a merge instead of passing
+  # it — which is what the always-run summary job at the bottom exists to avoid.
+  #
+  # `code` is an EXCLUSION list — "every changed file is NOT documentation" —
+  # so this step carries `predicate-quantifier: 'every'`. The quantifier is a
+  # property of the STEP, not of a filter: a positive OR list must live in its
+  # own step under the default `some`, or `every` would turn it into an AND that
+  # no single file can satisfy.
+  changes:
+    name: Change detection
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      # The filter runs on pull requests only. On a push or a tag the step is
+      # skipped and the fallback keeps `code` true, so those events keep their
+      # full coverage.
+      code: ${{ steps.filter.outputs.code || 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect non-documentation changes
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v4
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            code:
+              - '!**/*.md'
+              - '!docs/**'
+              - '!LICENSE*'
+              - '!.github/ISSUE_TEMPLATE/**'
+              - '!.github/PULL_REQUEST_TEMPLATE.md'
+
   resolve-suite:
     name: Resolve device target suite
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     outputs:
       suite: ${{ steps.read.outputs.suite }}
       secondary_suite: ${{ steps.read.outputs.secondary_suite }}
@@ -81,7 +127,8 @@ jobs:
 
   build:
     name: ${{ matrix.suite }} · arm64
-    needs: resolve-suite
+    needs: [changes, resolve-suite]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04-arm
     container:
       image: debian:${{ matrix.suite }}-slim
@@ -210,7 +257,8 @@ jobs:
 
   test-results:
     name: ${{ matrix.group }} · ${{ matrix.suite }} results
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -245,7 +293,8 @@ jobs:
 
   analyzer:
     name: GCC -fanalyzer (advisory)
-    needs: resolve-suite
+    needs: [changes, resolve-suite]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04-arm
     container:
       image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
@@ -324,6 +373,8 @@ jobs:
   sanitizers:
     name: Sanitizers (placeholder — no coverage claimed)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       # Deliberately a no-op that says so. AddressSanitizer/UBSan/ThreadSanitizer
       # coverage needs the host shim to stand in for /dev/rga, and that shim is
@@ -343,3 +394,38 @@ jobs:
             echo "When the shim lands, this job builds \`-fsanitize=address,undefined\`"
             echo "against it and becomes a real leg."
           } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # The one check a branch-protection rule can require. It runs on every event,
+  # including a docs-only pull request where every gate above skipped, and goes
+  # red whenever a dependency failed or was cancelled. A SKIPPED dependency is a
+  # pass — that is the whole point of the gating above.
+  #
+  # `analyzer` is deliberately absent: it is `continue-on-error: true` ADVISORY,
+  # and folding an advisory lane into the blocking summary would promote it to a
+  # gate by the back door.
+  build-check-summary:
+    name: Build Check summary
+    if: always()
+    needs:
+      - changes
+      - resolve-suite
+      - build
+      - test-results
+      - sanitizers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any dependency failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "dependency results: ${RESULTS}"
+          for result in ${RESULTS}; do
+            case "${result}" in
+              failure|cancelled)
+                echo "::error::a required job reported '${result}'"
+                exit 1
+                ;;
+            esac
+          done
+          echo "every dependency succeeded or was skipped"
