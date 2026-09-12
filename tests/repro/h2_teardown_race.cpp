@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// Modified by CeraLive 2026-09-12: distinguish owned-reference release from last-reference races.
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -13,6 +14,9 @@
 // RgaApi.h's compatibility macro calls the empty c_RkRgaDeInit(). H2 needs
 // the real RgaDeInit(void **) declared by NormalRga.h, not that no-op.
 #undef RgaDeInit
+#undef RgaInit
+
+extern volatile int32_t refCount;
 
 static int make_buffer()
 {
@@ -28,8 +32,9 @@ static int make_buffer()
 int main(int argc, char **argv)
 {
     if (argc != 2 || (std::strcmp(argv[1], "deinit") != 0 &&
-                      std::strcmp(argv[1], "exit") != 0)) {
-        std::fprintf(stderr, "usage: %s {deinit|exit}\n", argv[0]);
+                      std::strcmp(argv[1], "exit") != 0 &&
+                      std::strcmp(argv[1], "refcount") != 0)) {
+        std::fprintf(stderr, "usage: %s {deinit|exit|refcount}\n", argv[0]);
         return 2;
     }
     if (dlsym(RTLD_DEFAULT, "fake_rga_active") == nullptr) {
@@ -62,6 +67,21 @@ int main(int argc, char **argv)
         return 2;
     }
     const int device_fd = static_cast<rgaContext *>(context)->rgaFd;
+    if (std::strcmp(argv[1], "refcount") == 0) {
+        void *owned = nullptr;
+        if (refCount != 1 || RgaInit(&owned) < 0 || owned != context || refCount != 2)
+            return 2;
+        const int status = RgaDeInit(&owned);
+        const int remaining = refCount;
+        const bool open = fcntl(device_fd, F_GETFD) >= 0;
+        const int blit = open ? c_RkRgaBlit(&src, &dst, nullptr) : -EBADF;
+        std::printf("H2 refcount: before=2 after=%d deinit=%d fd_open=%d blit=%d\n",
+                    remaining, status, open, blit);
+        close(src.fd);
+        close(dst.fd);
+        if (RgaDeInit(&context) != 0) return 2;
+        return status != 0 || remaining != 1 || !open || blit != 0;
+    }
     const bool exit_scenario = std::strcmp(argv[1], "exit") == 0;
     std::atomic<bool> stop{false}, teardown_started{false};
     std::atomic<unsigned long> successful{0}, rejected{0};

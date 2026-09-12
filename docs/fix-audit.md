@@ -47,6 +47,7 @@ can be checked rather than asserted:
 
 | Provenance SHA | Reproducer (path · RED · GREEN) | Hardware gate | ABI closure (nm vs R0 · abidiff vs previous release) | Independent reviewer verdict · reviewer session id | `Upstream-status` |
 |---|---|---|---|---|---|
+| Candidate B; no fix. Base `b886777023e0c503134e340be348d6c1b11c8adc`, unchanged R1 library | `tests/repro/run-candidate-b.sh` extends H2; **DEMONSTRATED** last-reference/deinit and exit races under the stated caller pattern. TSan 200/200 each; ASan/UBSan deinit 167/200, exit 0/200. Owned-reference control passes both builds. RED transcript below; no GREEN/fix | host-shim-only | Not run; no library or ABI change | Not dispatched; no reviewer session or fix approval claimed | Not reported; characterization only |
 | `GAP: no fix landed` — H1 is characterisation of the unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. Nothing was cherry-picked and nothing was changed under `core/` or `im2d_api/`. | `tests/repro/h1_init_race.cpp` + `tests/repro/run-h1-host.sh`, scenario `c-init`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier`. Every iteration identical: `ok=8 refcount_after_init=0 fds_after_init=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. `c_RkRgaInit()` is `return 0;` at `core/RgaApi.cpp:27` — the C shim was hollowed out and `include/RgaApi.h:41-45` documents it — so this entry point opens no device and increments no counter. Teardown returns `-19` (`-ENODEV`, "Try to exit uninit"), which is the evidence the scenario left no session. GREEN: n/a, no fix. Transcripts: `test-results/h1/c-init.{log,csv}`. | `host-shim-only` (`tests/shim/fake_rga.c`, mock device is a `memfd_create("fake-rga")`; TSan build via `scripts/build-sanitized.sh tsan`). No board contacted. | n/a — no library change, so nothing to close. `librga.so.2.1.0` in `build-tsan/` is the unmodified tree. | `GAP: no review dispatched` — this row is a host-side observation, not a landed fix. | n/a — nothing to report upstream from a NOT-REPRODUCED control. |
 | `GAP: no fix landed` — as above, unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. | Same pair, scenario `singleton-get`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier` into `RockchipRga::get()` → `RkRgaInit()` → `RgaInit()` → `NormalRgaOpen()`. Every iteration identical: `ok=8 ctx_agreed=1 refcount_after_init=1 fds_after_init=1 deinit_calls=1 refcount_after_teardown=0 fds_after_teardown=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. The unguarded `if (!rgaCtx)` at `core/NormalRga.cpp:66` is real — only `refCount++` is inside `mMutex` — but on this host it is never reached concurrently, because `Singleton::getInstance()` (`include/RgaSingleton.h:33-40`) holds `sLock` across the whole null-check-and-construct. The eight threads serialise one level above the defect. GREEN: n/a, no fix. Transcripts: `test-results/h1/singleton-get.{log,csv}`. | `host-shim-only`, same build and shim as the row above. No board contacted. | n/a — no library change. | `GAP: no review dispatched` — host-side observation, not a landed fix. | n/a — the latent unguarded check is recorded here, not reported, because no reproducer turned it RED. |
 | H10a observation; **no fix**. Execution base `96c9a53ba94c487f9fae938c73347f5bc00e624d`; library source unchanged from `57a1067a246c71fa6c9a355d1668884fda155dd5`. | `tests/repro/h10_job_handle.cpp count`, via `bash tests/repro/run-h10.sh asan` or `tsan`. **RED: counter drift.** Unknown ID `2147483647`: count/map `0/0 -> -1/0`; 64 subsequent creates yield `63/64`; valid cancellation of all 64 leaves `-1/0`. Both sanitizer builds reproduce it. RED transcripts: `test-results/h10/asan-eS80sZZq/count/transcript.txt`, `test-results/h10/tsan-KHb1J64S/count/transcript.txt` (exit 1 each). `im2d_api/src/im2d_impl.cpp:2445` decrements even when lookup finds no job. No premature creation limit found within this bounded check; all 64 creates succeed and there is no userspace count-limit gate in this source. Re-run 2026-09-06 reproduces the same line in both modes: `test-results/h10/asan-eK4JCCKy/count/`, `test-results/h10/tsan-a3eySo3y/count/`. **GREEN: none; no fix tested.** | `host-shim-only`; native x86_64, GCC 16.2.1, 2026-09-06. No board access. | Not run: QA test/docs only; no library, header, or ABI change. | Not requested; no independent reviewer session or fix approval claimed. | Not reported upstream; characterization only. CeraLive does not call this job API (task scope). |
@@ -63,6 +64,73 @@ can be checked rather than asserted:
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
+
+## Appendix — candidate-b.md
+
+Source: [fix-audit.d/candidate-b.md](fix-audit.d/candidate-b.md). D21 rows are in the [ledger above](#rows).
+
+
+### Candidate B — fresh R1 evidence, 2026-09-12
+
+Branch: `qa/candidate-b-shutdown`. Native x86_64, GCC 16.2.1.
+
+```sh
+bash scripts/build-sanitized.sh asan
+bash scripts/build-sanitized.sh tsan
+bash tests/repro/run-candidate-b.sh
+```
+
+The final command returns **1**. It compiles the existing H2 source under each
+sanitizer and invokes its existing runner for 200 fresh processes per scenario.
+Raw wrapper evidence: `test-results/candidate-b/run.98LZbp/`.
+ASan/UBSan batch: `test-results/h2/asan/run.gGIVDA/`.
+TSan batch: `test-results/h2/tsan/run.SwcTLe/`.
+Both preloaded canaries report. LSan is enabled; TSan symbolization is offline.
+
+```text
+scenario,iterations,clean,sanitizer,other_failure,invalid
+asan/deinit,200,33,167,0,0
+asan/exit,200,200,0,0,0
+tsan/deinit,200,0,200,0,0
+tsan/exit,200,0,200,0,0
+H2 refcount: before=2 after=1 deinit=0 fd_open=1 blit=0
+```
+
+The refcount line occurs in **both** sanitized builds, exit 0. It acquires a
+second real `RgaInit` reference, releases it, verifies the fd still exists, and
+successfully blits with the singleton's remaining reference. This refutes the
+blanket claim that `RgaDeInit` ignores its reference count in serial operation.
+
+The deinit race deliberately releases the singleton's **borrowed last reference**
+while another thread repeatedly calls `c_RkRgaBlit`. It is not a test of two
+independently owned references. The worker completes at least 32 successful
+blits before the action marker, and the runner validates those ioctls. A sample:
+
+```text
+H2 action=deinit successful_blits=107
+../core/NormalRga.cpp:1494:17: runtime error: member access within null pointer of type 'struct rgaContext'
+```
+
+TSan reports the unsynchronized `rgaCtx` store at `NormalRgaClose:203` against
+the read at `RgaBlit:375` (`addr2line` offsets `0x22197`, `0x2236e` in this build).
+The operation holds no lifetime reference or shared lock against that release.
+The ASan/UBSan sample is a **UBSan null-context report**, not an ASan heap UAF.
+No heap-use-after-free claim is inferred from a null-context failure. This proves
+the missing protection for the exercised last-reference caller pattern, not that
+the API promises arbitrary concurrent destruction or that normal owned-reference
+usage is broken.
+
+The exit scenario calls `exit(0)` without joining the active blit thread.
+TSan's sample reports `use of an invalid mutex (e.g. uninitialized or destroyed)`
+through `Mutex::lock` (`0x2e67e`, `RgaMutex.h:164`) and
+`Singleton<RockchipRga>::getInstance` (`0x2e6fc`, `RgaSingleton.h:34`). The static
+mutex is destroyed at process exit while another thread can still acquire it.
+The heap singleton is never automatically deleted; no `RockchipRga` destructor
+race or universally unspecified destructor order is established. Joining users
+before process exit is a separate caller responsibility not waived by this test.
+
+No hardware, two-batch GREEN, memory-leak finding, release gate or fix approval
+is claimed. The ordinary baseline suite remains separate from these RED probes.
 
 ## Appendix — h1.md
 
