@@ -26,7 +26,7 @@ Two Debian packages, both release assets of one tag and both served from
 | Package | Contents |
 |---|---|
 | `librga2-ceralive` | The runtime library, SONAME `librga.so.2`. `Provides: librga2`, `Conflicts`/`Replaces: librga2`, so it substitutes for the distribution package on a CeraLive device. |
-| `librga-ceralive-dev` | Headers under `include/rga/`, the static library, and `librga.pc`. |
+| `librga-ceralive-dev` | Headers under `include/rga/` and `librga.pc`. No static archive: `packaging/build-deb.sh` deletes `librga.a` and `packaging/package-contract.sh` fails the build if one is staged in either package. |
 
 The SONAME, the pkg-config name, and the header install path are unchanged from
 upstream. The exported-symbol set is a superset contract: it may grow, never
