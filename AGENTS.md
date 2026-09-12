@@ -150,6 +150,11 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
+It adds direct exported-init coverage to H1 and H3; build both sanitizer trees
+first. Results and the unproven subclaims are in `docs/fix-audit.d/candidate-a.md`.
+Exit 1 is a RED reproducer, not part of the green baseline suite.
+
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
 It preserves the shared-library alias before the static-library reassignment and
 appends UAPI parity, goldens, unit and board fragments in dependency order. Run it

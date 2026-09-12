@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+/* Modified by CeraLive 2026-09-12: exercise the exported init below the singleton lock. */
 /*
  * H1: concurrent-init reproducer for the legacy session bring-up path.
  *
@@ -70,7 +71,7 @@
 #    include <barrier>
 #  endif
 #endif
-#if defined(__cpp_lib_barrier)
+#if __cplusplus >= 202002L && defined(__cpp_lib_barrier) && !defined(__clang__)
 #  define H1_HAVE_STD_BARRIER 1
 #endif
 
@@ -311,10 +312,36 @@ static void print(const char *scenario, const Result &result)
     fflush(stdout);
 }
 
+static Result run_direct_init(void)
+{
+    Result result;
+    StartGate gate(THREADS);
+    void *contexts[THREADS] = {};
+    int statuses[THREADS] = {};
+    std::vector<std::thread> threads;
+    for (int i = 0; i < THREADS; ++i) {
+        threads.emplace_back([&, i]() {
+            gate.arrive_and_wait();
+            statuses[i] = RgaInit(&contexts[i]);
+        });
+    }
+    for (std::thread &thread : threads)
+        thread.join();
+    for (int i = 0; i < THREADS; ++i) {
+        if (statuses[i] >= 0 && contexts[i]) ++result.ok;
+        if (contexts[i] != contexts[0]) result.ctx_agreed = false;
+    }
+    result.ctx = rgaCtx;
+    result.refcount_after_init = refCount;
+    result.fds_after_init = count_device_fds();
+    teardown(result, rgaCtx);
+    return result;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
-        fprintf(stderr, "usage: h1_init_race {c-init|singleton-get}\n");
+        fprintf(stderr, "usage: h1_init_race {c-init|singleton-get|direct-init}\n");
         return 2;
     }
 
@@ -335,6 +362,13 @@ int main(int argc, char **argv)
     if (!strcmp(argv[1], "singleton-get")) {
         print("singleton-get", run_singleton_get());
         return 0;
+    }
+    if (!strcmp(argv[1], "direct-init")) {
+        Result result = run_direct_init();
+        print("direct-init", result);
+        return result.ok != THREADS || !result.ctx_agreed ||
+            result.refcount_after_init != THREADS || result.fds_after_init != 1 ||
+            result.refcount_after_teardown != 0 || result.fds_after_teardown != 0;
     }
 
     fprintf(stderr, "h1: unknown scenario '%s'\n", argv[1]);

@@ -47,6 +47,7 @@ can be checked rather than asserted:
 
 | Provenance SHA | Reproducer (path · RED · GREEN) | Hardware gate | ABI closure (nm vs R0 · abidiff vs previous release) | Independent reviewer verdict · reviewer session id | `Upstream-status` |
 |---|---|---|---|---|---|
+| Candidate A; no fix. Base `b886777023e0c503134e340be348d6c1b11c8adc`, unchanged R1 library | `tests/repro/run-candidate-a.sh`, extending H1/H3; **DEMONSTRATED**: 20/20 direct-init TSan reports and duplicate opens; 1000/1000 failed HW-version calls leak one fd each through both real legacy init and im2d. RED transcript below; GREEN not run, no fix | host-shim-only | Not run; no library, public header, default, visibility or SONAME change | Not dispatched; no reviewer session or fix approval claimed | Not reported; QA evidence only |
 | `GAP: no fix landed` — H1 is characterisation of the unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. Nothing was cherry-picked and nothing was changed under `core/` or `im2d_api/`. | `tests/repro/h1_init_race.cpp` + `tests/repro/run-h1-host.sh`, scenario `c-init`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier`. Every iteration identical: `ok=8 refcount_after_init=0 fds_after_init=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. `c_RkRgaInit()` is `return 0;` at `core/RgaApi.cpp:27` — the C shim was hollowed out and `include/RgaApi.h:41-45` documents it — so this entry point opens no device and increments no counter. Teardown returns `-19` (`-ENODEV`, "Try to exit uninit"), which is the evidence the scenario left no session. GREEN: n/a, no fix. Transcripts: `test-results/h1/c-init.{log,csv}`. | `host-shim-only` (`tests/shim/fake_rga.c`, mock device is a `memfd_create("fake-rga")`; TSan build via `scripts/build-sanitized.sh tsan`). No board contacted. | n/a — no library change, so nothing to close. `librga.so.2.1.0` in `build-tsan/` is the unmodified tree. | `GAP: no review dispatched` — this row is a host-side observation, not a landed fix. | n/a — nothing to report upstream from a NOT-REPRODUCED control. |
 | `GAP: no fix landed` — as above, unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. | Same pair, scenario `singleton-get`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier` into `RockchipRga::get()` → `RkRgaInit()` → `RgaInit()` → `NormalRgaOpen()`. Every iteration identical: `ok=8 ctx_agreed=1 refcount_after_init=1 fds_after_init=1 deinit_calls=1 refcount_after_teardown=0 fds_after_teardown=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. The unguarded `if (!rgaCtx)` at `core/NormalRga.cpp:66` is real — only `refCount++` is inside `mMutex` — but on this host it is never reached concurrently, because `Singleton::getInstance()` (`include/RgaSingleton.h:33-40`) holds `sLock` across the whole null-check-and-construct. The eight threads serialise one level above the defect. GREEN: n/a, no fix. Transcripts: `test-results/h1/singleton-get.{log,csv}`. | `host-shim-only`, same build and shim as the row above. No board contacted. | n/a — no library change. | `GAP: no review dispatched` — host-side observation, not a landed fix. | n/a — the latent unguarded check is recorded here, not reported, because no reproducer turned it RED. |
 | H10a observation; **no fix**. Execution base `96c9a53ba94c487f9fae938c73347f5bc00e624d`; library source unchanged from `57a1067a246c71fa6c9a355d1668884fda155dd5`. | `tests/repro/h10_job_handle.cpp count`, via `bash tests/repro/run-h10.sh asan` or `tsan`. **RED: counter drift.** Unknown ID `2147483647`: count/map `0/0 -> -1/0`; 64 subsequent creates yield `63/64`; valid cancellation of all 64 leaves `-1/0`. Both sanitizer builds reproduce it. RED transcripts: `test-results/h10/asan-eS80sZZq/count/transcript.txt`, `test-results/h10/tsan-KHb1J64S/count/transcript.txt` (exit 1 each). `im2d_api/src/im2d_impl.cpp:2445` decrements even when lookup finds no job. No premature creation limit found within this bounded check; all 64 creates succeed and there is no userspace count-limit gate in this source. Re-run 2026-09-06 reproduces the same line in both modes: `test-results/h10/asan-eK4JCCKy/count/`, `test-results/h10/tsan-a3eySo3y/count/`. **GREEN: none; no fix tested.** | `host-shim-only`; native x86_64, GCC 16.2.1, 2026-09-06. No board access. | Not run: QA test/docs only; no library, header, or ABI change. | Not requested; no independent reviewer session or fix approval claimed. | Not reported upstream; characterization only. CeraLive does not call this job API (task scope). |
@@ -63,6 +64,73 @@ can be checked rather than asserted:
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
+
+## Appendix — candidate-a.md
+
+Source: [fix-audit.d/candidate-a.md](fix-audit.d/candidate-a.md). D21 rows are in the [ledger above](#rows).
+
+
+### Candidate A — fresh R1 evidence, 2026-09-12
+
+Branch: `qa/candidate-a-initialization`. Native x86_64, GCC 16.2.1.
+From the checkout root:
+
+```sh
+bash scripts/build-sanitized.sh tsan
+bash scripts/build-sanitized.sh asan
+bash tests/repro/run-candidate-a.sh
+```
+
+The final command returns **1**. Complete raw evidence is retained in
+`test-results/candidate-a/run.csKMOd/` (each future run gets its own directory).
+Both canaries reported under the same shim preload. TSan uses `symbolize=0`;
+online symbolization stalled the initial direct-init attempt (20-second timeout,
+no completed observation), which is not counted among the 20 measured processes.
+An earlier runner check expected the wrong ASan canary category; corrected to
+the existing canary's heap-buffer-overflow before scoring any candidate.
+
+All 20 fresh, eight-thread direct `RgaInit` processes returned 66 with TSan
+data-race reports. Every process also printed:
+
+```text
+scenario=direct-init gate=atomic-spin threads=8 ok=8 ... ctx_agreed=0 refcount_after_init=8 fds_after_init=8 deinit_calls=8 last_deinit_ret=0 refcount_after_teardown=0 fds_after_teardown=7
+WARNING: ThreadSanitizer: data race
+```
+
+Offline `addr2line -Cfipe build-tsan/librga.so.2.1.0 0x21e69 0x21b55 0x22234`
+maps the opposing store/read to `NormalRgaOpen` lines **135/77**, reached through
+`RgaInit` line 215. The unguarded null check lets eight allocations and opens
+proceed; competing stores overwrite the only global owner. Draining all eight
+references closes only the last published context's fd, leaving seven open.
+No global was overwritten by the test. This is the exported low-level API, NOT
+`c_RkRgaInit` (a no-op) or singleton construction: those two controls each ran
+20/20 processes without reports, with respectively zero and one device fd.
+
+The ASan/UBSan build ran with LSan enabled (`detect_leaks=1`) and
+`verify_asan_link_order=0`. Its descriptor census printed:
+
+```text
+hwversion,RgaInit,iterations=1000,failed_calls=1000,start=0,end=1000,growing_rows=1000,verdict=RED
+unset,RgaInit,iterations=1000,failed_calls=0,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+hwversion,improcess,iterations=1000,failed_calls=1000,start=0,end=1000,growing_rows=1000,verdict=RED
+unset,improcess,iterations=1000,failed_calls=0,start=1,end=1,growing_rows=0,verdict=NOT-REPRODUCED
+```
+
+`FAKE_RGA_FAIL=hwversion FAKE_RGA_ERRNO=5` makes the query fail after open.
+Legacy `NormalRgaOpen:151-155` frees the context without closing its fd;
+im2d `rga_device_init` returns before publishing or closing its local fd.
+These are **fd-census assertions under instrumentation**, not LSan descriptor
+reports: ASan/LSan do not diagnose fd leaks, and emitted no memory-error report
+for these four census processes. Successful legacy init/deinit and warmed im2d
+controls are flat, excluding ordinary session ownership from the leak claim.
+
+Subclaims deliberately not promoted: no incomplete-context read was observed;
+publication without synchronization is proven, not a specific uninitialized
+member read. The counter is volatile rather than atomic, but Linux increments
+are mutex-protected and the measured count is eight, not a lost increment.
+No refcount race was demonstrated by this init-only test. Other early-return
+branches were not dynamically covered. No two-batch GREEN, hardware coverage,
+ABI closure or approval to land a fix is claimed.
 
 ## Appendix — h1.md
 
