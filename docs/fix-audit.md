@@ -47,6 +47,7 @@ can be checked rather than asserted:
 
 | Provenance SHA | Reproducer (path · RED · GREEN) | Hardware gate | ABI closure (nm vs R0 · abidiff vs previous release) | Independent reviewer verdict · reviewer session id | `Upstream-status` |
 |---|---|---|---|---|---|
+| Candidate D; no fix. Base `b886777023e0c503134e340be348d6c1b11c8adc`, unchanged R1 library | H6 `sync-only` via `bash tests/repro/run-candidate-d.sh`; **DEMONSTRATED**, 200/200 failure calls retain the positive fence fd, 200/200 success controls consume it. Exit 1, transcript below; no GREEN/fix | host-shim-only | Not run; no library or ABI change, fence polarity unchanged | Not dispatched; no reviewer session or fix approval claimed | Not reported; error-branch cleanup evidence only |
 | `GAP: no fix landed` — H1 is characterisation of the unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. Nothing was cherry-picked and nothing was changed under `core/` or `im2d_api/`. | `tests/repro/h1_init_race.cpp` + `tests/repro/run-h1-host.sh`, scenario `c-init`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier`. Every iteration identical: `ok=8 refcount_after_init=0 fds_after_init=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. `c_RkRgaInit()` is `return 0;` at `core/RgaApi.cpp:27` — the C shim was hollowed out and `include/RgaApi.h:41-45` documents it — so this entry point opens no device and increments no counter. Teardown returns `-19` (`-ENODEV`, "Try to exit uninit"), which is the evidence the scenario left no session. GREEN: n/a, no fix. Transcripts: `test-results/h1/c-init.{log,csv}`. | `host-shim-only` (`tests/shim/fake_rga.c`, mock device is a `memfd_create("fake-rga")`; TSan build via `scripts/build-sanitized.sh tsan`). No board contacted. | n/a — no library change, so nothing to close. `librga.so.2.1.0` in `build-tsan/` is the unmodified tree. | `GAP: no review dispatched` — this row is a host-side observation, not a landed fix. | n/a — nothing to report upstream from a NOT-REPRODUCED control. |
 | `GAP: no fix landed` — as above, unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. | Same pair, scenario `singleton-get`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier` into `RockchipRga::get()` → `RkRgaInit()` → `RgaInit()` → `NormalRgaOpen()`. Every iteration identical: `ok=8 ctx_agreed=1 refcount_after_init=1 fds_after_init=1 deinit_calls=1 refcount_after_teardown=0 fds_after_teardown=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. The unguarded `if (!rgaCtx)` at `core/NormalRga.cpp:66` is real — only `refCount++` is inside `mMutex` — but on this host it is never reached concurrently, because `Singleton::getInstance()` (`include/RgaSingleton.h:33-40`) holds `sLock` across the whole null-check-and-construct. The eight threads serialise one level above the defect. GREEN: n/a, no fix. Transcripts: `test-results/h1/singleton-get.{log,csv}`. | `host-shim-only`, same build and shim as the row above. No board contacted. | n/a — no library change. | `GAP: no review dispatched` — host-side observation, not a landed fix. | n/a — the latent unguarded check is recorded here, not reported, because no reproducer turned it RED. |
 | H10a observation; **no fix**. Execution base `96c9a53ba94c487f9fae938c73347f5bc00e624d`; library source unchanged from `57a1067a246c71fa6c9a355d1668884fda155dd5`. | `tests/repro/h10_job_handle.cpp count`, via `bash tests/repro/run-h10.sh asan` or `tsan`. **RED: counter drift.** Unknown ID `2147483647`: count/map `0/0 -> -1/0`; 64 subsequent creates yield `63/64`; valid cancellation of all 64 leaves `-1/0`. Both sanitizer builds reproduce it. RED transcripts: `test-results/h10/asan-eS80sZZq/count/transcript.txt`, `test-results/h10/tsan-KHb1J64S/count/transcript.txt` (exit 1 each). `im2d_api/src/im2d_impl.cpp:2445` decrements even when lookup finds no job. No premature creation limit found within this bounded check; all 64 creates succeed and there is no userspace count-limit gate in this source. Re-run 2026-09-06 reproduces the same line in both modes: `test-results/h10/asan-eK4JCCKy/count/`, `test-results/h10/tsan-a3eySo3y/count/`. **GREEN: none; no fix tested.** | `host-shim-only`; native x86_64, GCC 16.2.1, 2026-09-06. No board access. | Not run: QA test/docs only; no library, header, or ABI change. | Not requested; no independent reviewer session or fix approval claimed. | Not reported upstream; characterization only. CeraLive does not call this job API (task scope). |
@@ -63,6 +64,58 @@ can be checked rather than asserted:
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
+
+## Appendix — candidate-d.md
+
+Source: [fix-audit.d/candidate-d.md](fix-audit.d/candidate-d.md). D21 rows are in the [ledger above](#rows).
+
+
+### Candidate D — imsync error branch, 2026-09-12
+
+Branch: `qa/candidate-d-imsync-error`. Native x86_64, GCC 16.2.1.
+
+```sh
+bash scripts/build-sanitized.sh asan
+bash tests/repro/run-candidate-d.sh
+```
+
+The final command returns **1**. The existing H6 C4 loop was moved unchanged
+into a callable test function; the original no-argument H6 still executes all
+three existing cases. The new `sync-only` mode executes no submit/polarity case.
+It uses the existing shim's `FAKE_RGA_SYNC_FAIL=1` knob, not a replacement for
+`imsync` or `rga_sync_wait`.
+
+Raw artifacts: `test-results/candidate-d/run.vYtMzT/` contains the executable,
+preloaded ASan-canary transcript, every test row, and the shim log.
+The runner checks exactly **200** failed `poll` calls with `errno=5` (EIO).
+Recorded rows (`case,iteration,status,fd,open_after,fd_before,fd_after,out_fence,verdict`):
+
+```text
+C4-control-success,1,1,3,0,4,3,-1,PASS
+C4,1,0,3,1,4,4,-1,RED
+C4: RED (200/200 defect observations)
+```
+
+All 200 iterations match this pattern. The successful wait consumes the positive
+eventfd. On EIO, `rga_sync_wait` returns -1, `imsync` returns
+`IM_STATUS_FAILED` (**0**, not a positive success status), and `fcntl(F_GETFD)`
+still finds that fd open. The live-fd census is unchanged rather than decreasing
+by one. The test closes the retained fd **after recording** the failure and
+asserts restoration of its baseline, so the result is 200 independent ownership
+observations, not a claim of 200 accumulated fds or fd-exhaustion behavior.
+
+Mechanism: `im2d.cpp:851-857` returns from the wait-error branch before reaching
+`close(fence_fd)`. This demonstrates missing error-branch consumption under
+the project's cleanup expectation. It does not establish a kernel sync-fence
+bug: the fence is a host eventfd and the failed poll is injected.
+The `fence_fd <= 0` validation and every submit-return polarity remain untouched.
+
+ASan/UBSan instrument both library and client, LSan is enabled, and
+`verify_asan_link_order=0` permits the existing preload. The preloaded canary
+reports a heap-buffer-overflow. The candidate emits **no ASan/LSan/UBSan memory
+diagnostic**; the RED is the fd ownership/census assertion. Those sanitizers do
+not track file-descriptor ownership, so their silence is not leak cleanliness.
+No hardware coverage, library fix, GREEN transcript or release approval claimed.
 
 ## Appendix — h1.md
 
