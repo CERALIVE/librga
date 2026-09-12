@@ -150,6 +150,11 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+Candidate C's scheduler-default assertion [EXISTS] is
+`bash tests/repro/run-candidate-c.sh`. It uses the existing unit helper but
+expects legitimate zero input to succeed, so exits RED separately from H5's
+unchanged characterization assertions. Evidence: `docs/fix-audit.d/candidate-c.md`.
+
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
 It preserves the shared-library alias before the static-library reassignment and
 appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
