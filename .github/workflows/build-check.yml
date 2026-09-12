@@ -274,13 +274,52 @@ jobs:
           set -euo pipefail
           mapfile -t srcs < <(sed -n '/^librga_srcs = \[/,/^\]/p' meson.build \
             | grep -oE "'[^']+\.cpp'" | tr -d "'")
-          mapfile -t incs < <(sed -n '/^incdir = include_directories(/,/)$/p' meson.build \
+          # Bound the include extraction to the include_directories() call
+          # itself. The previous `/)$/` range overran into the shared_library()
+          # block that follows and swept up its 'rga' name and its '-w' cpp_arg
+          # as if they were directories, which is how `-Irga -I-w` ended up on
+          # the command line. Joining the statement and cutting at the first
+          # ')' is exact however many lines the call is spread over.
+          incdir_stmt="$(sed -n '/^incdir = include_directories(/,/)/p' meson.build | tr '\n' ' ')"
+          mapfile -t incs < <(printf '%s' "${incdir_stmt%%)*}" \
             | grep -oE "'[^']+'" | tr -d "'")
-          if [ "${#srcs[@]}" -lt 15 ] || [ "${#incs[@]}" -lt 5 ]; then
-            echo "ERROR: read ${#srcs[@]} sources and ${#incs[@]} include dirs out of" >&2
-            echo "       meson.build; its shape changed and this extraction is stale." >&2
+          # Validate the extraction against meson.build itself rather than
+          # against a count. A hardcoded threshold pins ONE branch's source list
+          # and fails closed on the other for no reason: main lists 17 sources,
+          # the 1.10.1 release line lists 14, and `-lt 15` aborted this branch
+          # before a single source reached the compiler.
+          if [ "${#srcs[@]}" -eq 0 ] || [ "${#incs[@]}" -eq 0 ]; then
+            echo "ERROR: extraction read ${#srcs[@]} sources and ${#incs[@]} include" >&2
+            echo "       dirs out of meson.build; its shape changed." >&2
             exit 1
           fi
+          for src in "${srcs[@]}"; do
+            [ -f "${src}" ] || { echo "ERROR: meson.build lists ${src}, not on disk" >&2; exit 1; }
+          done
+          for inc in "${incs[@]}"; do
+            [ -d "${inc}" ] || { echo "ERROR: meson.build lists ${inc}, not a directory" >&2; exit 1; }
+          done
+          # Positive control. `-fanalyzer` being ACCEPTED by the driver says
+          # nothing about it doing any work, and a silently inert analyzer
+          # reports the same clean zero as a clean tree. Prove it diagnoses a
+          # planted null dereference in THIS toolchain before trusting a quiet
+          # result from it. No pipe here on purpose: `grep -q` exits on first
+          # match and would SIGPIPE the compiler, which `pipefail` then reads
+          # as a probe failure.
+          cat > analyzer-probe.cpp <<'PROBE'
+          int main() { int *p = nullptr; *p = 1; return 0; }
+          PROBE
+          probe_log="$(mktemp)"
+          g++ -std=c++14 -fanalyzer -c -o /dev/null analyzer-probe.cpp \
+            > "${probe_log}" 2>&1 || true
+          if ! grep -q -- '-Wanalyzer-null-dereference' "${probe_log}"; then
+            echo "ERROR: -fanalyzer emitted no diagnostic for a planted null" >&2
+            echo "       dereference, so it is not analyzing anything in this" >&2
+            echo "       toolchain. Probe output follows." >&2
+            cat "${probe_log}" >&2
+            exit 1
+          fi
+          rm -f analyzer-probe.cpp
           # `-I.` is not in meson.build's incdir list and is still required:
           # meson puts the project source root on the include path for every
           # target implicitly, and im2d.cpp reaches core/rga_sync.h through it.
@@ -288,21 +327,46 @@ jobs:
           for inc in "${incs[@]}"; do args+=("-I${inc}"); done
           rc=0
           : > analyzer.log
+          analyzed=0
           for src in "${srcs[@]}"; do
             echo "--- ${src}" | tee -a analyzer.log
             g++ "${args[@]}" "${src}" 2>&1 | tee -a analyzer.log || rc=1
+            analyzed=$((analyzed + 1))
           done
-          echo "analyzed ${#srcs[@]} sources (exit ${rc})"
+          # The summary step reads this file, and its absence is the ONLY thing
+          # that distinguishes "analyzed everything, found nothing" from
+          # "analyzed nothing".
+          echo "${analyzed}" > analyzed.count
+          echo "analyzed ${analyzed} sources (exit ${rc})"
           exit "${rc}"
 
       - name: Analyzer summary
         if: always()
         run: |
           set -euo pipefail
-          count=0
-          if [ -f analyzer.log ]; then
-            count="$(grep -c 'analyzer' analyzer.log || true)"
+          analyzed=0
+          if [ -f analyzed.count ]; then
+            analyzed="$(cat analyzed.count)"
           fi
+          # "0 findings" and "0 sources analyzed" are not the same claim, and
+          # until now this step printed the same zero for both — a clean-looking
+          # summary for an analysis that never started. Report the did-not-run
+          # case as a failure instead of as a pass with nothing in it.
+          if [ ! -s analyzer.log ] || [ "${analyzed}" -eq 0 ]; then
+            {
+              echo "## GCC -fanalyzer — ANALYZER DID NOT RUN"
+              echo
+              echo "**No source was analyzed, so this is NOT a clean result.** The"
+              echo "extraction guard or the analyzer capability probe failed before"
+              echo "any source reached the compiler. Read the job log; do not read"
+              echo "this as zero findings."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          # Match the diagnostic tag, not the bare word: the loose pattern also
+          # counted any source path containing "analyzer", so it agreed with the
+          # real total only by coincidence.
+          count="$(grep -c -- '-Wanalyzer-' analyzer.log || true)"
           {
             echo "## GCC -fanalyzer — ADVISORY"
             echo
@@ -310,7 +374,8 @@ jobs:
             echo "analyzer sees in the library sources, which meson.build's \`-w\`"
             echo "hides from every other build in this repository."
             echo
-            echo "- diagnostic lines mentioning the analyzer: \`${count}\`"
+            echo "- sources analyzed: \`${analyzed}\`"
+            echo "- analyzer diagnostics: \`${count}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the analyzer log
