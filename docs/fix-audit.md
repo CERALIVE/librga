@@ -68,6 +68,7 @@ can be checked rather than asserted:
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | Wave-E C; first-party scheduler-default fix on `1bde9018d28092879978419f8e48f2b88debcbaa`; commit resolved by `git log --format=%H --grep='fix(imconfig): accept the documented default scheduler'` | `tests/repro/run-candidate-c.sh`: RED 2/5 assertions, GREEN 0/5 failures; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: documented enum acceptance; not yet submitted upstream |
+| Wave-E D; first-party wait-error ownership fix; commit resolved by `git log --format=%H --grep='fix(imsync): consume the fence after a failed wait'` | `tests/repro/run-candidate-d.sh`: RED 200/200 retained fds, GREEN 0/200; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: error-path ownership repair; not yet submitted upstream |
 
 ## Appendix — candidate-a.md
 
@@ -1019,3 +1020,43 @@ Candidate C: exit=0; evidence=test-results/candidate-c/run.oT8Bu5
 Disposition: promoted unchanged into the green Meson baseline as `candidate-c`,
 linked against the ordinary shared library (not the golden-test static library).
 Historical characterization fragments remain verbatim.
+
+## Appendix — wave-e-d.md
+
+Source: [fix-audit.d/wave-e-d.md](fix-audit.d/wave-e-d.md). D21 rows are in the [ledger above](#rows).
+
+
+### Wave-E D — wait-error fence ownership
+
+Mechanism: `imsync` closes the accepted positive fence after a failed wait,
+just as it already does after a successful wait. The `fence_fd <= 0` rejection,
+return-status polarity, successful path and submit paths are unchanged.
+Fix: `im2d_api/src/im2d.cpp`, `imsync` error branch.
+
+Exact invocation before and after: `bash tests/repro/run-candidate-d.sh`, after
+building `build-asan` with `scripts/build-sanitized.sh asan` (incrementally rebuilt
+with `meson compile -C build-asan` after the change).
+
+RED on `1bde9018d28092879978419f8e48f2b88debcbaa`:
+
+```text
+C4: RED (200/200 defect observations)
+Candidate D: exit=1; evidence=test-results/candidate-d/run.lBWs5e
+```
+
+GREEN:
+
+```text
+C4: NOT-REPRODUCED (0/200 defect observations)
+Candidate D: exit=0; evidence=test-results/candidate-d/run.jxTWU5
+```
+
+The existing probe calls a clean run `NOT-REPRODUCED`; here it is a measured
+RED-to-GREEN transition, not an already-green candidate. Both runs verified the
+ASan canary and exactly 200 injected `poll` failures (`errno=5`); each also
+completed 200 successful-wait controls. Per-call census and status transcripts
+remain under those evidence directories. No sanitizer reports in the fixed probe.
+
+Disposition: the unchanged `h6_polarity_fence.cpp sync-only` probe is promoted to
+the green Meson baseline as `candidate-d`. Full H6 remains an opt-in
+characterization because C2/C3 are separate, unfixed findings.

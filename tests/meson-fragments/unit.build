@@ -37,3 +37,12 @@ candidate_c = executable('candidate-c', 'tests/repro/candidate_c_scheduler.cpp',
     cpp_args : unit_warnings,
     install : false)
 test('candidate-c', candidate_c, env : unit_session_env, depends : fake_rga, timeout : 30)
+
+candidate_d = executable('candidate-d', 'tests/repro/h6_polarity_fence.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings + ['-DLINUX=1'],
+    install : false)
+test('candidate-d', candidate_d, args : ['sync-only'],
+    env : unit_session_env, depends : fake_rga, timeout : 30)

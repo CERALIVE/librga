@@ -225,6 +225,11 @@ Candidate C's scheduler-default regression [EXISTS] is now the green Meson
 the documented zero default as well as every previously accepted scheduler value;
 no default or public signature changes. Historical RED evidence remains in the ledger.
 
+Candidate D's `imsync` wait-error regression [EXISTS] is the green Meson
+`candidate-d` test (`h6_polarity_fence.cpp sync-only`). Positive fences are consumed
+on success and wait failure; the existing `fence_fd <= 0` rejection is unchanged.
+The full H6 characterization remains opt-in because its other rows are not fixed.
+
 The manual H2 teardown probe [EXISTS] is `tests/repro/run-h2.sh`: 200 fresh
 processes per scenario and sanitizer, with its six-field ledger fragment in
 `docs/fix-audit.d/h2.md`. Invocation and diagnostic-output settings are documented
