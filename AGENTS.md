@@ -170,6 +170,12 @@ Candidate D's isolated H6/C4 mode [EXISTS] is
 the default H6 cases unchanged and measures only positive-fd `imsync` wait-error
 cleanup under host instrumentation; see `docs/fix-audit.d/candidate-d.md`.
 
+Candidates A–D are manual, expected-RED characterization probes, deliberately
+absent from the Meson baseline and its `concurrency` suite. Exit 1 means a
+reproduced finding, not a passing baseline test; do not register these runners
+as required-green tests. The combined R1 run and its baseline results are in
+[`docs/fix-audit.d/r1-consolidation.md`](docs/fix-audit.d/r1-consolidation.md).
+
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
 It preserves the shared-library alias before the static-library reassignment and
 appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
