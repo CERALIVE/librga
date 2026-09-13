@@ -159,6 +159,15 @@ the bookworm leg is a portability signal, not a second runtime target.
 
 ## Export set: what the baseline comparison actually measured
 
+**Owner-approved amendment, 2026-09-12:** R0's Radxa export floor now explicitly
+means **every global symbol**, not every dynamic symbol. The recorded full-ELF
+FAIL stays FAIL. [R0-NEUTRALITY.md](R0-NEUTRALITY.md) is the acceptance authority;
+[R0-AMENDMENT-CHECK.md](R0-AMENDMENT-CHECK.md) checks binding as well as names and
+proves that removing any protected global still fails. The package comparator
+itself is unchanged: its "full floor" means the committed 254-name baseline,
+not the 274-definition unfiltered ELF set. Its candidate name list includes weak
+definitions, so the separate manual binding check is mandatory.
+
 `packaging/baseline-symbols-radxa-2.2.0-1.txt` is the export floor, taken from the
 real board binary (sha256 `0b455344…`, `rga_api version 1.10.1_[4]`). Three
 measurements were run against it, and the difference between them is the reason
@@ -171,7 +180,8 @@ measurements were run against it, and the difference between them is the reason
 
 The R0 result is the one that matters for the neutrality claim in todo 15: a GCC
 14 rebuild of the same upstream API release exports **every** global symbol the
-Radxa build exports. Nothing is narrowed.
+Radxa build exports. This is narrower than full dynamic-export containment;
+the owner-approved amendment makes that limit explicit.
 
 Two details behind that number, both of which cost time to discover:
 
@@ -179,9 +189,18 @@ Two details behind that number, both of which cost time to discover:
   dynamic symbols: 254 global and 20 weak. The R0 rebuild reproduces all 254
   globals and drops three of the weak ones — all three
   `std::_Rb_tree<unsigned int, im_rga_job *>` members. Those are COMDAT template
-  instantiations emitted by whichever compiler happened to build the object, not
-  promises this library makes. Including them would make the contract fail for a
-  toolchain reason and train people to ignore it.
+  instantiations of a private `std::map`, not supported caller entry points.
+  Radxa's matching debug package identifies **GNU C++14 12.2.0**, `-O2`,
+  `-fstack-protector-strong`, `-fPIC`, via `.gnu_debuglink` and build id
+  `2da72b58ecbe1601d24d31868d3a1e7e905f5887`. GCC 12.2 emits these helpers;
+  GCC **14.2.0-19** inlines them. R0 is also at effective **`-O2`** (later than
+  Meson's `-O3`), so this is a compiler-version difference, not a missing flag.
+  A measured, R0-legal final **`-O1` only for `im2d_impl.cpp`** yields **281**
+  exports with **all 274** Radxa definitions contained, **0 missing**. The owner
+  deliberately **declines** that repair: it deoptimizes a much larger translation
+  unit for unsupported internal symbols, with unmeasured performance impact,
+  and changes the binary, invalidating the existing both-board G-A receipt.
+  Neither library source nor any build flag is changed by the amendment.
 - **`LC_ALL=C` everywhere.** `comm(1)` needs both inputs in the same collation. A
   list sorted under a UTF-8 locale and compared inside a C-locale container
   reported 232 phantom differences, with the words `input is not in sorted order`

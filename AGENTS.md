@@ -28,7 +28,7 @@ Two releases exist, versioned upstream-style rather than CalVer:
 
 | Release | Base | What it is |
 |---|---|---|
-| **R0** `1.10.1+ceralive.1` | `5a97e650a30b7c7036eb5aa26e39f2d09f18fcc9` | A rebuild of the same API release the bench boards run today, with packaging and CI commits only. Its neutrality claim is **bounded** to export-set containment, request-byte goldens on the CeraLive call set, and both-board gate rows. Never "byte-identical source". |
+| **R0** `1.10.1+ceralive.1` | `5a97e650a30b7c7036eb5aa26e39f2d09f18fcc9` | A rebuild of the same API release the bench boards run today, with packaging and CI commits only. Under the owner-approved 2026-09-12 amendment, neutrality is **bounded** to global export containment (254/254), semantic request equality on the CeraLive call set excluding only nine proved `full_csc` padding bytes, and both-board gate rows. Weak COMDAT template internals are outside the floor. Never "byte-identical source". |
 | **R1** `1.10.5+ceralive.1` | `57a1067a246c71fa6c9a355d1668884fda155dd5` | The pinned fork point plus the fix series that Wave 0 actually turned RED. |
 
 ## Repository map
@@ -111,10 +111,14 @@ These are compatibility contracts with live consumers, not cleanup opportunities
   `Conflicts`/`Replaces: librga2`) and `librga-ceralive-dev` (development).
 - **pkg-config:** the file is `librga.pc` and keeps its name and its variables.
 - **Header install path:** public headers install under `include/rga/`.
-- **Exported symbols are a SUPERSET contract.** The set may grow; it may **never
-  shrink**. No symbol removal, no public-struct layout change, no visibility or
-  version-script change. `nm -D` containment against R0 plus `abidiff` between
-  releases are the executable authorities.
+- **Exported symbols are a SUPERSET contract, with an explicit R0 exception.**
+  R0-versus-Radxa guarantees every global export; compiler-version-dependent weak
+  COMDAT template internals of the private job map are excluded. See the dated
+  [owner-approved amendment](docs/R0-NEUTRALITY.md) and its
+  [executable acceptance procedure](docs/R0-AMENDMENT-CHECK.md). This does not
+  permit source-level symbol removal, public-struct layout changes, visibility
+  changes or version scripts. The later-release `nm -D` containment against R0
+  and `abidiff` obligations are unchanged; this amendment does not touch R1.
 - **Defaults are frozen.** The default colour matrix, the default interpolation
   mode, and the default log level stay exactly as upstream ships them. Changing
   any of them silently changes behaviour for every caller, including callers
@@ -133,6 +137,12 @@ to be broken by well-meant tidying:
 > `LIBRGA_STRICT_DRIVER=1` stays as a default-off opt-in; validation changes only
 > accept MORE valid input.
 
+The quotation above is preserved as the original plan text. For **R0 versus
+Radxa only**, the owner's 2026-09-12 amendment explicitly narrows "every exported
+symbol" to every global export, excluding compiler-generated weak COMDAT
+internals. No library source is stripped or changed. Do not apply this exception
+to a supported API or silently extend it to R1.
+
 In practice: the Android and RT-Thread build files stay even though CeraLive
 builds with Meson, the CMake tree stays even though we do not use it, chips we
 will never ship stay in the format and scheduler tables, and a validation fix may
@@ -140,6 +150,18 @@ only widen the accepted input set. Deleting any of it is merge friction against
 an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
+
+Current R0 authority: the **owner-approved 2026-09-12 amendment** in
+[`docs/R0-NEUTRALITY.md`](docs/R0-NEUTRALITY.md), with mandatory manual semantic-byte
+and global-floor checks plus negative controls in
+[`docs/R0-AMENDMENT-CHECK.md`](docs/R0-AMENDMENT-CHECK.md). Existing raw comparators
+are unchanged; literal G8 and unfiltered weak-symbol comparisons remain
+known-failing advisories, not passes. No source, build flags, or artifact changes
+are allowed by this amendment. The new both-board receipt is linked there; a
+fresh independent review is still required before any merge or release.
+
+**Historical gate status through 2026-09-08 follows, unaltered.** It records the
+old literal contract and older board environment, not the current amendment:
 
 The R0 integration branch carries the bootstrap infrastructure on `5a97e650`,
 not the newer imported implementation. Its test adaptations and outstanding
@@ -183,12 +205,16 @@ are documented in [`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md).
 
 ### The suite proves
 
-- That the request bytes this library writes for the CeraLive call set are
-  unchanged against the recorded goldens.
+- That the instrumented static construction library matches its recorded goldens
+  byte-for-byte. Production R0-versus-Radxa semantic equality is a separate manual
+  acceptance procedure; raw G8 remains FAIL because Radxa's padding varies.
 - That every ioctl number and every shared struct layout matches the island
   driver's UAPI at the pinned island tag, on aarch64.
-- That the exported-symbol set of a release contains R0's, and that `abidiff`
-  reports no incompatible change against the previous release.
+- The staged package contract checks the recorded Radxa global-name floor. It
+  does not prove full ELF containment or symbol binding; the amendment's manual
+  check also requires global binding. Later-release containment against R0 and
+  `abidiff` against the previous release remain separate obligations, not proof
+  supplied by a green R0 CI run.
 - On the board, only what the transcript for that run names: the exact package,
   the exact kernel, the exact island tag, and the finite observations that run
   scored.

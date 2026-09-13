@@ -5,6 +5,169 @@ Package version: `1.10.1+ceralive.1`. No library implementation, public header,
 default, or installed target flags were changed. The release branch stays at
 the base; only the integration branch receives tier-(c) infrastructure.
 
+## Owner-approved contract amendment — 2026-09-12 [EXISTS]
+
+**Authority and scope.** The owner explicitly authorized this amendment after
+the independent review of PR #2 at `f09da93cc0ef6049997e7387cf832f60189ea0ef`
+rejected the literal contract. It changes the **R0-versus-Radxa acceptance
+contract**, not the library, the artifact, or any existing comparator. It is not
+an approval receipt, a merge, or a release. A fresh independent review must
+adjudicate this amended claim. It does not change the R1 branch or authorize an
+R1 fix without its own reproducer.
+
+### The amended guarantee
+
+R0 guarantees these three bounded properties:
+
+1. **Global export containment:** every global exported symbol of the pinned
+   Radxa reference is contained in R0 (**254/254 measured**). Weak COMDAT C++
+   template instantiations are explicitly excluded from that export floor. The
+   three missing definitions are internal implementation details of the private
+   `std::map<unsigned int, im_rga_job *>`, not supported caller entry points.
+   No supported caller can reference those helpers through the library's API.
+   This is not permission to remove a public API, change a symbol's visibility,
+   or replace a required global definition with a weak one. Full unfiltered ELF
+   containment is **not** claimed.
+2. **Semantic request equality:** every semantically meaningful request field
+   on the CeraLive G1–G8 call set is equal to the pinned Radxa reference. The
+   only byte exclusion is the **nine padding bytes inside `rga_req.full_csc`**,
+   at zero-based request offsets **309, 310, 311, 318, 319, 330, 331, 342, 343**
+   in the measured 504-byte aarch64 request. All other bytes remain compared,
+   including `flag`, every named coefficient and offset, neighboring fields,
+   and the rest of the request. Neither G8 nor the whole `full_csc` is excluded.
+   There is no blanket exemption for other padding, reserved bytes, architectures,
+   layouts, call sets, or future differences.
+3. **Both-board G-A rows:** the package still needs the unchanged hardware gate
+   on Orange Pi 5+ and Rock 5B+, with matching same-session pixel-oracle rows,
+   per-core routing, complete one-hour soaks, and successful restoration. The
+   [2026-09-12 receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5649766546)
+   records all nine matching PSNR cells and **139,031 / 140,572** soak iterations
+   respectively on Rock / Orange Pi, with fd 5→5. This is the newer environment
+   carrying island `v2026.9.3`, not a retroactive pass of the older kernel. The
+   receipt calls the cells byte-equal; the executable gate compares PSNR rows,
+   not retained cross-library output images. Exact oracle equality is established
+   for the infinite-PSNR cells; equal finite PSNR alone is not proof that every
+   output-image byte is identical. No board was contacted for this amendment.
+
+This deliberately narrows two literal promises. It does **not** convert any
+recorded FAIL into PASS. All historical sections below, including the original
+G8 and weak-symbol FAIL entries and their then-current release blocks, are
+preserved verbatim. The superseding acceptance rule is this dated amendment,
+not an edit of those observations. The independent REJECT remains valid for
+the old contract.
+
+### Gap A: a compiler-version difference, not a missing flag
+
+The exact CI R0 and Radxa libraries each define **274** dynamic symbols. Equal
+totals hid three missing weak symbols; containment requires set comparison.
+The missing `std::_Rb_tree<unsigned int, im_rga_job *>` members are
+`_M_emplace_hint_unique`, `_M_get_insert_unique_pos`, and
+`_M_get_insert_hint_unique_pos`. GCC **12.2** emitted their out-of-line COMDAT
+definitions; GCC **14.2** inlines these private map helpers instead. This
+compiler-dependent emission is not a supported ABI entry point. The exact
+mangled names and global-floor check are retained in the
+[amendment verification record](R0-AMENDMENT-CHECK.md).
+
+Radxa's published `librga2-dbgsym_2.2.0-1_arm64.deb` was matched through
+`.gnu_debuglink` and build id **`2da72b58ecbe1601d24d31868d3a1e7e905f5887`**.
+Its `im2d_impl.cpp` DWARF records:
+
+```text
+DW_AT_producer: GNU C++14 12.2.0 -mlittle-endian -mabi=lp64 -g -O2 -std=c++14 -fstack-protector-strong -fPIC -fasynchronous-unwind-tables
+```
+
+`GNU C++14` names the language standard, not compiler version 14. R0 uses
+**GCC 14.2.0-19**, also at effective **`-O2`**: Meson's earlier `-O3` is overridden
+by a later `-O2`. Adding `-O2` is therefore not a fix. This recovered producer
+string does not establish Radxa's exact source commit, full defines, or complete
+historical build manifest; it supplements, rather than rewrites, the earlier
+stripped-binary investigation.
+
+**A legal flag-only fix exists and is deliberately declined.** Compiling only
+`im2d_api/src/im2d_impl.cpp` with a final `-O1` yielded **281** dynamic symbols,
+containing **all 274** Radxa exports with **0 missing**. This would be legal
+within packaging/CI-only R0. The owner declines it because that translation unit
+contains far more than the map helpers: it deoptimizes unrelated code, with
+**unmeasured performance impact**, purely to emit three unsupported C++ internal
+symbols. It also changes the binary and invalidates the existing both-board G-A
+receipt for the current artifact. No source, build flag, or Meson optimization
+setting is changed here. Gap A is **fixable but declined**, not impossible.
+
+### Gap B: Radxa does not match itself
+
+The original seven **one-based `cmp` positions** were
+310/311/312/319/320/343/344. Their **zero-based offsets** are
+**309/310/311/318/319/342/343**. In particular, treating positions 312, 320 or
+344 as offsets inspects named coefficient bytes and is wrong. The layout table
+in the preserved Q1 investigation below identifies all nine padding bytes.
+
+The follow-up used the **unchanged, hash-verified Radxa library**, not a rebuilt
+reference: **40 fresh processes** (20 fixed-environment and 20 varied-environment)
+produced **40 distinct complete requests**. Offsets **342/343** varied even in
+the fixed-environment group. In **20/20 controlled poison pairs on each of BOTH
+libraries**, seeding the callee stack `aa` then `55` changed **all nine** padding
+bytes and no named coefficient. The named values stayed:
+
+```text
+flag=1 Y=187,628,63,16368 U=-102,-346,449,130944 V=449,-407,-40,130944
+```
+
+Even the first five bytes that read `00` in natural runs are therefore stack
+history, not deterministic initialization. **Repeatable literal equality against
+independently executed Radxa is impossible in principle**, not merely unfixed:
+Radxa does not match itself. An accidentally equal pair would not establish a
+fresh-process guarantee.
+
+The pinned source explains why: `core/NormalRgaApi.cpp` declares
+`full_csc_t default_csc_table;` as an **uninitialized local**, assigns its named
+members, then executes
+`memcpy(&msg->full_csc, &default_csc_table, sizeof(full_csc_t))`. The copied
+representation includes the local's padding. Zeroing only the destination
+does not fix it; the poison probe already starts with zeroed requests. The
+Q1 source/disassembly and pinned driver-consumption evidence below establish why
+those padding bytes are not semantic CSC inputs. The follow-up measurement
+record and reproducible negative controls are in [R0-AMENDMENT-CHECK.md](R0-AMENDMENT-CHECK.md).
+
+**R1 forward item, not an R0 fix:** reproduce this inherited uninitialized-padding
+hygiene defect on the R1 base, then initialize the copied representation with
+its own regression test and review. Stack bytes crossing the ioctl boundary
+into the kernel are a genuine hygiene defect in both Radxa and R0; semantic
+neutrality neither cures it nor proves external exploitability. R0 is the honest,
+characterized baseline against which the intended shipping R1 is measured.
+
+### Executable acceptance and artifact boundary
+
+The [verification procedure](R0-AMENDMENT-CHECK.md) is part of this amended
+manual release contract. It requires meaningful-byte equality and a complete
+global floor, and requires negative controls that reject named-field mutations
+and missing globals. **Existing comparators retain their behavior.** Raw dynamic
+G8 `cmp`, the stack-poison raw comparison, and full unfiltered export comparison
+remain known-failing **advisories**, with their original nonzero statuses retained.
+They are not amended-gate passes. An unexpected named-byte or global-symbol
+difference still blocks acceptance; an unexplained new weak-symbol difference
+requires review rather than being silently excused. The existing instrumented
+static goldens, package contract and CI checks remain mandatory, but do not
+prove production raw-byte equality. No `abidiff` suppression is introduced and
+its historical FAIL is not relabeled; this R0 exception does not weaken future
+release ABI checks.
+
+The frozen artifact is Build Check **34708891767**, `dist` **10302383893**, at
+pre-amendment head `f09da93cc0ef6049997e7387cf832f60189ea0ef`:
+
+```text
+R0 runtime .deb  7c59bade43e2f8bb4c31e0ae965bee480128aa128528fdc88e8bc082e98ec498
+R0 library       adf9e34934497092c30ba2ec3cf45141e058c368991d77524d9c0e38f5e29fc6
+Radxa library    0b455344259c37fec821955e2de85bb5f76a34e69682217b514c407d8a35c6c3
+```
+
+The amendment changes documentation only; no packaged input or epoch-selection
+input changes. The release dry-run must still reproduce the board-tested `.deb`
+SHA-256 exactly. A different artifact needs new both-board evidence, not this
+amendment as a waiver. Owner permission to proceed does not replace fresh
+independent review; no merge, approval, tag or publish is performed here.
+
+## Historical record (unaltered)
+
 ## Bootstrap adaptations
 
 All fourteen non-merge bootstrap commits were replayed with `cherry-pick -x`,

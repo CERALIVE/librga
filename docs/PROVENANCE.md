@@ -151,13 +151,19 @@ still reports `[4]`. (In this history `R0`'s message body does read
 selection rule reads the header, not the message, and would still be correct if
 they disagreed.)
 
-R0's **neutrality claim is bounded to three measurable things** and nothing else:
+Under the **owner-approved amendment of 2026-09-12**, R0's **neutrality claim is
+bounded to three measurable things** and nothing else:
 
-- (a) ELF export-set containment against the Radxa `.so`,
-- (b) request-byte goldens equal on the CeraLive call set,
+- (a) every global export of the Radxa `.so` contained (254/254), excluding
+  compiler-generated weak COMDAT template internals of the private job map,
+- (b) every semantic request field equal on the CeraLive call set, excluding
+  only nine proved non-deterministic padding bytes inside `rga_req.full_csc`,
 - (c) both-board gate rows equal.
 
-It is **never** a claim of byte-identical source.
+It is **never** a claim of byte-identical source. The exact exclusions, compiler
+and stack-history evidence, preserved raw FAIL records, and negative controls
+are part of [R0-NEUTRALITY.md](R0-NEUTRALITY.md). This changes the original literal
+export/byte promises openly; it does not claim that their failures passed.
 
 ## The upstream `debian/` directory is kept verbatim and UNUSED
 

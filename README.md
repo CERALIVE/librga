@@ -29,8 +29,10 @@ Two Debian packages, both release assets of one tag and both served from
 | `librga-ceralive-dev` | Headers under `include/rga/` and `librga.pc`. No static archive: `packaging/build-deb.sh` deletes `librga.a` and `packaging/package-contract.sh` fails the build if one is staged in either package. |
 
 The SONAME, the pkg-config name, and the header install path are unchanged from
-upstream. The exported-symbol set is a superset contract: it may grow, never
-shrink.
+upstream. R0 contains every Radxa global export (254/254); compiler-generated weak
+COMDAT template instantiations are outside that floor. This is the explicit
+[owner-approved R0 amendment, 2026-09-12](docs/R0-NEUTRALITY.md#owner-approved-contract-amendment--2026-09-12-exists),
+not full ELF containment or permission to remove supported APIs.
 
 ## Versioning: R0 and R1
 
@@ -40,9 +42,13 @@ cares about is the im2d API release it corresponds to:
 - **R0 — `1.10.1+ceralive.1`.** A rebuild of the same API release the CeraLive
   bench boards already run (`rga_api version 1.10.1_[4]`), cut from
   `release/1.10.1` with packaging and CI commits only. Its neutrality claim is
-  deliberately **bounded** to three measurable things: ELF export-set containment
-  against the board's existing library, request-byte goldens on the CeraLive call
-  set, and equal board-gate rows. It is never a claim of byte-identical source.
+  deliberately **bounded** to every global export, every semantically meaningful
+  request field on the CeraLive call set, and equal both-board gate rows. The
+  explicit exclusions are compiler-version-dependent weak COMDAT internals of a
+  private `std::map` and the nine proved non-deterministic padding bytes inside
+  `rga_req.full_csc`—never its named coefficients. The amendment preserves the
+  literal G8 and weak-symbol FAIL records and requires executable negative
+  controls. It is never a claim of byte-identical source or whole-request bytes.
 - **R1 — `1.10.5+ceralive.1`.** The pinned fork point plus the fix series that
   reproducers actually turned RED, each fix carrying its own red/green transcripts
   and independent-review receipt in [`docs/fix-audit.md`](docs/fix-audit.md).
