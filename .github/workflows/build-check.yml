@@ -1,0 +1,484 @@
+name: Build Check
+
+# `push` carries a positive branch/tag selector on purpose: with a bare `push:`
+# every pull-request-branch push would run this workflow twice, and
+# `concurrency:` does NOT dedupe it — refs/heads/<branch> and refs/pull/N/merge
+# hash to different groups, so the trigger filter is the fix.
+on:
+  push:
+    branches: [main, "release/**"]
+    tags: ["*"]
+  pull_request:
+    branches: [main, "release/**", "integration/**"]
+
+concurrency:
+  group: build-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# A container job's default shell is `sh -e`, and dash has no `pipefail`. Every
+# `run:` block here is written as bash; say so once rather than degrading each
+# one to POSIX sh.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  resolve-suite:
+    name: Resolve device target suite
+    runs-on: ubuntu-latest
+    outputs:
+      suite: ${{ steps.read.outputs.suite }}
+      secondary_suite: ${{ steps.read.outputs.secondary_suite }}
+      arch: ${{ steps.read.outputs.arch }}
+      triplet: ${{ steps.read.outputs.triplet }}
+      glibc_floor: ${{ steps.read.outputs.glibc_floor }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # The values reach the build job as OUTPUTS, never `$GITHUB_ENV`. GitHub
+      # selects a job's `container:` before that job's first step runs, so a
+      # same-job export is structurally too late to name the image — which is
+      # exactly what the build matrix needs it for.
+      - name: Read ci/target-suite.env
+        id: read
+        run: |
+          set -euo pipefail
+          # shellcheck source=ci/target-suite.env
+          source ci/target-suite.env
+          for key in TARGET_SUITE SECONDARY_SUITE TARGET_ARCH TARGET_TRIPLET GLIBC_FLOOR; do
+            if [ -z "${!key:-}" ]; then
+              echo "ERROR: $key is not declared in ci/target-suite.env" >&2
+              exit 1
+            fi
+          done
+          {
+            echo "suite=${TARGET_SUITE}"
+            echo "secondary_suite=${SECONDARY_SUITE}"
+            echo "arch=${TARGET_ARCH}"
+            echo "triplet=${TARGET_TRIPLET}"
+            echo "glibc_floor=${GLIBC_FLOOR}"
+          } >> "$GITHUB_OUTPUT"
+          echo "target ${TARGET_SUITE} · secondary ${SECONDARY_SUITE} · ${TARGET_ARCH} · glibc floor ${GLIBC_FLOOR}"
+
+      # Without this, flipping TARGET_SUITE to a suite the matrix does not build
+      # would silently retire the ABI floor gate: its step condition would match
+      # no leg and the workflow would stay green having checked nothing.
+      - name: Assert both declared suites are matrix legs
+        run: |
+          set -euo pipefail
+          for suite in '${{ steps.read.outputs.suite }}' '${{ steps.read.outputs.secondary_suite }}'; do
+            if ! grep -qE "^ +- suite: ${suite}\$" .github/workflows/build-check.yml; then
+              echo "ERROR: ci/target-suite.env names ${suite}, but the build matrix has" >&2
+              echo "       no '- suite: ${suite}' leg, so nothing would be built for it." >&2
+              exit 1
+            fi
+          done
+          echo "matrix covers ${{ steps.read.outputs.suite }} and ${{ steps.read.outputs.secondary_suite }}"
+
+  build:
+    name: ${{ matrix.suite }} · arm64
+    needs: resolve-suite
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ matrix.suite }}-slim
+    strategy:
+      # Both legs always report. A secondary-suite failure is a real portability
+      # problem and must be seen, not hidden behind a cancelled sibling.
+      fail-fast: false
+      matrix:
+        include:
+          - suite: bookworm
+          - suite: trixie
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
+    steps:
+      # The slim image has no git, and `actions/checkout` silently degrades to a
+      # history-less REST tarball without it. Base tooling therefore installs
+      # BEFORE the checkout, not after.
+      - name: Install base tooling
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git
+
+      # fetch-depth 0 is load-bearing. packaging/build-deb.sh derives
+      # SOURCE_DATE_EPOCH from the last commit that touched a PACKAGED INPUT, and
+      # a depth-1 checkout answers that query with nothing whenever HEAD happens
+      # to be a docs or test commit — which is most of them.
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.suite }}-arm64-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.suite }}-arm64-
+
+      # ONE step, on purpose. Everything this leg does lives in the script, so
+      # `docker run --rm --platform linux/arm64 -v "$PWD":/src -w /src
+      # debian:${{ matrix.suite }}-slim bash ci/build-check-steps.sh` reproduces
+      # it exactly, without a pull request and without this file.
+      - name: Build check (deps · contract · meson · test · package)
+        run: bash ci/build-check-steps.sh
+
+      - name: Export unit-pure, unit-session, goldens and uapi-parity results
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          def test_name(name):
+              return name.rsplit(' / ', 1)[-1].rsplit(':', 1)[-1]
+          for raw, expected in [
+              ('librga / unit-pure', 'unit-pure'),
+              ('librga:uapi / uapi-parity', 'uapi-parity'),
+              ('librga:goldens', 'goldens'),
+              ('unit-session', 'unit-session'),
+          ]:
+              if test_name(raw) != expected:
+                  raise SystemExit(f'Meson result-name regression: {raw}')
+          results = [json.loads(line) for line in Path('build/meson-logs/testlog.json').read_text().splitlines()]
+          Path('build/test-results.json').write_text(json.dumps([
+              {'name': test_name(row['name']), 'result': row['result']}
+              for row in results
+          ]))
+          PY
+
+      - name: Upload suite test results
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.suite }}
+          path: build/test-results.json
+          if-no-files-found: error
+
+      # Enforced only on the TARGET leg, and the condition reads the declared
+      # suite rather than a literal. The secondary leg builds against an OLDER
+      # glibc by construction, so its imports say nothing about the device.
+      #
+      # This gates the unstripped library in the meson tree; ci/build-check-steps.sh
+      # has already gated the stripped one the runtime package ships. They are two
+      # different binaries and both are worth refusing.
+      - name: ABI floor gate (target suite only)
+        if: matrix.suite == needs.resolve-suite.outputs.suite
+        run: bash ci/check-abi-floors.sh build/librga.so.2.1.0
+
+      - name: Note the secondary-suite leg
+        if: matrix.suite != needs.resolve-suite.outputs.suite
+        run: |
+          echo "${{ matrix.suite }} is the secondary suite, not the device target"
+          echo "(${{ needs.resolve-suite.outputs.suite }}). It proves the source still"
+          echo "configures, compiles and passes its tests on an older toolchain. The"
+          echo ".deb and the ABI floors are properties of the target suite and are"
+          echo "checked on that leg."
+
+      # The R0/R1 release branches consume these: the board gate installs the
+      # exact archives a build-check run produced rather than rebuilding them.
+      # Only the target leg produces a shippable package.
+      - name: Upload the built packages
+        if: matrix.suite == needs.resolve-suite.outputs.suite
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+
+      - name: Save ccache
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.suite }}-arm64-${{ github.sha }}
+
+      - name: Build summary
+        if: always()
+        run: |
+          {
+            echo "## ${{ matrix.suite }} · arm64"
+            echo
+            echo "- device target suite: \`${{ needs.resolve-suite.outputs.suite }}\` (GLIBC floor \`${{ needs.resolve-suite.outputs.glibc_floor }}\`)"
+            echo "- ABI floor gate: ${{ matrix.suite == needs.resolve-suite.outputs.suite && 'enforced' || 'not applicable (secondary suite)' }}"
+            echo "- packaging: ${{ matrix.suite == needs.resolve-suite.outputs.suite && 'librga2-ceralive + librga-ceralive-dev built and contract-checked' || 'not applicable (secondary suite)' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test-results:
+    name: ${{ matrix.group }} · ${{ matrix.suite }} results
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [bookworm, trixie]
+        group: [unit, goldens, uapi-parity]
+    steps:
+      - name: Download suite test results
+        uses: actions/download-artifact@v8
+        with:
+          name: test-results-${{ matrix.suite }}
+      - name: Require every test in the group to have run successfully
+        env:
+          GROUP: ${{ matrix.group }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          expected = {
+              'unit': {'unit-pure': 1, 'unit-session': 1},
+              'goldens': {'goldens': 8},
+              'uapi-parity': {'uapi-parity': 1, 'uapi-parity-stubs': 1},
+          }[os.environ['GROUP']]
+          results = json.loads(Path('test-results.json').read_text())
+          for name, count in expected.items():
+              rows = [row for row in results if row['name'] == name]
+              if len(rows) != count or any(row['result'] != 'OK' for row in rows):
+                  raise SystemExit(f'{name}: expected {count} OK results, got {rows}')
+              print(f'{name}: {count} OK')
+          PY
+
+  analyzer:
+    name: GCC -fanalyzer (advisory)
+    needs: resolve-suite
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
+    # ADVISORY for the R0 release line. The findings are read, triaged and
+    # recorded; they do not block a merge yet. Promoting this job to a gate is a
+    # separate, deliberate step once the backlog it surfaces is at zero.
+    continue-on-error: true
+    steps:
+      - name: Install base tooling
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git g++
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # meson.build compiles the library with `-w`, which inhibits ALL warnings
+      # including every analyzer diagnostic. So the analyzer cannot be run
+      # through meson at all: `-w` is global and wins wherever it appears on the
+      # command line. The source and include lists are read out of meson.build
+      # rather than duplicated here, so a new source file cannot quietly escape
+      # the analyzer.
+      - name: Analyze every library source
+        run: |
+          set -euo pipefail
+          mapfile -t srcs < <(sed -n '/^librga_srcs = \[/,/^\]/p' meson.build \
+            | grep -oE "'[^']+\.cpp'" | tr -d "'")
+          # Bound the include extraction to the include_directories() call
+          # itself. The previous `/)$/` range overran into the shared_library()
+          # block that follows and swept up its 'rga' name and its '-w' cpp_arg
+          # as if they were directories, which is how `-Irga -I-w` ended up on
+          # the command line. Joining the statement and cutting at the first
+          # ')' is exact however many lines the call is spread over.
+          incdir_stmt="$(sed -n '/^incdir = include_directories(/,/)/p' meson.build | tr '\n' ' ')"
+          mapfile -t incs < <(printf '%s' "${incdir_stmt%%)*}" \
+            | grep -oE "'[^']+'" | tr -d "'")
+          # Validate the extraction against meson.build itself rather than
+          # against a count. A hardcoded threshold pins ONE branch's source list
+          # and fails closed on the other for no reason: main lists 17 sources,
+          # the 1.10.1 release line lists 14, and `-lt 15` aborted this branch
+          # before a single source reached the compiler.
+          if [ "${#srcs[@]}" -eq 0 ] || [ "${#incs[@]}" -eq 0 ]; then
+            echo "ERROR: extraction read ${#srcs[@]} sources and ${#incs[@]} include" >&2
+            echo "       dirs out of meson.build; its shape changed." >&2
+            exit 1
+          fi
+          for src in "${srcs[@]}"; do
+            [ -f "${src}" ] || { echo "ERROR: meson.build lists ${src}, not on disk" >&2; exit 1; }
+          done
+          for inc in "${incs[@]}"; do
+            [ -d "${inc}" ] || { echo "ERROR: meson.build lists ${inc}, not a directory" >&2; exit 1; }
+          done
+          # Positive control. `-fanalyzer` being ACCEPTED by the driver says
+          # nothing about it doing any work, and a silently inert analyzer
+          # reports the same clean zero as a clean tree. Prove it diagnoses a
+          # planted null dereference in THIS toolchain before trusting a quiet
+          # result from it. No pipe here on purpose: `grep -q` exits on first
+          # match and would SIGPIPE the compiler, which `pipefail` then reads
+          # as a probe failure.
+          cat > analyzer-probe.cpp <<'PROBE'
+          int main() { int *p = nullptr; *p = 1; return 0; }
+          PROBE
+          probe_log="$(mktemp)"
+          g++ -std=c++14 -fanalyzer -c -o /dev/null analyzer-probe.cpp \
+            > "${probe_log}" 2>&1 || true
+          if ! grep -q -- '-Wanalyzer-null-dereference' "${probe_log}"; then
+            echo "ERROR: -fanalyzer emitted no diagnostic for a planted null" >&2
+            echo "       dereference, so it is not analyzing anything in this" >&2
+            echo "       toolchain. Probe output follows." >&2
+            cat "${probe_log}" >&2
+            exit 1
+          fi
+          rm -f analyzer-probe.cpp
+          # `-I.` is not in meson.build's incdir list and is still required:
+          # meson puts the project source root on the include path for every
+          # target implicitly, and im2d.cpp reaches core/rga_sync.h through it.
+          args=(-std=c++14 -DLINUX=1 -I. -fanalyzer -c -o /dev/null)
+          for inc in "${incs[@]}"; do args+=("-I${inc}"); done
+          rc=0
+          : > analyzer.log
+          analyzed=0
+          for src in "${srcs[@]}"; do
+            echo "--- ${src}" | tee -a analyzer.log
+            g++ "${args[@]}" "${src}" 2>&1 | tee -a analyzer.log || rc=1
+            analyzed=$((analyzed + 1))
+          done
+          # The summary step reads this file, and its absence is the ONLY thing
+          # that distinguishes "analyzed everything, found nothing" from
+          # "analyzed nothing".
+          echo "${analyzed}" > analyzed.count
+          echo "analyzed ${analyzed} sources (exit ${rc})"
+          exit "${rc}"
+
+      - name: Analyzer summary
+        if: always()
+        run: |
+          set -euo pipefail
+          analyzed=0
+          if [ -f analyzed.count ]; then
+            analyzed="$(cat analyzed.count)"
+          fi
+          # "0 findings" and "0 sources analyzed" are not the same claim, and
+          # until now this step printed the same zero for both — a clean-looking
+          # summary for an analysis that never started. Report the did-not-run
+          # case as a failure instead of as a pass with nothing in it.
+          if [ ! -s analyzer.log ] || [ "${analyzed}" -eq 0 ]; then
+            {
+              echo "## GCC -fanalyzer — ANALYZER DID NOT RUN"
+              echo
+              echo "**No source was analyzed, so this is NOT a clean result.** The"
+              echo "extraction guard or the analyzer capability probe failed before"
+              echo "any source reached the compiler. Read the job log; do not read"
+              echo "this as zero findings."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          # Match the diagnostic tag, not the bare word: the loose pattern also
+          # counted any source path containing "analyzer", so it agreed with the
+          # real total only by coincidence.
+          count="$(grep -c -- '-Wanalyzer-' analyzer.log || true)"
+          {
+            echo "## GCC -fanalyzer — ADVISORY"
+            echo
+            echo "This job does not gate a merge. It reports what the GCC static"
+            echo "analyzer sees in the library sources, which meson.build's \`-w\`"
+            echo "hides from every other build in this repository."
+            echo
+            echo "- sources analyzed: \`${analyzed}\`"
+            echo "- analyzer diagnostics: \`${count}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the analyzer log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: analyzer-log
+          path: analyzer.log
+          if-no-files-found: warn
+
+  sanitizers:
+    name: Sanitizers (placeholder — no coverage claimed)
+    runs-on: ubuntu-latest
+    steps:
+      # Deliberately a no-op that says so. AddressSanitizer/UBSan/ThreadSanitizer
+      # coverage needs the host shim to stand in for /dev/rga, and that shim is
+      # not on this branch yet. A green job here proves NOTHING about memory or
+      # thread safety, and this step exists so nobody reads it as if it did.
+      - name: Declare that no sanitizer ran
+        run: |
+          set -euo pipefail
+          {
+            echo "## Sanitizers — NOT RUN"
+            echo
+            echo "No sanitizer executed and no sanitizer coverage is claimed by this"
+            echo "run. The suite needs the host \`/dev/rga\` shim to reach any library"
+            echo "code path at all, so wiring it before the shim exists would produce"
+            echo "a job that passes without executing anything."
+            echo
+            echo "When the shim lands, this job builds \`-fsanitize=address,undefined\`"
+            echo "against it and becomes a real leg."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # THE terminal summary job, and the only one. The branch ruleset on `main` and
+  # `release/*` requires the single status context `Build Check summary`, and a
+  # job's reported context is its `name:` verbatim — so this `name:` is
+  # load-bearing wire protocol, not a label. Renaming it renames the context and
+  # re-blocks every pull request in the repository on a check nothing produces,
+  # which is exactly the state this job was added to end. Adding a SECOND
+  # terminal sink is equally wrong: then neither is authoritative.
+  build-check-summary:
+    name: Build Check summary
+    # Every failure-bearing prerequisite, setup job included. `resolve-suite` is
+    # here for a reason that is easy to miss: if it fails, `build` and
+    # `test-results` SKIP rather than fail, so a summary watching only the lanes
+    # would see no failure and report green over a run that built nothing.
+    needs: [resolve-suite, build, test-results, analyzer, sanitizers]
+    # `always()` rather than the implicit success-gate. A summary that runs only
+    # when its dependencies already passed can never report red, and a required
+    # check that cannot fail is decorative.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every prerequisite to have succeeded
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          results = {
+              job: (data or {}).get('result')
+              for job, data in json.loads(os.environ['NEEDS_JSON']).items()
+          }
+          if not results:
+              raise SystemExit('needs context is empty; this job has no prerequisites to judge')
+
+          # No job in this workflow carries a job-level `if:` — there is no
+          # docs-only `changes` gate here and nothing has licence to skip. A
+          # `skipped` result therefore means an upstream prerequisite failed or
+          # the run was cancelled, never a legitimate no-op, so it is red. If a
+          # conditionally-gated lane is ever added to this workflow, this is the
+          # line to revisit: it must then stay red on skip whenever the gate
+          # claimed the lane's inputs were present.
+          #
+          # `analyzer` is advisory and carries its own `continue-on-error: true`,
+          # which makes GitHub report `success` for it even when its steps fail.
+          # That is where the advisory decision lives, so listing it in `needs`
+          # does not promote it to a gate by the back door.
+          bad = {job: res for job, res in results.items() if res != 'success'}
+
+          lines = ['## Build Check summary', '']
+          for job in sorted(results):
+              res = results[job]
+              lines.append(f"- `{job}`: **{res}**{'' if res == 'success' else '  ← blocking'}")
+          lines.append('')
+          if bad:
+              lines.append(
+                  'FAILED — '
+                  + ', '.join(f'`{job}` ({res})' for job, res in sorted(bad.items()))
+                  + '. This check is red on purpose; read the failing job above.'
+              )
+          else:
+              lines.append('Every prerequisite succeeded.')
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as handle:
+                  handle.write('\n'.join(lines) + '\n')
+          print('\n'.join(lines))
+
+          if bad:
+              raise SystemExit(1)
+          PY

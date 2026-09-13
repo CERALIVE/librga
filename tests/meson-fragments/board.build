@@ -1,0 +1,28 @@
+add_languages('c')
+board_cc = meson.get_compiler('c')
+board_math = board_cc.find_library('m')
+board_dl = board_cc.find_library('dl')
+board_cargs = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic']
+board_oracle = static_library('board-oracle', 'tests/oracle/oracle.c',
+    c_args : board_cargs, install : false)
+oracle_test = executable('oracle-test', 'tests/oracle/test-oracle.c',
+    link_with : board_oracle, dependencies : board_math, c_args : board_cargs, install : false)
+test('board-oracle', oracle_test)
+executable('probe-version', 'tests/board/probe-version.c',
+    include_directories : incdir, link_with : librga_so,
+    c_args : board_cargs, install : false)
+board_bench = executable('rga-convert-bench', 'tests/board/rga-convert-bench.c',
+    include_directories : incdir, link_with : [librga_so, board_oracle],
+    dependencies : [board_math, board_dl], c_args : board_cargs, install : false)
+test('board-session-baseline', board_bench, args : ['--session-selftest'],
+    env : fake_rga_env, depends : fake_rga)
+test('board-conversion-evidence', find_program('bash'),
+    args : [files('tests/board/conversion-evidence.sh'), '--selftest'])
+board_timing = shared_library('rga_timing', 'tests/shim/fake_rga.c',
+    include_directories : incdir, dependencies : [board_dl, libthreads_dep],
+    c_args : board_cargs + ['-DFORWARD_TIMING'], install : false)
+timing_contract = executable('timing-contract', 'tests/shim/timing-contract.c',
+    dependencies : board_dl, export_dynamic : true, c_args : board_cargs, install : false)
+timing_env = environment()
+timing_env.set('LD_PRELOAD', board_timing.full_path())
+test('board-timing', timing_contract, env : timing_env, depends : board_timing)

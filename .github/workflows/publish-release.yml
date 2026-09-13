@@ -1,0 +1,500 @@
+name: Publish Release
+
+# `workflow_dispatch` ONLY, and deliberately so. There is no `push:`, no `tags:`
+# trigger and no `pull_request:`: this workflow publishes packages devices
+# install, so cutting a release is always a human decision.
+#
+# The version is NOT invented here. packaging/version is the single place a
+# release version is written, and the operator retypes it as `expected_version`
+# so a dispatch aimed at the wrong branch — or at a branch whose version file has
+# moved since — fails on a string comparison instead of publishing something
+# nobody meant to publish.
+#
+# The run happens on the ref it was dispatched with (`gh workflow run ... --ref`),
+# which is how the R0 release line publishes from `release/1.10.1` while `main`
+# publishes the R1 line.
+#
+# This workflow does NOT dispatch a root `version-bump`. The workspace pin for
+# this component is written by one deliberate root change, not chained off a
+# release.
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: >-
+          The version this release must be, character for character. It is
+          compared against packaging/version and the run fails if they differ.
+        required: true
+        type: string
+      channel:
+        description: apt channel to publish into
+        required: true
+        default: beta
+        type: choice
+        options:
+          - stable
+          - beta
+      dry_run:
+        description: >-
+          Build, gate, package and install-smoke ONLY — create no tag, no GitHub
+          release, and fire no apt-reindex dispatch.
+        type: boolean
+        default: true
+
+# NOT ref-scoped, on purpose. Two concurrent runs would race on the same tag and
+# on apt-worker's index. One release at a time — and never cancelled part-way
+# through publishing.
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+# A container job's default shell is `sh -e`, and dash has no `pipefail`. Every
+# `run:` block here is bash; say so once rather than degrading each one.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  resolve:
+    name: Resolve target suite and release version
+    runs-on: ubuntu-latest
+    outputs:
+      suite: ${{ steps.suite.outputs.suite }}
+      secondary_suite: ${{ steps.suite.outputs.secondary_suite }}
+      arch: ${{ steps.suite.outputs.arch }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      # The release lines and nothing else. A release built from a feature or
+      # integration branch would carry a version string that names a line it was
+      # never on.
+      - name: Require a release ref
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF" in
+            refs/heads/main|refs/heads/release/*) ;;
+            *)
+              echo "ERROR: releases run only from refs/heads/main or refs/heads/release/*," >&2
+              echo "       not ${GITHUB_REF}." >&2
+              exit 1
+              ;;
+          esac
+          echo "release ref ${GITHUB_REF}"
+
+      # fetch-depth 0 is load-bearing twice over: the tag-collision check needs
+      # the existing tags, and packaging/build-deb.sh derives SOURCE_DATE_EPOCH
+      # from the last commit that touched a packaged input.
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The suite reaches the build job as an OUTPUT, never `$GITHUB_ENV`. GitHub
+      # selects a job's `container:` before that job's first step runs, so a
+      # same-job export is structurally too late to name the image.
+      - name: Read ci/target-suite.env
+        id: suite
+        run: |
+          set -euo pipefail
+          # shellcheck source=ci/target-suite.env
+          source ci/target-suite.env
+          for key in TARGET_SUITE SECONDARY_SUITE TARGET_ARCH; do
+            if [ -z "${!key:-}" ]; then
+              echo "ERROR: $key is not declared in ci/target-suite.env" >&2
+              exit 1
+            fi
+          done
+          {
+            echo "suite=${TARGET_SUITE}"
+            echo "secondary_suite=${SECONDARY_SUITE}"
+            echo "arch=${TARGET_ARCH}"
+          } >> "$GITHUB_OUTPUT"
+          echo "target suite ${TARGET_SUITE} · secondary ${SECONDARY_SUITE} · ${TARGET_ARCH}"
+
+      # The packages are built ONCE, on the target suite, and BOTH suites are
+      # smoked — with opposite expected outcomes. See the install-smoke job for
+      # why the secondary leg proves a refusal rather than an install. Dropping
+      # either leg would leave a real gap invisible, so the leg set is asserted
+      # rather than trusted to review.
+      - name: Assert the install smoke covers both suites, including the target
+        run: |
+          set -euo pipefail
+          legs="$(sed -n 's/^[[:space:]]*suite: \[\(.*\)\]$/\1/p' .github/workflows/publish-release.yml)"
+          if [ -z "${legs}" ]; then
+            echo "ERROR: could not read the install-smoke matrix from this workflow" >&2
+            exit 1
+          fi
+          for required in bookworm trixie '${{ steps.suite.outputs.suite }}' '${{ steps.suite.outputs.secondary_suite }}'; do
+            case ",${legs// /}," in
+              *",${required},"*) ;;
+              *)
+                echo "ERROR: the install-smoke matrix [${legs}] has no '${required}' leg." >&2
+                exit 1
+                ;;
+            esac
+          done
+          echo "install smoke legs: ${legs}"
+
+      # packaging/version is the only place a version is written; the input is
+      # the operator's independent statement of what they believe they are
+      # releasing. Agreement is the gate. The tag IS the version string —
+      # `1.10.1+ceralive.1`, no `v` prefix — matching the sibling fork's
+      # `1.14.4+ceralive.1` precedent.
+      - name: Resolve and verify the release version
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(sed -e 's/#.*//' -e 's/[[:space:]]//g' packaging/version | grep -m1 . || true)"
+          if [ -z "${version}" ]; then
+            echo "ERROR: packaging/version carries no version line" >&2
+            exit 1
+          fi
+          expected='${{ inputs.expected_version }}'
+          if [ "${version}" != "${expected}" ]; then
+            echo "ERROR: packaging/version on ${GITHUB_REF} is '${version}', but this" >&2
+            echo "       dispatch declared expected_version='${expected}'." >&2
+            echo "       Either the wrong ref was dispatched or the version file has moved." >&2
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/${version}" >/dev/null; then
+            echo "ERROR: tag ${version} already exists — a released version is never rebuilt" >&2
+            exit 1
+          fi
+          {
+            echo "version=${version}"
+            echo "tag=${version}"
+          } >> "$GITHUB_OUTPUT"
+          echo "releasing ${version} into the ${{ inputs.channel }} channel"
+
+      - name: Run summary
+        run: |
+          {
+            echo "## Release plan"
+            echo
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| version | \`${{ steps.version.outputs.version }}\` |"
+            echo "| tag | \`${{ steps.version.outputs.tag }}\` |"
+            echo "| channel | \`${{ inputs.channel }}\` |"
+            echo "| ref | \`${{ github.ref }}\` |"
+            echo "| build suite | \`debian:${{ steps.suite.outputs.suite }}-slim\` |"
+            echo "| dry run | \`${{ inputs.dry_run }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Gate and package · debian:${{ needs.resolve.outputs.suite }} · ${{ needs.resolve.outputs.arch }}
+    needs: resolve
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ needs.resolve.outputs.suite }}-slim
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
+      RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+      DEB_ARCH: ${{ needs.resolve.outputs.arch }}
+    steps:
+      # The slim image has no git, and `actions/checkout` silently degrades to a
+      # history-less REST tarball without it. Base tooling installs BEFORE the
+      # checkout, not after.
+      - name: Install base tooling
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git
+
+      # SOURCE_DATE_EPOCH is deliberately NOT passed in from here.
+      # packaging/build-deb.sh derives it from the last commit that touched a
+      # PACKAGED INPUT, which is what keeps a docs-only commit from changing the
+      # archive hashes — handing it HEAD's date would defeat exactly that. Full
+      # history is what makes the derivation answerable.
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-release-${{ needs.resolve.outputs.suite }}-arm64-${{ github.sha }}
+          restore-keys: |
+            ccache-release-${{ needs.resolve.outputs.suite }}-arm64-
+            ccache-${{ needs.resolve.outputs.suite }}-arm64-
+
+      # THE FULL BUILD-CHECK GATE, and the same script build-check.yml runs: the
+      # static package contract, meson configure/compile, the whole test suite,
+      # packaging, the staged package contract and the ABI floor gate. Nothing is
+      # published that has not passed it, and it runs BEFORE any packaging output
+      # is looked at, let alone attached to a release.
+      - name: Build check gate (deps · contract · meson · test · package)
+        run: bash ci/build-check-steps.sh
+
+      # The release publishes EXACTLY four files: two .deb archives and their two
+      # checksums. apt-worker's reindex consumes what is attached to the tag, so a
+      # stray archive is a publish failure rather than a cosmetic one.
+      - name: Assemble and verify the release assets
+        run: |
+          set -euo pipefail
+          runtime="librga2-ceralive_${RELEASE_VERSION}_${DEB_ARCH}.deb"
+          dev="librga-ceralive-dev_${RELEASE_VERSION}_${DEB_ARCH}.deb"
+          for deb in "${runtime}" "${dev}"; do
+            [ -f "dist/${deb}" ] || { echo "ERROR: dist/${deb} was not produced" >&2; exit 1; }
+            ( cd dist && sha256sum "${deb}" > "${deb}.sha256" )
+          done
+          # Set EQUALITY, not a count plus a spot check: counting to four and
+          # confirming the two .debs exist would happily accept them plus any two
+          # stray files as the release payload.
+          expected="$(printf '%s\n%s\n%s\n%s\n' "${runtime}" "${runtime}.sha256" "${dev}" "${dev}.sha256" | LC_ALL=C sort)"
+          actual="$(find dist -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)"
+          if [ "${actual}" != "${expected}" ]; then
+            echo "ERROR: dist must hold exactly the two .debs and their two .sha256 files" >&2
+            { echo "expected:"; printf '%s\n' "${expected}" | sed 's/^/  /'; } >&2
+            { echo "actual:";   printf '%s\n' "${actual}"   | sed 's/^/  /'; } >&2
+            exit 1
+          fi
+          echo "release assets:"
+          printf '%s\n' "${actual}" | sed 's/^/  /'
+          cat "dist/${runtime}.sha256" "dist/${dev}.sha256"
+
+      - name: Record the package control fields
+        run: |
+          set -euo pipefail
+          {
+            echo "## Packages"
+            echo
+            for deb in dist/*.deb; do
+              echo "### $(basename "${deb}")"
+              echo
+              echo '```'
+              dpkg-deb -I "${deb}"
+              echo '```'
+              echo
+              echo '<details><summary>contents</summary>'
+              echo
+              echo '```'
+              dpkg-deb -c "${deb}"
+              echo '```'
+              echo
+              echo '</details>'
+              echo
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save ccache
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-release-${{ needs.resolve.outputs.suite }}-arm64-${{ github.sha }}
+
+      - name: Upload the release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-assets
+          path: dist
+          if-no-files-found: error
+
+  # Both suites are smoked, with OPPOSITE expected outcomes, and that asymmetry
+  # is the point rather than an oversight.
+  #
+  # The packages are built once, on the target suite. librga's target suite is
+  # the NEWER of the two, so the archive imports symbol versions the secondary
+  # suite's glibc does not have and its declared `libc6` floor is above what that
+  # suite can offer. It therefore MUST NOT install there — and proving apt says
+  # so is worth more than skipping the leg: an install that succeeded would mean
+  # the runtime Depends floor is under-declared, which is precisely the failure
+  # that is invisible in a build container and only a device discovers.
+  #
+  # Both conditions read the resolved target suite rather than a literal, so a
+  # suite flip in ci/target-suite.env moves the expectation with it.
+  install-smoke:
+    name: Install smoke · debian:${{ matrix.suite }}
+    needs: [resolve, build]
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      # Both legs always report. Either failure is a real installability problem
+      # and must be seen, not hidden behind a cancelled sibling.
+      fail-fast: false
+      matrix:
+        suite: [bookworm, trixie]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download the release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Clean-container install smoke (target suite — must install)
+        if: matrix.suite == needs.resolve.outputs.suite
+        run: |
+          set -euo pipefail
+          docker run --rm -v "${PWD}:/work" -w /work "debian:${{ matrix.suite }}-slim" \
+            bash -c '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              # python3 and pkg-config only, and only these: every package
+              # installed before the dependency closure is checked is a library
+              # that could mask a Depends the packages failed to declare. Neither
+              # of these pulls libstdc++6 or libgcc-s1, which are the two the
+              # runtime package must ask for itself.
+              apt-get install -y --no-install-recommends python3 pkg-config
+              # Installs BOTH archives with apt, so the closure is resolved rather
+              # than force-unpacked, then dlopens librga.so.2 and reads the
+              # pkg-config version.
+              bash ci/install-smoke.sh dist
+              # Only now: a compiler. This proves the DEVELOPMENT package is
+              # usable — the headers under /usr/include/rga, the librga.so
+              # link-time symlink and librga.pc, together.
+              apt-get install -y --no-install-recommends gcc libc6-dev
+              printf "#include <rga/im2d.h>\nint main(void) { return 0; }\n" > /tmp/probe.c
+              # shellcheck disable=SC2046
+              gcc /tmp/probe.c $(pkg-config --cflags --libs librga) -o /tmp/probe
+              /tmp/probe
+              echo "dev-package compile and link: OK"
+            '
+
+      - name: Clean-container install refusal (secondary suite — must not install)
+        if: matrix.suite != needs.resolve.outputs.suite
+        run: |
+          set -euo pipefail
+          docker run --rm -v "${PWD}:/work" -w /work "debian:${{ matrix.suite }}-slim" \
+            bash -c '
+              set -uo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              mapfile -t debs < <(find /work/dist -maxdepth 1 -name "*.deb" | LC_ALL=C sort)
+              if [ "${#debs[@]}" -ne 2 ]; then
+                echo "ERROR: expected exactly two .deb files, found ${#debs[@]}" >&2
+                exit 1
+              fi
+              echo "attempting: ${debs[*]}"
+              out="$(apt-get install -y --no-install-recommends "${debs[@]}" 2>&1)" && rc=0 || rc=$?
+              printf "%s\n" "${out}"
+              if [ "${rc}" -eq 0 ]; then
+                echo "ERROR: the packages INSTALLED on the secondary suite. They are built" >&2
+                echo "       on the newer target suite, so a successful install here means" >&2
+                echo "       the runtime libc6 floor is under-declared and a device could" >&2
+                echo "       load a library whose symbol versions it cannot resolve." >&2
+                exit 1
+              fi
+              # Refused is not enough: refused for the RIGHT reason. A corrupt
+              # archive or a missing file would also be non-zero and would pass a
+              # bare exit-code check while proving nothing about the floor.
+              if ! grep -qE "librga2-ceralive.*[Dd]epends: libc6" <<<"${out}"; then
+                echo "ERROR: apt refused the packages, but not on the declared libc6 floor." >&2
+                exit 1
+              fi
+              echo "install refusal on the secondary suite, on the declared libc6 floor: OK"
+            '
+
+  publish:
+    name: Publish release and dispatch apt reindex
+    needs: [resolve, build, install-smoke]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: release-assets
+          path: dist
+
+      # The same set-equality assertion as the build job, re-checked on the bytes
+      # about to be attached. The two jobs are separated by an artifact
+      # round-trip, and this is the last point at which an extra asset can still
+      # be refused.
+      - name: Assert exactly two .debs and their two checksums
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+          DEB_ARCH: ${{ needs.resolve.outputs.arch }}
+        run: |
+          set -euo pipefail
+          runtime="librga2-ceralive_${RELEASE_VERSION}_${DEB_ARCH}.deb"
+          dev="librga-ceralive-dev_${RELEASE_VERSION}_${DEB_ARCH}.deb"
+          expected="$(printf '%s\n%s\n%s\n%s\n' "${runtime}" "${runtime}.sha256" "${dev}" "${dev}.sha256" | LC_ALL=C sort)"
+          actual="$(find dist -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)"
+          printf '%s\n' "${actual}" | sed 's/^/  /'
+          if [ "${actual}" != "${expected}" ]; then
+            echo "ERROR: the two .deb / .sha256 pairs are not the asset set" >&2
+            exit 1
+          fi
+          ( cd dist && sha256sum -c "${runtime}.sha256" "${dev}.sha256" )
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.resolve.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: librga ${{ needs.resolve.outputs.version }}
+          prerelease: ${{ inputs.channel == 'beta' }}
+          files: |
+            dist/*.deb
+            dist/*.deb.sha256
+          fail_on_unmatched_files: true
+
+      # apt-worker's reindex.yml listens for `apt-reindex` and validates every
+      # field against its own allowlists. `component` is the RUNTIME package —
+      # the one the device image installs and the one the index is keyed on; the
+      # development package rides the same tag. `repo` is this repository's name.
+      - name: Dispatch apt-reindex to CERALIVE/apt-worker
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.CERALIVE_DISPATCH_TOKEN }}
+          repository: CERALIVE/apt-worker
+          event-type: apt-reindex
+          client-payload: >-
+            {"component":"librga2-ceralive","repo":"librga","channel":"${{ inputs.channel }}","tag":"${{ needs.resolve.outputs.tag }}","version":"${{ needs.resolve.outputs.version }}"}
+
+  dry-run-report:
+    name: Dry run — what would have been published
+    needs: [resolve, build, install-smoke]
+    if: ${{ inputs.dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: release-assets
+          path: dist
+
+      # A dry run proves everything except the two irreversible actions. It still
+      # renders the dispatch payload verbatim, so the shape apt-worker will
+      # validate is reviewable without firing it.
+      - name: Report the withheld release and dispatch
+        run: |
+          set -euo pipefail
+          payload='{"component":"librga2-ceralive","repo":"librga","channel":"${{ inputs.channel }}","tag":"${{ needs.resolve.outputs.tag }}","version":"${{ needs.resolve.outputs.version }}"}'
+          python3 -c 'import json,sys; json.loads(sys.argv[1])' "${payload}"
+          {
+            echo "## Dry run — nothing was published"
+            echo
+            echo "No tag was created, no GitHub release exists, and no \`apt-reindex\`"
+            echo "dispatch was fired. Everything below was produced and verified."
+            echo
+            echo "### Assets that would have been attached"
+            echo
+            echo '```'
+            find dist -maxdepth 1 -type f | LC_ALL=C sort
+            echo '```'
+            echo
+            echo "### Release that would have been created"
+            echo
+            echo "- tag: \`${{ needs.resolve.outputs.tag }}\`"
+            echo "- prerelease: \`${{ inputs.channel == 'beta' }}\`"
+            echo
+            echo "### repository_dispatch that would have been sent to CERALIVE/apt-worker"
+            echo
+            echo '```json'
+            echo "${payload}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$GITHUB_STEP_SUMMARY"

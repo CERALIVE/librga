@@ -1,0 +1,158 @@
+Host request-byte goldens
+========================
+
+These fixtures pin API-to-driver request construction, not rendered pixels or
+hardware acceptance. No demo code is built or linked. Every case starts a fresh
+process, uses memfds duplicated to fd 100/101, and must reach the fake /dev/rga.
+The client refuses to call librga if the preload marker is absent. The runner
+requires a successful intercepted open and exactly DRIVER_VERSION (return 1),
+HW_VERSION (return 1), BLIT_SYNC (return 0), in that order, for every case.
+
+G1  NV16 3840x2160 -> NV12 3840x2160, IM_SYNC, strides equal dimensions.
+G2  NV12 64x64 copy.
+G3  BGR 1920x1080 crop {8,8,1280,720} -> NV12 1280x720.
+G4  BGR 1920x1080 -> NV12 1280x720 scale.
+G5  NV12 1280x720 -> NV12 720x1280, 90-degree rotation. Both swapped widths
+    satisfy the driver's 16-pixel stride alignment; no hidden padded stride.
+G6  Scheduler RGA3_CORE1 and priority 3, then G1.
+G7  Legacy c_RkRgaInit/rga_set_rect/c_RkRgaBlit NV16 -> NV12 at 3840x2160.
+G8  RGB 1920x1080 -> NV12 1280x720, imsetColorSpace explicitly selecting
+    IM_RGB_FULL -> IM_YUV_BT709_LIMIT_RANGE; the full CSC bytes are retained.
+
+G1.bin through G8.bin are plain hex dumps (od -An -v -tx1), not binary blobs,
+despite the required .bin extension. Decode with xxd -r -p G1.bin if needed.
+Each represents exactly sizeof(struct rga_req) raw bytes: 504 on the initial
+64-bit little-endian host baseline. No padding, field, address, or reserved byte
+is masked. The comparator names the case, zero-based byte offset, and source
+rectangle region on a mismatch. G1 additionally runs twice and cmp compares the
+raw dumps across independent processes. Fixtures are ABI/endian-specific.
+
+The dedicated, non-installed rga-golden-host library is compiled from the same
+librga_srcs with -ftrivial-auto-var-init=zero. This is REQUIRED: upstream
+NormalRgaApi.cpp:825 creates an uninitialized full_csc_t local and line 913
+copies its padding into the request. Uninstrumented G8 changed at byte 318
+between processes. Compiler initialization makes that padding deterministic
+before request construction, without rewriting/masking captured output or
+patching production source. These are instrumented-host construction goldens,
+not a claim that the unmodified production library initializes all padding.
+R0/R1 source comparisons must use the same instrumentation. A separate
+uninstrumented test is needed to diagnose uninitialized-memory regressions.
+
+Build and run
+-------------
+
+The parallel-todo contract forbids editing the shared root meson.build here.
+The coordinator appends tests/meson-fragments/goldens.build verbatim to its end.
+Until that wiring lands, make a disposable repo-local scratch copy:
+
+    mkdir -p test-results/scratch
+    git archive HEAD | tar -x -C test-results/scratch
+    cp -R tests test-results/scratch/
+    cat tests/meson-fragments/goldens.build >> test-results/scratch/meson.build
+    meson setup test-results/scratch/build test-results/scratch -Dcpp_args=-fpermissive
+    meson test -C test-results/scratch/build goldens --verbose
+    meson test -C test-results/scratch/build shim-contract --verbose
+
+Use a new/empty scratch directory, not one with already-appended wiring.
+The temporary -fpermissive option is needed for the imported upstream's known
+pointer-to-unsigned-int casts on 64-bit hosts. It changes no source; removing it
+belongs to the later truncation fix. The new C targets use -Wall -Wextra -Werror.
+The fragment exports fake_rga (the shared-object target) and fake_rga_env (an
+environment with LD_PRELOAD set), reusable by the unit-session fragment.
+Dependencies: Linux/glibc, GCC, Meson/Ninja, sh, coreutils, awk and grep.
+Keep build/test artifacts in a gitignored repo-local directory.
+
+Regeneration
+------------
+
+    root=$PWD
+    build=$root/test-results/scratch/build
+    for case in G1 G2 G3 G4 G5 G6 G7 G8; do
+        sh tests/golden/run.sh --regen "$build/golden-cases" \
+            "$build/libfake_rga.so" "$root/tests/golden" "$case" || break
+    done
+
+--regen is for the initial baseline and, thereafter, ONLY a commit whose message
+names the fix that changed the request bytes. Never regenerate to make an
+unexplained failure green. Normal Meson tests only compare, never rewrite.
+Copy updated fixtures into the scratch copy before testing it. To exercise the
+negative control, edit ONLY scratch/tests/golden/cases.c: change G3's crop x
+from 8 to 9, run meson test ... goldens --verbose, require a G3 source-rect
+byte mismatch, then restore cases.c from the original and rebuild.
+
+Shim environment contract
+-------------------------
+
+LD_PRELOAD=/absolute/path/libfake_rga.so enables interposition. open/openat and
+their glibc open64/openat64 aliases fake ONLY the literal path /dev/rga with a
+memfd; all other paths, modes and directory fds are forwarded through RTLD_NEXT.
+close removes fake-fd tracking. Non-fake ioctls go to RTLD_NEXT. Unknown ioctls
+on a fake fd return -1/ENOTTY, never reach hardware. Capacity is 256 concurrently
+open fake device fds. This host shim is not intended for 32-bit large-file ABIs,
+device-fd duplication, or fork-shared driver state.
+
+FAKE_RGA_DUMP=<path>
+    Append binary INPUT bytes before output mutations or fault injection:
+    BLIT_SYNC/ASYNC: one rga_req; REQUEST_SUBMIT/CONFIG: one rga_user_request
+    followed by task_num rga_req structs from task_ptr. No headers or separators.
+    Queries, import/release, create/cancel are logged, not dumped. The caller
+    owns truncation and supplies valid argument pointers. Request task counts
+    above RGA_TASK_NUM_MAX fail EINVAL. Pointer bytes in rga_user_request are
+    retained, so batching clients need fixed-address task storage for cross-
+    process goldens; the eight single-blit cases contain no task_ptr.
+
+FAKE_RGA_LOG=<path>
+    Append the canary log; default is ./interposed.log. Every literal device
+    open attempt and every handled ioctl records fd and return/errno. The
+    golden runner uses one isolated interposed.log per process and asserts
+    the entire expected ioctl sequence (including return codes).
+
+FAKE_RGA_RET_<IOCTL>=<integer>
+    Override the return for the exact full symbolic ioctl name, e.g.
+    FAKE_RGA_RET_RGA_BLIT_SYNC=1. Numbers use strtol base 0 (decimal/hex).
+    Nonnegative overrides still populate normal output arguments; negative
+    overrides skip output writes and set errno as below. Controls are read
+    on every ioctl, so setenv/unsetenv fault changes work within a process.
+
+FAKE_RGA_FAIL=<IOCTL>
+    Exact full symbolic name, e.g. RGA_IOC_GET_DRVIER_VERSION (the UAPI's
+    DRVIER spelling is intentional). Matching calls return -1, take precedence
+    over RET overrides, and skip output writes. Persistent, not one-shot.
+
+FAKE_RGA_ERRNO=<integer>
+    errno for FAIL or a negative RET override; default EIO (5). Use numeric
+    values, e.g. 22 for EINVAL. Persistent EINTR/512 injection deliberately
+    makes librga retry indefinitely: use a timeout for such reproducers.
+
+FAKE_RGA_GETENV_COUNT=<path>
+    At normal process exit, overwrite with a decimal count plus newline of
+    external getenv calls observed by this shim. Atomic process-wide counter;
+    internal FAKE_RGA_* lookups bypass it. No per-call file I/O is added to the
+    perf path. _exit, crashes and killed processes do not flush the count.
+
+Unset DUMP/GETENV_COUNT disables that output. Output-open/write errors exit 125
+instead of silently losing evidence. Parent directories must already exist.
+Use separate paths per process; dump/log are append-only, count is overwritten.
+The runner does not clear externally supplied fault controls: an injected
+failure must fail the test, not be hidden by its environment setup.
+
+Default ioctl results and output arguments
+-----------------------------------------
+
+RGA_IOC_GET_DRVIER_VERSION: 1; version 1.3.11 (revision decimal 11).
+RGA_IOC_GET_HW_VERSION: 1; cores 3.0.76831 twice, then 3.2.63318. Hardware
+    revision numbers are hexadecimal, as in librga's hardware matching table.
+RGA2_GET_VERSION / RGA_GET_VERSION: 1; string 3.2.63318.
+RGA_BLIT_SYNC / RGA_BLIT_ASYNC: 0; out_fence_fd = -1.
+RGA_IOC_IMPORT_BUFFER: 0; each external buffer gets a handle starting at 1,
+    increasing process-wide. RELEASE_BUFFER: 0.
+RGA_IOC_REQUEST_CREATE: 0; replaces the flags/id argument with an increasing
+    process-wide id starting at 1, independently of imported-buffer handles.
+RGA_IOC_REQUEST_SUBMIT / CONFIG: 0; release_fence_fd = -1.
+RGA_IOC_REQUEST_CANCEL, RGA_FLUSH, RGA_GET_RESULT: 0.
+
+The shim models successful submission, not scheduling or sync_file fences:
+no actual image work, DMA import, completion fence, or request-lifetime
+validation is performed. Legacy version queries are available for fault-path
+tests; blit dumps model the multi-RGA rga_req ABI used by the 1.3.11 island,
+including G7 (legacy userspace API, NOT the obsolete rga2_req driver ABI).

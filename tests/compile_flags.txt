@@ -1,0 +1,6 @@
+-std=gnu11
+-I../include
+-I../im2d_api
+-I../core
+-I../core/hardware
+-I../core/3rdparty/android_hal

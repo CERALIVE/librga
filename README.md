@@ -1,3 +1,130 @@
+# CeraLive librga
+
+Rockchip's RGA (Raster Graphic Acceleration) userspace library — the 2D
+scale/rotate/blend/colour-convert engine used by the CeraLive RK3588 streaming
+stack. This is CeraLive's public fork; the upstream README follows below,
+unmodified.
+
+## Maintainer notice
+
+This fork is maintained by **CeraLive** at
+<https://github.com/CERALIVE/librga>. Issues and pull requests for the CeraLive
+packages belong here, not on an upstream project. Upstream bugs that are genuinely
+upstream are still reported upstream, but the packages CeraLive ships are ours to
+support.
+
+The fork imports JeffyCN's `mirrors` repository, branch `linux-rga-multi`, pinned
+at `57a1067a246c71fa6c9a355d1668884fda155dd5`. Nothing in the imported history has
+been rewritten. The exact import coordinate and the evidence behind the version
+claims are in [`docs/PROVENANCE.md`](docs/PROVENANCE.md).
+
+## The packages
+
+Two Debian packages, both release assets of one tag and both served from
+`apt.ceralive.tv`:
+
+| Package | Contents |
+|---|---|
+| `librga2-ceralive` | The runtime library, SONAME `librga.so.2`. `Provides: librga2`, `Conflicts`/`Replaces: librga2`, so it substitutes for the distribution package on a CeraLive device. |
+| `librga-ceralive-dev` | Headers under `include/rga/` and `librga.pc`. No static archive: `packaging/build-deb.sh` deletes `librga.a` and `packaging/package-contract.sh` fails the build if one is staged in either package. |
+
+The SONAME, the pkg-config name, and the header install path are unchanged from
+upstream. R0 contains every Radxa global export (254/254); compiler-generated weak
+COMDAT template instantiations are outside that floor. This is the explicit
+[owner-approved R0 amendment, 2026-09-12](docs/R0-NEUTRALITY.md#owner-approved-contract-amendment--2026-09-12-exists),
+not full ELF containment or permission to remove supported APIs.
+
+## Versioning: R0 and R1
+
+Releases are versioned **upstream-style, not CalVer**, because the number a caller
+cares about is the im2d API release it corresponds to:
+
+- **R0 — `1.10.1+ceralive.1`.** A rebuild of the same API release the CeraLive
+  bench boards already run (`rga_api version 1.10.1_[4]`), cut from
+  `release/1.10.1` with packaging and CI commits only. Its neutrality claim is
+  deliberately **bounded** to every global export, every semantically meaningful
+  request field on the CeraLive call set, and equal both-board gate rows. The
+  explicit exclusions are compiler-version-dependent weak COMDAT internals of a
+  private `std::map` and the nine proved non-deterministic padding bytes inside
+  `rga_req.full_csc`—never its named coefficients. The amendment preserves the
+  literal G8 and weak-symbol FAIL records and requires executable negative
+  controls. It is never a claim of byte-identical source or whole-request bytes.
+- **R1 — `1.10.5+ceralive.1`.** The pinned fork point plus the fix series that
+  reproducers actually turned RED, each fix carrying its own red/green transcripts
+  and independent-review receipt in [`docs/fix-audit.md`](docs/fix-audit.md).
+
+## Build
+
+R0 is currently an unreleased integration candidate. See
+[`docs/R0-NEUTRALITY.md`](docs/R0-NEUTRALITY.md) for the measured export and real-board
+request-byte results; build success alone is not release approval.
+
+CeraLive builds with **Meson**, targeting Debian **Trixie** on arm64. The CMake,
+Android, and RT-Thread build files upstream ships are preserved but unused.
+
+```bash
+meson setup build --prefix=/usr --buildtype=release
+meson compile -C build
+meson test -C build --print-errorlogs
+```
+
+Build the Debian packages and check them against the package contract with:
+
+```bash
+bash packaging/build-deb.sh
+bash packaging/package-contract.sh
+```
+
+The upstream `debian/` directory in this tree is JeffyCN's. It is kept
+byte-for-byte and is **never invoked** — no debhelper is involved in a CeraLive
+build.
+
+Before reaching for the im2d API, read
+[`docs/API-TRAPS.md`](docs/API-TRAPS.md). It documents the argument-unit and
+status-code surprises that this library's callers hit first, and most of them are
+silent.
+
+## Credits
+
+This repository descends from Rockchip's `linux-rga` through JeffyCN's
+`linux-rga-multi` mirror branch. CeraLive thanks:
+
+- **Rockchip Electronics Co., Ltd.** and its contributors for the original RGA
+  userspace library. The principal authors named in the tree are **Zhiqin Wei**,
+  **Putin Lee**, and **Yu Qiaowei (Cerf Yu)**.
+- **Jeffy Chen / JeffyCN** for maintaining the `mirrors` repository and its
+  `linux-rga-multi` branch — the tree this fork imports — and for the upstream
+  `debian/` packaging retained here.
+- **tsukumijima** for the packaging model that informed CeraLive's `packaging/`
+  layout. Ideas only; no code is taken.
+- **nyanmisaka** for downstream fixes that are candidate donors. Any pick is taken
+  with `git cherry-pick -x`, keeps its original author, and is recorded in
+  `docs/fix-audit.md` with its reproducer. Picks are credited individually as they
+  land.
+
+`airockchip/librga` is consulted as a header and CHANGELOG reference only. That
+distribution is binary-only and is never a source donor.
+
+## License
+
+This library is **Apache License, Version 2.0** — see [`COPYING`](COPYING) — with
+documented third-party exceptions. The bundled libdrm headers under
+`core/3rdparty/libdrm/` and `samples/utils/3rdparty/libdrm/` are MIT/X11-style and
+keep their own notices, and the root `Android.mk` carries a GPL-3.0-or-later
+notice that conflicts with `COPYING`; it is an Android build file, is never built
+and never shipped, and is excluded from every distributed artifact. The complete
+file-level census is in [`docs/PROVENANCE.md`](docs/PROVENANCE.md), and the
+machine-readable attribution is `packaging/copyright`.
+
+CeraLive modifications remain Apache-2.0. Modified files carry an Apache-2.0
+§4(b) notice line, `// Modified by CeraLive <YYYY-MM-DD>: <why>`. Upstream
+copyright and licence notices are preserved everywhere.
+
+Contribution rules, frozen contracts, and the proof boundary of the test suite are
+in [`AGENTS.md`](AGENTS.md).
+
+---
+
 # librga
 
 RGA (Raster Graphic Acceleration Unit)是一个独立的2D硬件加速器，可用于加速点/线绘制，执行图像缩放、旋转、bitBlt、alpha混合等常见的2D图形操作。本仓库代码实现了RGA用户空间驱动，并提供了一系列2D图形操作API。
@@ -123,4 +250,3 @@ $ ./meson.sh
   [RGA_FAQ【中文】](docs/Rockchip_FAQ_RGA_CN.md)
 
   [RGA_FAQ【英文】](docs/Rockchip_FAQ_RGA_EN.md)
-
