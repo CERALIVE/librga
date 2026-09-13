@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Modified by CeraLive 2026-09-05: reproduce H6 fence ownership on the host. */
+/* Modified by CeraLive 2026-09-12: run the unchanged C4 checks alone under ASan/LSan. */
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -107,9 +108,41 @@ static void summary(FILE *file, const char *name, int red)
     std::printf("%s: %s (%d/%d defect observations)\n", name, verdict, red, iterations);
 }
 
-int main()
+static int check_sync_error(FILE *details, FILE *cases)
+{
+    int baseline = census();
+    int c4_red = 0;
+    for (int i = 1; i <= iterations; ++i) {
+        int control = fence();
+        int before = census();
+        IM_STATUS status = imsync(control);
+        int after = census();
+        REQUIRE(status == IM_STATUS_SUCCESS && !is_open(control) && after == before - 1);
+        row(details, "C4-control-success", i, status, control, false, before, after, -1, "PASS");
+
+        int fd = fence();
+        before = census();
+        knob("FAKE_RGA_SYNC_FAIL", "1");
+        status = imsync(fd);
+        knob("FAKE_RGA_SYNC_FAIL", nullptr);
+        REQUIRE(status == IM_STATUS_FAILED);
+        bool leaked = is_open(fd);
+        after = census();
+        REQUIRE(after == before - (leaked ? 0 : 1));
+        c4_red += leaked;
+        row(details, "C4", i, status, fd, leaked, before, after, -1,
+            leaked ? "RED" : "NOT-REPRODUCED");
+        if (leaked) REQUIRE(close(fd) == 0);
+        REQUIRE(census() == baseline);
+    }
+    summary(cases, "C4", c4_red);
+    return c4_red;
+}
+
+int main(int argc, char **argv)
 {
     REQUIRE(dlsym(RTLD_DEFAULT, "fake_rga_active") != nullptr);
+    REQUIRE(argc == 1 || (argc == 2 && !std::strcmp(argv[1], "sync-only")));
     // H6a is WITHDRAWN: no real positive-success submit path exists on the island.
     // Do not let an inherited return override manufacture that withdrawn case.
     for (char **entry = environ; *entry; ++entry)
@@ -117,6 +150,7 @@ int main()
     knob("FAKE_RGA_FAIL", nullptr);
     knob("FAKE_RGA_SYNC_FAIL", nullptr);
     knob("FAKE_RGA_ERRNO", "5");
+    if (argc == 2) return check_sync_error(stdout, stdout) ? 1 : 0;
     out_fence(-1);
     REQUIRE(is_open(STDIN_FILENO));
     int saved_stdin = dup(STDIN_FILENO);
@@ -190,30 +224,7 @@ int main()
     }
     summary(cases, "C3", c3_red);
 
-    for (int i = 1; i <= iterations; ++i) {
-        int control = fence();
-        int before = census();
-        IM_STATUS status = imsync(control);
-        int after = census();
-        REQUIRE(status == IM_STATUS_SUCCESS && !is_open(control) && after == before - 1);
-        row(details, "C4-control-success", i, status, control, false, before, after, -1, "PASS");
-
-        int fd = fence();
-        before = census();
-        knob("FAKE_RGA_SYNC_FAIL", "1");
-        status = imsync(fd);
-        knob("FAKE_RGA_SYNC_FAIL", nullptr);
-        REQUIRE(status == IM_STATUS_FAILED);
-        bool leaked = is_open(fd);
-        after = census();
-        REQUIRE(after == before - (leaked ? 0 : 1));
-        c4_red += leaked;
-        row(details, "C4", i, status, fd, leaked, before, after, -1,
-            leaked ? "RED" : "NOT-REPRODUCED");
-        if (leaked) REQUIRE(close(fd) == 0);
-        REQUIRE(census() == baseline);
-    }
-    summary(cases, "C4", c4_red);
+    c4_red = check_sync_error(details, cases);
     REQUIRE(std::fclose(details) == 0 && std::fclose(cases) == 0);
     REQUIRE(close(src) == 0 && close(dst) == 0 && close(saved_stdin) == 0);
     std::puts("H6a: WITHDRAWN (no real positive-success submit path exists on the island)");

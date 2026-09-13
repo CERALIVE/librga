@@ -165,6 +165,11 @@ Candidate C's scheduler-default assertion [EXISTS] is
 expects legitimate zero input to succeed, so exits RED separately from H5's
 unchanged characterization assertions. Evidence: `docs/fix-audit.d/candidate-c.md`.
 
+Candidate D's isolated H6/C4 mode [EXISTS] is
+`bash tests/repro/run-candidate-d.sh`, after the ASan tree is built. It keeps
+the default H6 cases unchanged and measures only positive-fd `imsync` wait-error
+cleanup under host instrumentation; see `docs/fix-audit.d/candidate-d.md`.
+
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
 It preserves the shared-library alias before the static-library reassignment and
 appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
