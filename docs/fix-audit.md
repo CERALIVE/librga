@@ -53,9 +53,23 @@ the re-extracted library SHA-256 is
 `adf9e34934497092c30ba2ec3cf45141e058c368991d77524d9c0e38f5e29fc6`.
 Publication must reproduce this package or obtain new both-board evidence.
 
+**Merged-head review, 2026-09-13.** The same independent reviewer approved
+`09671546814cfe61e8c8f2f0fa25bfc1b5bb5565` in the
+[delta receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5650321908).
+The only change after the initial receipt was the required CI summary job:
+21 executed cases passed, including all 15 dependency failure/cancel/skip
+controls. Run `34733274164` reported all 12 contexts successful, and its
+downloaded package and re-extracted library matched the hashes above. Ruleset
+`22329765` was unchanged; no bypass or administrative merge was used.
+
+PR #2 merged as `f4c3ee62ab354c2cbe22718f543fc0ba6e58365c`, with exactly two
+parents: release base `5a97e650a30b7c7036eb5aa26e39f2d09f18fcc9` and reviewed
+head `09671546814cfe61e8c8f2f0fa25bfc1b5bb5565`. The merge tree equals the
+reviewed head's tree. This was a merge commit, not a squash.
+
 | Provenance SHA | Reproducer and executed controls | Hardware gate | ABI closure and limits | Independent reviewer verdict · reviewer session id | `Upstream-status` |
 |---|---|---|---|---|---|
-| `037e208e4cd79b49172a53bfba722fac577bfed9` | [Amended acceptance procedure](R0-AMENDMENT-CHECK.md) rerun verbatim: 254/254 global deletions and 495/495 non-padding byte mutations rejected; 9/9 padding-only mutations accepted; named-byte and request-length controls rejected. Freshly compiled poison diagnostic returns 1 on both packaged libraries. Raw G8 remains FAIL. | [G-A receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5649766546): R1–R7 PASS on Rock 5B+ and Orange Pi 5+ for the exact package; no hardware rerun by this reviewer. Equal finite PSNR scores are not byte-identical image proof. No hardware sanitizer claim. | Radxa GLOBAL floor 254/254, including GLOBAL binding. Unfiltered containment remains FAIL for the three enumerated weak map helpers; historical `abidiff` FAIL preserved, not rerun or promoted to a type-ABI pass. No R1 exemption. | **APPROVE under the amended contract** · `ses_f677dc1b2ffeX5gh5fNM7YkXqp` · [independent review receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5650165812). Formal approval refused because the token account authored the PR; verdict posted as the owner-authorized comment fallback. | Not applicable: R0 packaging/CI candidate and acceptance documentation; no library-source fix. |
+| `09671546814cfe61e8c8f2f0fa25bfc1b5bb5565` (merged head; initial amendment review at `037e208e4cd79b49172a53bfba722fac577bfed9`) | [Amended acceptance procedure](R0-AMENDMENT-CHECK.md) rerun verbatim: 254/254 global deletions and 495/495 non-padding byte mutations rejected; 9/9 padding-only mutations accepted; named-byte and request-length controls rejected. Freshly compiled poison diagnostic returns 1 on both packaged libraries. Raw G8 remains FAIL. | [G-A receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5649766546): R1–R7 PASS on Rock 5B+ and Orange Pi 5+ for the exact package; no hardware rerun by this reviewer. Equal finite PSNR scores are not byte-identical image proof. No hardware sanitizer claim. | Radxa GLOBAL floor 254/254, including GLOBAL binding. Unfiltered containment remains FAIL for the three enumerated weak map helpers; historical `abidiff` FAIL preserved, not rerun or promoted to a type-ABI pass. No R1 exemption. | **APPROVE under the amended contract, reaffirmed at the merged head** · `ses_f677dc1b2ffeX5gh5fNM7YkXqp` · [initial receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5650165812) · [delta receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5650321908). Formal approval refused because the token account authored the PR; verdict posted as the owner-authorized comment fallback. | Not applicable: R0 packaging/CI candidate and acceptance documentation; no library-source fix. |
 
 ## Rows
 
