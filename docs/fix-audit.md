@@ -67,6 +67,7 @@ can be checked rather than asserted:
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
+| Wave-E C; first-party scheduler-default fix on `1bde9018d28092879978419f8e48f2b88debcbaa`; commit resolved by `git log --format=%H --grep='fix(imconfig): accept the documented default scheduler'` | `tests/repro/run-candidate-c.sh`: RED 2/5 assertions, GREEN 0/5 failures; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: documented enum acceptance; not yet submitted upstream |
 
 ## Appendix — candidate-a.md
 
@@ -979,3 +980,42 @@ The generator was run again after adding it, then a second invocation was checke
 for byte-identical `docs/fix-audit.md` and `meson.build` output. The baseline's
 `wire-bootstrap` test also passed its structure, preservation and idempotency
 checks. All historical characterization fragments remain unchanged.
+
+## Appendix — wave-e-c.md
+
+Source: [fix-audit.d/wave-e-c.md](fix-audit.d/wave-e-c.md). D21 rows are in the [ledger above](#rows).
+
+
+### Wave-E C — scheduler-default acceptance
+
+Mechanism: the zero-valued documented default now bypasses the nonzero core-mask
+test, preserving acceptance of every previously accepted value.
+
+`im2d_api/src/im2d.cpp`, `imconfig(IM_CONFIG_SCHEDULER_CORE, value)`.
+No API, default, layout, visibility or SONAME change.
+
+Exact invocation before and after: `bash tests/repro/run-candidate-c.sh`.
+Native x86_64, GCC 16.2.1; ordinary shared library and fake-device preload.
+
+RED on `1bde9018` (`test-results/candidate-c/run.pZB6ua/transcript.txt`):
+
+```text
+FAIL default accepted on fresh thread: expected 1, got -4
+FAIL reset explicit core to default: expected 1, got -4
+candidate-c: 5 assertions, 2 failures
+Candidate C: exit=1; evidence=test-results/candidate-c/run.pZB6ua
+```
+
+GREEN (`test-results/candidate-c/run.oT8Bu5/transcript.txt`):
+
+```text
+== Candidate C: scheduler default is legitimate input ==
+0 1831754 1831754 E im2d_rga: IM2D: It's not legal rga_core[0x10], it needs to be a 'IM_SCHEDULER_CORE'.
+-- Candidate C: scheduler default is legitimate input: 5 assertions --
+candidate-c: 5 assertions, 0 failures
+Candidate C: exit=0; evidence=test-results/candidate-c/run.oT8Bu5
+```
+
+Disposition: promoted unchanged into the green Meson baseline as `candidate-c`,
+linked against the ordinary shared library (not the golden-test static library).
+Historical characterization fragments remain verbatim.

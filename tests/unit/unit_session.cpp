@@ -435,19 +435,10 @@ static void check_imconfig_rt1(void)
 {
     unit_begin("(f) RT-1 reproducer: imconfig scheduler core");
 
-    /*
-     * RT-1 reproducer: this flips to accept IM_SCHEDULER_DEFAULT in a later fix
-     * todo (D20).
-     *
-     * IM_SCHEDULER_DEFAULT is 0 (im2d_type.h:117) and imconfig() gates on
-     * "value & IM_SCHEDULER_MASK" (im2d.cpp:865-871), so the documented
-     * "let the driver choose" value is the one value the setter refuses. Until
-     * D20 lands, IM_STATUS_ILLEGAL_PARAM is the correct expectation and must
-     * not be softened.
-     */
+    // Modified by CeraLive 2026-09-13: gate the authorized RT-1 default-acceptance fix.
     unit_eq_int("IM_SCHEDULER_DEFAULT is 0", 0, IM_SCHEDULER_DEFAULT);
-    unit_eq_int("imconfig(IM_CONFIG_SCHEDULER_CORE, IM_SCHEDULER_DEFAULT) rejects today",
-                IM_STATUS_ILLEGAL_PARAM,
+    unit_eq_int("imconfig(IM_CONFIG_SCHEDULER_CORE, IM_SCHEDULER_DEFAULT) succeeds",
+                IM_STATUS_SUCCESS,
                 imconfig(IM_CONFIG_SCHEDULER_CORE, IM_SCHEDULER_DEFAULT));
 
     /* Any value outside the 0xf core mask is rejected the same way. */

@@ -297,6 +297,15 @@ test('unit-session', unit_session, env : unit_session_env, depends : fake_rga, t
 # Modified by CeraLive 2026-09-06: gate evidence assembly alongside the host tests.
 test('wire-bootstrap', find_program('bash'),
     args : [meson.current_source_dir() / 'tests/test-wire-bootstrap.sh'], timeout : 30)
+
+# Modified by CeraLive 2026-09-13: promote the fixed scheduler-default probe.
+candidate_c = executable('candidate-c', 'tests/repro/candidate_c_scheduler.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : golden_dl,
+    cpp_args : unit_warnings,
+    install : false)
+test('candidate-c', candidate_c, env : unit_session_env, depends : fake_rga, timeout : 30)
 # >>> fragment: board.build
 add_languages('c')
 board_cc = meson.get_compiler('c')
