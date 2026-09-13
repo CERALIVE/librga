@@ -109,6 +109,7 @@ static void rga_device_exit(rga_session_t *session) {
 }
 
 #else
+// Modified by CeraLive 2026-09-13: close the device on every failed initialization.
 static IM_STATUS rga_device_init(rga_session_t *session) {
     int ret;
     int fd;
@@ -124,6 +125,7 @@ static IM_STATUS rga_device_init(rga_session_t *session) {
         ret = ioctl(fd, RGA_IOC_GET_HW_VERSION, &session->core_version);
         if (ret < 0) {
             IM_LOGE("fail to get hardware versions! ret = %d, %s\n", ret, strerror(errno));
+            close(fd);
             return IM_STATUS_FAILED;
         }
 
@@ -136,6 +138,7 @@ static IM_STATUS rga_device_init(rga_session_t *session) {
             ret = ioctl(fd, RGA_GET_VERSION, session->core_version.version[0].str);
             if (ret < 0) {
                 IM_LOGE("librga fail to get RGA2/RGA1 version! ret = %d, %s\n", ret, strerror(errno));
+                close(fd);
                 return IM_STATUS_FAILED;
             }
         }
@@ -154,8 +157,10 @@ static IM_STATUS rga_device_init(rga_session_t *session) {
     }
 
     ret = rga_check_driver(session->driver_verison);
-    if (ret == IM_STATUS_ERROR_VERSION)
+    if (ret == IM_STATUS_ERROR_VERSION) {
+        close(fd);
         return (IM_STATUS)ret;
+    }
 
     set_driver_feature(session);
     session->rga_dev_fd = fd;
@@ -187,6 +192,7 @@ static int rga_session_init(rga_session_t *session) {
     ret = rga_get_info(&session->core_version, &session->hardware_info);
     if (ret != IM_STATUS_SUCCESS) {
         IM_LOGE("get RGA hardware info failed!\n");
+        rga_device_exit(session);
         return ret;
     }
 

@@ -230,6 +230,13 @@ Candidate D's `imsync` wait-error regression [EXISTS] is the green Meson
 on success and wait failure; the existing `fence_fd <= 0` rejection is unchanged.
 The full H6 characterization remains opt-in because its other rows are not fixed.
 
+Candidate A's direct-init and hardware-version-failure regressions [EXISTS] are
+green Meson tests (`candidate-a-init` in `concurrency`, plus one fd census per
+API). Context creation and publication share the legacy mutex; refcount operations
+are atomic without changing the exported integer's storage or type. Failed legacy
+and im2d initialization closes its device fd. `run-candidate-a.sh 200` runs the
+long host-only race acceptance batch; the default remains 20 fresh processes.
+
 The manual H2 teardown probe [EXISTS] is `tests/repro/run-h2.sh`: 200 fresh
 processes per scenario and sanitizer, with its six-field ledger fragment in
 `docs/fix-audit.d/h2.md`. Invocation and diagnostic-output settings are documented

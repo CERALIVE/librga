@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-13: serialize context publication and unwind failed initialization.
 #include "NormalRga.h"
 #include "NormalRgaContext.h"
 
@@ -24,10 +25,10 @@
 
 #elif LINUX
 #include <sys/ioctl.h>
+#endif
 #include <pthread.h>
 
 pthread_mutex_t mMutex = PTHREAD_MUTEX_INITIALIZER;
-#endif
 
 #include "im2d_api/src/im2d_impl.h"
 
@@ -74,12 +75,13 @@ int NormalRgaOpen(void **context) {
         goto mallocErr;
     }
 
+    pthread_mutex_lock(&mMutex);
     if (!rgaCtx) {
         ctx = (struct rgaContext *)malloc(sizeof(struct rgaContext));
         if(!ctx) {
             ret = -ENOMEM;
             ALOGE("malloc fail:%s.",strerror(errno));
-            goto mallocErr;
+            goto unlockErr;
         }
 
         fd = open("/dev/rga", O_RDWR, 0);
@@ -138,19 +140,17 @@ int NormalRgaOpen(void **context) {
         ALOGE("Had init the rga dev ctx = %p",ctx);
     }
 
-#ifdef ANDROID
-    android_atomic_inc(&refCount);
-#elif LINUX
-    pthread_mutex_lock(&mMutex);
-    refCount++;
-    pthread_mutex_unlock(&mMutex);
-#endif
+    __atomic_add_fetch(&refCount, 1, __ATOMIC_RELAXED);
     *context = (void *)ctx;
+    pthread_mutex_unlock(&mMutex);
     return ret;
 
 getVersionError:
+    close(fd);
 rgaOpenErr:
     free(ctx);
+unlockErr:
+    pthread_mutex_unlock(&mMutex);
 mallocErr:
     return ret;
 }
@@ -173,25 +173,25 @@ int NormalRgaClose(void **context) {
         return -ENODEV;
     }
 
-    if (refCount <= 0) {
+    if (__atomic_load_n(&refCount, __ATOMIC_RELAXED) <= 0) {
         ALOGE("This can not be happened, close before init");
         return 0;
     }
 
 #ifdef ANDROID
-    if (refCount > 0 && android_atomic_dec(&refCount) != 1)
+    if (__atomic_sub_fetch(&refCount, 1, __ATOMIC_RELAXED) != 0)
         return 0;
 #elif LINUX
     pthread_mutex_lock(&mMutex);
-    refCount--;
+    int remaining = __atomic_sub_fetch(&refCount, 1, __ATOMIC_RELAXED);
 
-    if (refCount < 0) {
-        refCount = 0;
+    if (remaining < 0) {
+        __atomic_store_n(&refCount, 0, __ATOMIC_RELAXED);
         pthread_mutex_unlock(&mMutex);
         return 0;
     }
 
-    if (refCount > 0)
+    if (remaining > 0)
     {
         pthread_mutex_unlock(&mMutex);
         return 0;
@@ -217,9 +217,12 @@ int RgaInit(void **ctx) {
         return ret;
 
     /* check driver version. */
-    ret = rga_check_driver(rgaCtx->mDriverVersion);
-    if (ret == IM_STATUS_ERROR_VERSION)
+    ret = rga_check_driver(((struct rgaContext *)*ctx)->mDriverVersion);
+    if (ret == IM_STATUS_ERROR_VERSION) {
+        NormalRgaClose(ctx);
+        *ctx = NULL;
         return -1;
+    }
 
     return ret;
 }
