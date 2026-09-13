@@ -220,6 +220,11 @@ contracts a new reproducer registers itself through are in
 [`docs/SANITIZERS.md`](docs/SANITIZERS.md). Every `-Wanalyzer-*` finding carries a
 disposition in [`docs/ANALYZER-TRIAGE.md`](docs/ANALYZER-TRIAGE.md).
 
+Candidate C's scheduler-default regression [EXISTS] is now the green Meson
+`candidate-c` test, linked against the ordinary shared library. `imconfig` accepts
+the documented zero default as well as every previously accepted scheduler value;
+no default or public signature changes. Historical RED evidence remains in the ledger.
+
 The manual H2 teardown probe [EXISTS] is `tests/repro/run-h2.sh`: 200 fresh
 processes per scenario and sanitizer, with its six-field ledger fragment in
 `docs/fix-audit.d/h2.md`. Invocation and diagnostic-output settings are documented

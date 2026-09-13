@@ -859,11 +859,12 @@ IM_API IM_STATUS imsync(int fence_fd) {
     return IM_STATUS_SUCCESS;
 }
 
+// Modified by CeraLive 2026-09-13: accept the documented default scheduler.
 IM_API IM_STATUS imconfig(IM_CONFIG_NAME name, uint64_t value) {
 
     switch (name) {
         case IM_CONFIG_SCHEDULER_CORE :
-            if (value & IM_SCHEDULER_MASK) {
+            if (value == IM_SCHEDULER_DEFAULT || (value & IM_SCHEDULER_MASK)) {
                 g_im2d_context.core = (IM_SCHEDULER_CORE)value;
             } else {
                 IM_LOGE("IM2D: It's not legal rga_core[0x%lx], it needs to be a 'IM_SCHEDULER_CORE'.", (unsigned long)value);
