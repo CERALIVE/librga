@@ -185,7 +185,8 @@ empty compatibility function, and an additional `RgaInit` would retain a second
 reference so one deinit would not free the context. The test borrows the
 singleton's context instead. It neither deletes the singleton nor installs an
 artificial exit handler. On this Linux implementation the singleton itself is
-not automatically deleted; its static mutex does have exit-time destruction.
+not automatically deleted. Wave E matches its active lock to that process lifetime;
+the old static mutex remains as an ABI symbol, unused by singleton lookup.
 
 Results, canary output, binary hashes and every process's stderr/stdout plus mock
 ioctl log are retained under `test-results/h2/<sanitizer>/run.*/`. Nothing is
@@ -193,6 +194,10 @@ overwritten between invocations. Exit codes are 0 for no finding, 1 for a
 sanitizer report or other runtime failure, and 2 for an invalid run. A missing
 action marker or fewer than 33 successful mock blit ioctls (warmup plus worker)
 cannot count as clean. The parent bounds every child to 10 seconds.
+
+The driver captures stdout in `*.stdout.log` and stderr in `*.log`, and scans both
+for diagnostics. This keeps buffered library stdout from splitting an otherwise
+valid `H2 complete` marker; no marker, control, timeout or sanitizer check is relaxed.
 
 TSan uses `halt_on_error=1:exitcode=66:symbolize=0`. An initial online-symbolized
 batch stalled in some processes; the complete batch with offline symbolization

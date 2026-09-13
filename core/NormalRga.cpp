@@ -37,14 +37,50 @@ pthread_mutex_t mMutex = PTHREAD_MUTEX_INITIALIZER;
 volatile int32_t refCount = 0;
 struct rgaContext *rgaCtx = NULL;
 
+// Modified by CeraLive 2026-09-13: drain active operations before last-reference teardown.
+namespace {
+pthread_cond_t context_idle = PTHREAD_COND_INITIALIZER;
+unsigned int active_operations = 0;
+bool context_closing = false;
+
+class RgaContextUse {
+public:
+    RgaContextUse() {
+        pthread_mutex_lock(&mMutex);
+        ctx = context_closing ? NULL : rgaCtx;
+        if (ctx)
+            active_operations++;
+        pthread_mutex_unlock(&mMutex);
+    }
+    ~RgaContextUse() {
+        if (!ctx)
+            return;
+        pthread_mutex_lock(&mMutex);
+        if (--active_operations == 0)
+            pthread_cond_broadcast(&context_idle);
+        pthread_mutex_unlock(&mMutex);
+    }
+    struct rgaContext *ctx;
+private:
+    RgaContextUse(const RgaContextUse&);
+    RgaContextUse& operator=(const RgaContextUse&);
+};
+}
+
 void is_debug_log(void) {
+    pthread_mutex_lock(&mMutex);
     struct rgaContext *ctx = rgaCtx;
-    ctx->Is_debug = get_int_property();
+    if (ctx)
+        ctx->Is_debug = get_int_property();
+    pthread_mutex_unlock(&mMutex);
 }
 
 int is_out_log( void ) {
+    pthread_mutex_lock(&mMutex);
     struct rgaContext *ctx = rgaCtx;
-    return ctx->Is_debug;
+    int level = ctx ? ctx->Is_debug : 0;
+    pthread_mutex_unlock(&mMutex);
+    return level;
 }
 
 int get_int_property(void) {
@@ -76,6 +112,8 @@ int NormalRgaOpen(void **context) {
     }
 
     pthread_mutex_lock(&mMutex);
+    while (context_closing)
+        pthread_cond_wait(&context_idle, &mMutex);
     if (!rgaCtx) {
         ctx = (struct rgaContext *)malloc(sizeof(struct rgaContext));
         if(!ctx) {
@@ -156,49 +194,46 @@ mallocErr:
 }
 
 int NormalRgaClose(void **context) {
+    if (!context)
+        return -ENODEV;
+
+    pthread_mutex_lock(&mMutex);
     struct rgaContext *ctx = rgaCtx;
 
     if (!ctx) {
         ALOGE("Try to exit uninit rgaCtx=%p", ctx);
+        pthread_mutex_unlock(&mMutex);
         return -ENODEV;
     }
 
     if (!*context) {
         ALOGE("Try to uninit rgaCtx=%p", *context);
+        pthread_mutex_unlock(&mMutex);
         return -ENODEV;
     }
 
     if (*context != ctx) {
         ALOGE("Try to exit wrong ctx=%p",ctx);
+        pthread_mutex_unlock(&mMutex);
         return -ENODEV;
     }
 
     if (__atomic_load_n(&refCount, __ATOMIC_RELAXED) <= 0) {
         ALOGE("This can not be happened, close before init");
-        return 0;
-    }
-
-#ifdef ANDROID
-    if (__atomic_sub_fetch(&refCount, 1, __ATOMIC_RELAXED) != 0)
-        return 0;
-#elif LINUX
-    pthread_mutex_lock(&mMutex);
-    int remaining = __atomic_sub_fetch(&refCount, 1, __ATOMIC_RELAXED);
-
-    if (remaining < 0) {
-        __atomic_store_n(&refCount, 0, __ATOMIC_RELAXED);
         pthread_mutex_unlock(&mMutex);
         return 0;
     }
 
+    int remaining = __atomic_sub_fetch(&refCount, 1, __ATOMIC_RELAXED);
     if (remaining > 0)
     {
         pthread_mutex_unlock(&mMutex);
         return 0;
     }
 
-    pthread_mutex_unlock(&mMutex);
-#endif
+    context_closing = true;
+    while (active_operations != 0)
+        pthread_cond_wait(&context_idle, &mMutex);
 
     rgaCtx = NULL;
     *context = NULL;
@@ -207,6 +242,9 @@ int NormalRgaClose(void **context) {
 
     free(ctx);
 
+    context_closing = false;
+    pthread_cond_broadcast(&context_idle);
+    pthread_mutex_unlock(&mMutex);
     return 0;
 }
 
@@ -236,9 +274,10 @@ int RgaDeInit(void **ctx) {
 #ifdef ANDROID
 int NormalRgaPaletteTable(buffer_handle_t dst,
                           unsigned int v, drm_rga_t *rects) {
+    RgaContextUse use;
     //check rects
     //check buffer_handle_t with rects
-    struct rgaContext *ctx = rgaCtx;
+    struct rgaContext *ctx = use.ctx;
     int srcVirW,srcVirH,srcActW,srcActH,srcXPos,srcYPos;
     int dstVirW,dstVirH,dstActW,dstActH,dstXPos,dstYPos;
     int srcType,dstType,srcMmuFlag,dstMmuFlag;
@@ -373,9 +412,10 @@ int NormalRgaPaletteTable(buffer_handle_t dst,
 #endif
 
 int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
+    RgaContextUse use;
     //check rects
     //check buffer_handle_t with rects
-    struct rgaContext *ctx = rgaCtx;
+    struct rgaContext *ctx = use.ctx;
     int srcVirW,srcVirH,srcActW,srcActH,srcXPos,srcYPos;
     int dstVirW,dstVirH,dstActW,dstActH,dstXPos,dstYPos;
     int src1VirW,src1VirH,src1ActW,src1ActH,src1XPos,src1YPos;
@@ -1503,7 +1543,8 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
 }
 
 int RgaFlush() {
-    struct rgaContext *ctx = rgaCtx;
+    RgaContextUse use;
+    struct rgaContext *ctx = use.ctx;
 
     //init context
     if (!ctx) {
@@ -1520,9 +1561,10 @@ int RgaFlush() {
 }
 
 int RgaCollorFill(rga_info *dst) {
+    RgaContextUse use;
     //check rects
     //check buffer_handle_t with rects
-    struct rgaContext *ctx = rgaCtx;
+    struct rgaContext *ctx = use.ctx;
     int dstVirW,dstVirH,dstActW,dstActH,dstXPos,dstYPos;
     int dstType,dstMmuFlag;
     int dstFd = -1;
@@ -1786,8 +1828,9 @@ int RgaCollorFill(rga_info *dst) {
 }
 
 int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
+    RgaContextUse use;
 
-    struct rgaContext *ctx = rgaCtx;
+    struct rgaContext *ctx = use.ctx;
     struct rga_req  Rga_Request;
     struct rga_req  Rga_Request2;
     int srcVirW ,srcVirH ,srcActW ,srcActH ,srcXPos ,srcYPos;

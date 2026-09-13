@@ -153,16 +153,16 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
 It adds direct exported-init coverage to H1 and H3; build both sanitizer trees
 first. Results and the unproven subclaims are in `docs/fix-audit.d/candidate-a.md`.
-Exit 1 is a RED reproducer, not part of the green baseline suite.
+Exit 1 records a finding; Wave E promotes its fixed cases as described below.
 
 Candidate B's host-only R1 probe [EXISTS], `tests/repro/run-candidate-b.sh`,
 runs H2 with an additional owned-reference control after both sanitizer trees
 are built. Its RED findings and ownership limits are recorded in
-`docs/fix-audit.d/candidate-b.md`; it is separate from the green baseline suite.
+`docs/fix-audit.d/candidate-b.md`; Wave-E results are in `docs/fix-audit.d/wave-e-b.md`.
 
 Candidate C's scheduler-default assertion [EXISTS] is
 `bash tests/repro/run-candidate-c.sh`. It uses the existing unit helper but
-expects legitimate zero input to succeed, so exits RED separately from H5's
+expects legitimate zero input to succeed, separately from H5's
 unchanged characterization assertions. Evidence: `docs/fix-audit.d/candidate-c.md`.
 
 Candidate D's isolated H6/C4 mode [EXISTS] is
@@ -170,10 +170,10 @@ Candidate D's isolated H6/C4 mode [EXISTS] is
 the default H6 cases unchanged and measures only positive-fd `imsync` wait-error
 cleanup under host instrumentation; see `docs/fix-audit.d/candidate-d.md`.
 
-Candidates A–D are manual, expected-RED characterization probes, deliberately
-absent from the Meson baseline and its `concurrency` suite. Exit 1 means a
-reproduced finding, not a passing baseline test; do not register these runners
-as required-green tests. The combined R1 run and its baseline results are in
+Candidates A–D were expected-RED characterization probes on the pre-fix R1 base.
+Wave E promotes the fixed cases into Meson; the canary-verified repeated-process
+runners remain explicit host-only QA and now expect exit 0. Exit 1 still means a
+finding, never an expected-pass inversion. The historical combined R1 run is in
 [`docs/fix-audit.d/r1-consolidation.md`](docs/fix-audit.d/r1-consolidation.md).
 
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
@@ -187,8 +187,8 @@ header. Duplicate ledger headers/separators are omitted from the generated file;
 the source fragments remain unchanged. Subsidiary tables, fenced transcripts and
 comments stay with the prose, not in the ledger. Malformed D21 rows fail assembly
 without overwriting the ledger. Edit evidence in the fragments, then regenerate;
-do not hand-edit the generated table or appendices. The introduction still records
-characterization of the unchanged upstream base, not landed library fixes.
+do not hand-edit the generated table or appendices. The generator migrates the
+historical introduction to distinguish upstream characterization from fix evidence.
 `bash tests/test-wire-bootstrap.sh` checks preservation, structure and idempotency
 in an isolated repo-local fixture; it also runs as the Meson `wire-bootstrap` test.
 
@@ -236,6 +236,15 @@ API). Context creation and publication share the legacy mutex; refcount operatio
 are atomic without changing the exported integer's storage or type. Failed legacy
 and im2d initialization closes its device fd. `run-candidate-a.sh 200` runs the
 long host-only race acceptance batch; the default remains 20 fresh processes.
+
+Candidate B's borrowed-last-reference and process-exit regressions [EXISTS] are
+green Meson `concurrency` tests, alongside the unchanged owned-reference control.
+Final legacy close rejects new operations, drains active operations, then closes
+and frees under the context mutex. The already process-lifetime Linux singleton
+now uses a process-lifetime lookup mutex; the old static lock stays exported for
+ABI compatibility but is unused by lookup. No singleton destructor is newly run.
+This fixes the demonstrated borrowed-reference/exit patterns, not a refcounting
+defect in the passing owned-reference path. Full batches: `run-candidate-b.sh`.
 
 The manual H2 teardown probe [EXISTS] is `tests/repro/run-h2.sh`: 200 fresh
 processes per scenario and sanitizer, with its six-field ledger fragment in

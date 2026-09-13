@@ -69,6 +69,18 @@ The upstream `debian/` directory in this tree is JeffyCN's. It is kept
 byte-for-byte and is **never invoked** — no debhelper is involved in a CeraLive
 build.
 
+### Wave-E regression checks (R1)
+
+The scheduler default, failed `imsync` wait cleanup, legacy initialization and
+borrowed-last-reference teardown fixes have green Meson regression cases. Long
+host-only runs use `tests/repro/run-candidate-{a,b,c,d}.sh`; build the ASan and
+TSan trees first with `scripts/build-sanitized.sh`. The owned-reference teardown
+control remains unchanged. The Linux singleton and its active lookup mutex both
+live until process termination; final context release drains in-flight operations.
+
+These fixes are not release approval. Fresh evidence and the separate R0 ABI
+closure finding are in [`docs/fix-audit.d/wave-e-verification.md`](docs/fix-audit.d/wave-e-verification.md).
+
 Before reaching for the im2d API, read
 [`docs/API-TRAPS.md`](docs/API-TRAPS.md). It documents the argument-unit and
 status-code surprises that this library's callers hit first, and most of them are

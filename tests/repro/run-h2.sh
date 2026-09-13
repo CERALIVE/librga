@@ -72,7 +72,7 @@ for scenario in deinit exit; do
         stem="$out/$scenario-$iteration"
         rc=0
         timeout --kill-after=2s 10s "${run_env[@]}" "FAKE_RGA_LOG=$stem.shim.log" \
-            "$build/h2-teardown-race" "$scenario" >"$stem.log" 2>&1 || rc=$?
+            "$build/h2-teardown-race" "$scenario" >"$stem.stdout.log" 2>"$stem.log" || rc=$?
         action=no
         grep -q "^H2 action=$scenario successful_blits=" "$stem.log" && action=yes
         blits=0
@@ -82,7 +82,7 @@ for scenario in deinit exit; do
         if [[ $action != yes || $blits -lt 33 ]]; then
             outcome=invalid
             ((invalid += 1))
-        elif grep -Eq 'ERROR: (AddressSanitizer|LeakSanitizer):|WARNING: ThreadSanitizer:|runtime error:|AddressSanitizer:DEADLYSIGNAL' "$stem.log"; then
+        elif grep -Eq 'ERROR: (AddressSanitizer|LeakSanitizer):|WARNING: ThreadSanitizer:|runtime error:|AddressSanitizer:DEADLYSIGNAL' "$stem.log" "$stem.stdout.log"; then
             outcome=sanitizer
             ((sanitizer += 1))
         elif [[ $rc -ne 0 ]]; then

@@ -19,6 +19,8 @@
 #ifndef _LIBS_RGA_SINGLETON_H
 #define _LIBS_RGA_SINGLETON_H
 
+// Modified by CeraLive 2026-09-13: match lock lifetime to the process-lifetime singleton.
+
 #ifndef ANDROID
 #include "RgaMutex.h"
 
@@ -31,7 +33,7 @@ template <typename TYPE>
 class Singleton {
   public:
     static TYPE& getInstance() {
-        Mutex::Autolock _l(sLock);
+        Mutex::Autolock _l(instanceLock());
         TYPE* instance = sInstance;
         if (instance == nullptr) {
             instance = new TYPE();
@@ -41,7 +43,7 @@ class Singleton {
     }
 
     static bool hasInstance() {
-        Mutex::Autolock _l(sLock);
+        Mutex::Autolock _l(instanceLock());
         return sInstance != nullptr;
     }
 
@@ -50,6 +52,12 @@ class Singleton {
     Singleton() { }
 
   private:
+    // sInstance is never deleted at exit; its lock must not be destroyed either.
+    // Keep sLock's original definition for exported-symbol/ABI compatibility.
+    static Mutex& instanceLock() {
+        static Mutex* lock = new Mutex();
+        return *lock;
+    }
     Singleton(const Singleton&);
     Singleton& operator = (const Singleton&);
     static Mutex sLock;

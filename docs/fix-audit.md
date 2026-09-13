@@ -4,8 +4,8 @@ The per-fix evidence ledger for this fork. One row per landed fix, no exceptions
 A fix with no row here is a fix with no evidence, and a row with a missing field is
 recorded as a gap rather than rounded up to a pass.
 
-The table below holds characterization rows for findings on the unmodified
-upstream base: **no fix has landed yet**, and no library source has been changed.
+The table below preserves upstream characterization and records the Wave-E fixes.
+Historical RED rows describe their named base; fix rows carry their own RED/GREEN evidence.
 Rows and verbatim supporting evidence are assembled from the investigation
 fragments by `scripts/wire-bootstrap.sh`; supporting prose follows in appendices.
 
@@ -67,9 +67,10 @@ can be checked rather than asserted:
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
-| Wave-E A; first-party initialization fix; commit resolved by `git log --format=%H --grep='fix(init): serialize context publication and unwind failed opens'` | `tests/repro/run-candidate-a.sh`: RED direct-init 20/20 TSan and 1000/1000 leaked fds per API; GREEN same command, then 200 processes per scenario twice; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: initialization ownership repair; not yet submitted upstream |
-| Wave-E C; first-party scheduler-default fix on `1bde9018d28092879978419f8e48f2b88debcbaa`; commit resolved by `git log --format=%H --grep='fix(imconfig): accept the documented default scheduler'` | `tests/repro/run-candidate-c.sh`: RED 2/5 assertions, GREEN 0/5 failures; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: documented enum acceptance; not yet submitted upstream |
-| Wave-E D; first-party wait-error ownership fix; commit resolved by `git log --format=%H --grep='fix(imsync): consume the fence after a failed wait'` | `tests/repro/run-candidate-d.sh`: RED 200/200 retained fds, GREEN 0/200; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: error-path ownership repair; not yet submitted upstream |
+| Wave-E A; first-party initialization fix; commit resolved by `git log --format=%H --grep='fix(init): serialize context publication and unwind failed opens'` | `tests/repro/run-candidate-a.sh`: RED direct-init 20/20 TSan and 1000/1000 leaked fds per API; GREEN same command, then 200 processes per scenario twice; transcripts below; fresh takeover run in `wave-e-verification.md` | host-shim-only | No removal or incompatible change vs pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent full-series review pending; not approved for merge | Downstream-only: initialization ownership repair; not yet submitted upstream |
+| Wave-E B; first-party teardown fix; commit resolved by `git log --format=%H --grep='fix(lifetime): drain active operations before final context release'` | `tests/repro/run-candidate-b.sh`: fresh RED on `1bde9018`, GREEN with active-operation draining and process-lifetime lookup lock; transcripts below | host-shim-only; no board claim | No removal or incompatible change against pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent review pending; no approval or reviewer session id; NOT approved for merge | Downstream-only: borrowed-last-reference and exit-time lock lifetime repair; not submitted upstream |
+| Wave-E C; first-party scheduler-default fix on `1bde9018d28092879978419f8e48f2b88debcbaa`; commit resolved by `git log --format=%H --grep='fix(imconfig): accept the documented default scheduler'` | `tests/repro/run-candidate-c.sh`: RED 2/5 assertions, GREEN 0/5 failures; transcripts below; fresh takeover and unit-session expectation migration in `wave-e-verification.md` | host-shim-only | No removal or incompatible change vs pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent full-series review pending; not approved for merge | Downstream-only: documented enum acceptance; not yet submitted upstream |
+| Wave-E D; first-party wait-error ownership fix; commit resolved by `git log --format=%H --grep='fix(imsync): consume the fence after a failed wait'` | `tests/repro/run-candidate-d.sh`: RED 200/200 retained fds, GREEN 0/200; transcripts below; fresh takeover run in `wave-e-verification.md` | host-shim-only | No removal or incompatible change vs pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent full-series review pending; not approved for merge | Downstream-only: error-path ownership repair; not yet submitted upstream |
 
 ## Appendix — candidate-a.md
 
@@ -1039,6 +1040,91 @@ Disposition: direct-init is in Meson's green `concurrency` suite; both injected
 hardware-version-failure censuses are green baseline tests against the ordinary
 shared library. The long canary-verified batches remain explicit host-only QA.
 
+## Appendix — wave-e-b.md
+
+Source: [fix-audit.d/wave-e-b.md](fix-audit.d/wave-e-b.md). D21 rows are in the [ledger above](#rows).
+
+
+### Wave-E B — final release and exit-time lookup
+
+Mechanism: final close marks the context closing under the publication mutex,
+rejects new operations and waits for all existing operation guards before closing
+the fd and freeing the context; singleton lookup uses a lock with the same process
+lifetime as the already never-deleted singleton.
+
+`core/NormalRga.cpp`: `RgaContextUse` guards legacy blit, fill, palette and flush
+operations; `NormalRgaClose` validates/decrements under `mMutex` and waits on
+`context_idle` only for the last reference. `NormalRgaOpen` waits for that close
+to complete. Debug-level context access is under the same mutex. Ordinary release
+from two owned references to one still returns without closing or draining.
+
+`include/RgaSingleton.h`: `instanceLock()` constructs its mutex once, with C++14
+thread-safe local-static initialization, and never destroys it. The singleton
+already has that lifetime upstream. The previous `sLock` definition is retained
+for ABI compatibility but lookup no longer uses it. This is deterministic lifetime
+matching, not an atexit registration-order trick, and does not introduce a
+singleton destructor that could race active callers. Explicit deletion/dlclose
+with active callers and Android's separate singleton implementation are not proven.
+
+The inherited B implementation is retained. Broken duplicated text in its pending
+documentation/generator edits was removed; no library cleanup was added. Its H2
+runner change separates stdout/stderr so buffered library stdout cannot split an
+action/completion marker. Both streams are scanned for sanitizer diagnostics;
+the required markers, 33 successful ioctls, timeout, exit checks and controls stay.
+
+Command on each tree after building both sanitizer trees:
+
+```sh
+bash tests/repro/run-candidate-b.sh
+```
+
+Fresh RED on `1bde9018d28092879978419f8e48f2b88debcbaa`:
+
+```text
+Candidate B evidence: test-results/candidate-b/run.hArjys
+ASan/UBSan summary (scenario,iterations,clean,sanitizer,other_failure,invalid):
+deinit,200,35,165,0,0
+exit,200,200,0,0,0
+H2 driver exit=1
+H2 refcount: before=2 after=1 deinit=0 fd_open=1 blit=0
+TSan summary (same columns):
+deinit,200,0,200,0,0
+exit,200,0,200,0,0
+H2 driver exit=1
+H2 refcount: before=2 after=1 deinit=0 fd_open=1 blit=0
+```
+
+The wrapper returned 1. Raw batch evidence: `test-results/h2/asan/run.UVRQED`
+and `test-results/h2/tsan/run.D9CjdS` in the pre-fix checkout. TSan exit reports
+use of an invalid/destroyed mutex, not a singleton-object use-after-free. Both
+owned-reference controls returned 0; they do not authorize a serial-refcount fix.
+
+Fresh GREEN with B applied:
+
+```text
+Candidate B evidence: test-results/candidate-b/run.4Zx5sj
+ASan/UBSan summary (scenario,iterations,clean,sanitizer,other_failure,invalid):
+deinit,200,200,0,0,0
+exit,200,200,0,0,0
+H2 driver exit=0
+H2 refcount: before=2 after=1 deinit=0 fd_open=1 blit=0
+TSan summary (same columns):
+deinit,200,200,0,0,0
+exit,200,200,0,0,0
+H2 driver exit=0
+H2 refcount: before=2 after=1 deinit=0 fd_open=1 blit=0
+```
+
+The wrapper returned 0. Raw batches: `test-results/h2/asan/run.zf3XQY` and
+`test-results/h2/tsan/run.fDpqql`. Both runtimes' deliberately failing canaries
+were checked by the runner. ASan exit was clean before as well as after: only
+TSan establishes that exit defect. No invalid run is counted as GREEN.
+
+Disposition: all three H2 scenarios are now green Meson `concurrency` tests.
+The 200-process batches and their canaries remain explicit host-only QA, not an
+expected-RED exception. The original probe source and owned-reference assertions
+are unchanged. Historical H2/candidate-B fragments retain their original results.
+
 ## Appendix — wave-e-c.md
 
 Source: [fix-audit.d/wave-e-c.md](fix-audit.d/wave-e-c.md). D21 rows are in the [ledger above](#rows).
@@ -1117,3 +1203,245 @@ remain under those evidence directories. No sanitizer reports in the fixed probe
 Disposition: the unchanged `h6_polarity_fence.cpp sync-only` probe is promoted to
 the green Meson baseline as `candidate-d`. Full H6 remains an opt-in
 characterization because C2/C3 are separate, unfixed findings.
+
+## Appendix — wave-e-verification.md
+
+Source: [fix-audit.d/wave-e-verification.md](fix-audit.d/wave-e-verification.md). D21 rows are in the [ledger above](#rows).
+
+### Wave-E takeover verification — 2026-09-13
+
+This is fresh execution, not adoption of the killed lane's claims. The inherited
+C/D/A commits were pushed to `origin/fixes/wave-e` before any edit. All RED runs
+used a separate checkout of exactly
+`1bde9018d28092879978419f8e48f2b88debcbaa`. All paths below are local to the tree
+named by the corresponding RED or GREEN section; no script needs another checkout.
+Historical fragments and their older runs remain evidence of those runs only.
+
+**Release closure is BLOCKED.** All four regressions and the host gate are green,
+but the strict export-superset requirement against the published R0 fails. The
+same exports are already absent on pre-fix R1. This is not permission to suppress
+them, modify visibility, add unrelated compatibility code, or merge the PR.
+
+#### Commands and proof boundary
+
+```sh
+bash scripts/build-sanitized.sh asan
+bash scripts/build-sanitized.sh tsan
+bash tests/repro/run-candidate-c.sh
+bash tests/repro/run-candidate-d.sh
+bash tests/repro/run-candidate-a.sh
+bash tests/repro/run-candidate-b.sh
+```
+
+On the RED tree the four runners return 1, so run them independently, not chained
+with `&&`. The GREEN runners return 0. Compiler: native x86_64 GCC 16.2.1;
+Meson 1.12.0. Sanitizer canaries run with the fake-device preload and must report.
+This is host-shim evidence, not silicon, Debian arm64 CI, or release approval.
+
+#### C — default scheduler
+
+Mechanism: explicitly accept the documented zero enum value before testing the
+nonzero scheduler mask, preserving every previously accepted value.
+Implementation retained from `752f719`: `im2d_api/src/im2d.cpp:869`.
+
+Fresh RED transcript excerpts:
+
+```text
+FAIL default accepted on fresh thread: expected 1, got -4
+FAIL reset explicit core to default: expected 1, got -4
+-- Candidate C: scheduler default is legitimate input: 5 assertions --
+candidate-c: 5 assertions, 2 failures
+Candidate C: exit=1; evidence=test-results/candidate-c/run.TAC5rk
+```
+
+Fresh GREEN:
+
+```text
+-- Candidate C: scheduler default is legitimate input: 5 assertions --
+candidate-c: 5 assertions, 0 failures
+Candidate C: exit=0; evidence=test-results/candidate-c/run.JJCggp
+```
+
+**Inherited commit corrected, implementation kept.** The full gate exposed the
+old `unit-session` RT-1 assertion still requiring rejection (expected -4, got 1).
+Its own comment explicitly reserved flipping to success for this authorized fix.
+The C delivery commit therefore includes that exact expectation migration and
+its README update; all 85 unit-session assertions and all controls remain.
+This correction is kept with C, not hidden in B. `candidate-c` is a green Meson
+case linked against the ordinary shared library; neither test is skipped.
+
+#### D — positive-fence ownership on wait error
+
+Mechanism: close the consumed positive fd on the failed wait branch as on the
+successful branch; `fence_fd <= 0` rejection and all return statuses stay.
+Implementation retained from `9675231`: `im2d_api/src/im2d.cpp:855`.
+
+Fresh RED:
+
+```text
+C4: RED (200/200 defect observations)
+Candidate D: exit=1; evidence=test-results/candidate-d/run.UdsAq7
+```
+
+Fresh GREEN:
+
+```text
+C4: NOT-REPRODUCED (0/200 defect observations)
+Candidate D: exit=0; evidence=test-results/candidate-d/run.XC2Nj1
+```
+
+Both runs include 200 successful-wait controls and the runner verifies exactly
+200 injected EIO poll records. No harness polarity or assertion changed. GREEN
+means the known leak is no longer reproduced, not that the probe stayed RED and
+was marked expected-pass. `candidate-d` (`sync-only`) is a green Meson case;
+the other unfixed H6 characterization modes remain opt-in. Inherited commit kept.
+
+#### A — publication and init-failure fd ownership
+
+Mechanism: serialize context discovery, single device open and publication under
+the mutex, atomically acquire references, and unwind failed opens in both the
+legacy context and the separately owned im2d session.
+Implementation retained from `e6d8fcf`: `core/NormalRga.cpp:104` (`NormalRgaOpen`),
+`:251` (`RgaInit`), `im2d_api/src/im2d_context.cpp:113` and `:195`.
+Atomic builtins preserve the exported refcount integer's type, size and symbol.
+
+Fresh RED:
+
+```text
+Candidate A evidence: test-results/candidate-a/run.Km1nUt
+hwversion,RgaInit,iterations=1000,failed_calls=1000,start=0,end=1000,growing_rows=1000,verdict=RED
+unset,RgaInit,iterations=1000,failed_calls=0,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+hwversion,improcess,iterations=1000,failed_calls=1000,start=0,end=1000,growing_rows=1000,verdict=RED
+unset,improcess,iterations=1000,failed_calls=0,start=1,end=1,growing_rows=0,verdict=NOT-REPRODUCED
+Candidate A: exit=1; per-process evidence in test-results/candidate-a/run.Km1nUt
+```
+
+All 20 `direct-init` rows in `races.csv` are `exit=66,tsan_report=1`;
+all 40 C-init/singleton controls are `exit=0,tsan_report=0`.
+
+Fresh GREEN:
+
+```text
+Candidate A evidence: test-results/candidate-a/run.HPHsmg
+hwversion,RgaInit,iterations=1000,failed_calls=1000,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+unset,RgaInit,iterations=1000,failed_calls=0,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+hwversion,improcess,iterations=1000,failed_calls=1000,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+unset,improcess,iterations=1000,failed_calls=0,start=1,end=1,growing_rows=0,verdict=NOT-REPRODUCED
+Candidate A: exit=0; per-process evidence in test-results/candidate-a/run.HPHsmg
+```
+
+All 60 race/control rows are `exit=0,tsan_report=0`. Failure injection still makes
+all 1000 calls per API fail: GREEN is fd cleanup, not a fault that stopped firing.
+Inherited commit kept. Direct-init and both failure censuses are green Meson
+cases; long batches remain explicit QA. The earlier lane's two 200-process batches
+are preserved in its fragment, not claimed as independently repeated here.
+
+#### B — teardown
+
+The fresh RED/GREEN transcripts, ownership distinction, implementation and baseline
+disposition are in [wave-e-b.md](wave-e-b.md). The inherited B lifetime mechanism
+was retained after validation. Only unfinished surrounding evidence/build wiring
+and corrupted documentation/generator text needed completion.
+
+#### Host gate
+
+```sh
+meson test -C build-qa --print-errorlogs
+bash packaging/package-contract.sh
+ASAN_OPTIONS=detect_leaks=1:verify_asan_link_order=0:abort_on_error=1 \
+  UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+  meson test -C build-asan --print-errorlogs \
+  unit-pure unit-session shim-contract goldens \
+  candidate-a-fds-RgaInit candidate-a-fds-improcess candidate-c candidate-d \
+  candidate-b-deinit candidate-b-exit candidate-b-refcount candidate-a-init
+TSAN_OPTIONS=halt_on_error=1:exitcode=66:symbolize=0 \
+  meson test -C build-tsan --print-errorlogs --suite concurrency
+QEMU_LD_PREFIX=/usr/aarch64-linux-gnu meson setup test-results/wave-e-cross \
+  --cross-file tests/uapi-parity/aarch64.cross -Dlibrga_demo=false
+QEMU_LD_PREFIX=/usr/aarch64-linux-gnu \
+  meson test -C test-results/wave-e-cross --print-errorlogs --suite uapi
+```
+
+| Gate | Result |
+|---|---|
+| Native host | 24/24 OK, no skips: all former 16 baseline cases plus 8 regressions |
+| ASan/UBSan/LSan host | 19/19 OK: all former 11 baseline cases plus 8 regressions |
+| TSan concurrency | 4/4 OK, including owned-reference control |
+| aarch64 UAPI under QEMU | 2/2 OK; 21 ioctls, 29 sizes, 170 offsets |
+| Static package contract | OK; no version/SONAME/visibility/packaging edits |
+
+Native, ASan and TSan testlogs are in their build directories' `meson-logs/`;
+the cross testlog is under `test-results/wave-e-cross/meson-logs/`. The aarch64
+record is restored by the cross test after native smoke. The pre-existing corrupt
+`build-parity/` is untouched; the new cross build has its own output directory.
+This gate does not claim a built .deb, staged package contract, a Debian arm64
+release matrix or a board drill. The out-of-scope `rga_osd_info` exception is unchanged.
+
+#### ABI and export closure — fail closed against R0
+
+Published baseline: GitHub release `1.10.1+ceralive.1`, target commit
+`f4c3ee62ab354c2cbe22718f543fc0ba6e58365c`.
+Downloaded `librga2-ceralive_1.10.1+ceralive.1_arm64.deb`; its published sidecar
+verified SHA-256 `7c59bade43e2f8bb4c31e0ae965bee480128aa128528fdc88e8bc082e98ec498`.
+R0 is the actual stripped release ELF, not a locally substituted baseline.
+
+Both pre-fix and fixed R1 ELFs were built with the same aarch64 GCC 16.1.0
+cross file and debug configuration. For each ELF:
+
+```sh
+nm -D --defined-only --format=posix <library> | cut -d ' ' -f1 | LC_ALL=C sort -u
+```
+
+`comm -23` gives **0 removed exports vs pre-fix R1**, but **21 missing vs R0**.
+The R0-minus-R1 list is byte-identical before and after Wave E. Eighteen entries
+are librga internals already named in `packaging/baseline-symbols-upstream-delta.txt`;
+three are compiler-emitted C++ symbols. No entry is ignored by this strict check.
+
+Unfiltered `abidiff` 2.6.0:
+
+```text
+R0 -> fixed R1:
+Functions changes summary: 0 Removed, 0 Changed, 325 Added functions
+Variables changes summary: 0 Removed, 0 Changed, 1 Added variable
+Function symbols changes summary: 19 Removed, 16 Added function symbols not referenced by debug info
+Variable symbols changes summary: 2 Removed, 2 Added variable symbols not referenced by debug info
+R0_ABIDIFF_EXIT=12
+
+pre-fix R1 -> fixed R1:
+Functions changes summary: 0 Removed, 0 Changed, 2 Added functions
+Variables changes summary: 0 Removed, 0 Changed, 0 Added variable
+Function symbols changes summary: 0 Removed, 0 Added function symbol not referenced by debug info
+Variable symbols changes summary: 0 Removed, 2 Added variable symbols not referenced by debug info
+R1_BASE_ABIDIFF_EXIT=4
+```
+
+Exit 4 here is additive change only; exit 12 includes incompatible change. The
+added R1 symbols are the new private singleton lock accessor, emitted mutex
+constructor and its local-static storage/guard. R0 has no DWARF, so its zero
+changed-function count does **not** establish public-struct ABI equivalence.
+No suppression or `--no-unreferenced-symbols` option was used. Logs and symbol
+lists are `test-results/wave-e-abi-summary.log`, `wave-e-r0-abidiff.log`,
+`wave-e-missing-r0.txt`, `wave-e-base-missing-r0.txt` and `wave-e-missing-base.txt`.
+
+The existing package checker permits a recorded upstream delta against Radxa;
+that is not the user's stricter published-R0 superset requirement. Wave E causes
+no removals, but **R1 release ABI closure is not green**. Restoring those exports
+or changing that policy requires a separate owner decision, not an unrelated
+fifth fix smuggled into this series.
+
+#### Generated-file provenance
+
+The inherited pending generator contained malformed duplicate awk/shell text,
+and its test had a duplicated, unterminated Python assertion. Those edits were
+not a legitimate merge repair and were removed. The only intentional generator
+change now migrates the stale introduction from upstream characterization to
+historical-plus-fix evidence. Its fixture test verifies migration, idempotency,
+unchanged fragments, one continuous D21 table and malformed-row rejection.
+
+The inherited hand-edited introduction is not accepted as provenance: the new
+generator reconstructs it itself. No rows or appendices are hand-merged.
+After all fragments are written, run `bash scripts/wire-bootstrap.sh` twice;
+compare complete file contents and record the ledger SHA-256 outside the ledger
+(putting its own hash inside it would be self-referential). The PR carries the
+hash and equality result. The Meson test registrations are also generated,
+not edited in their assembled region. Independent reviewer approval is pending.

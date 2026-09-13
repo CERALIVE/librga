@@ -1,4 +1,4 @@
-| Wave-E D; first-party wait-error ownership fix; commit resolved by `git log --format=%H --grep='fix(imsync): consume the fence after a failed wait'` | `tests/repro/run-candidate-d.sh`: RED 200/200 retained fds, GREEN 0/200; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: error-path ownership repair; not yet submitted upstream |
+| Wave-E D; first-party wait-error ownership fix; commit resolved by `git log --format=%H --grep='fix(imsync): consume the fence after a failed wait'` | `tests/repro/run-candidate-d.sh`: RED 200/200 retained fds, GREEN 0/200; transcripts below; fresh takeover run in `wave-e-verification.md` | host-shim-only | No removal or incompatible change vs pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent full-series review pending; not approved for merge | Downstream-only: error-path ownership repair; not yet submitted upstream |
 
 ### Wave-E D — wait-error fence ownership
 

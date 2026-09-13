@@ -56,8 +56,10 @@ with tempfile.TemporaryDirectory(prefix='wire-bootstrap-', dir=results) as direc
     assert text.splitlines().count(header) == 1, 'duplicate D21 headers'
     assert text.splitlines().count(separator) == 1, 'duplicate D21 separators'
     assert 'empty on purpose' not in text, 'stale introduction'
-    assert 'no fix has landed yet' in text
-    assert 'no library source has been changed' in text
+    intro = text.split(header, 1)[0]
+    assert 'no fix has landed yet' not in intro
+    assert 'no library source has been changed' not in intro
+    assert 'Historical RED rows describe their named base' in intro
     expected_rows = [line for data in fragments.values() for line in data.decode().splitlines()
                      if line.startswith('|') and line.count('|') == 7
                      and line not in (header, separator)]
@@ -82,6 +84,18 @@ with tempfile.TemporaryDirectory(prefix='wire-bootstrap-', dir=results) as direc
     assert (fixture / 'meson.build').read_bytes() == meson, 'Meson wiring is not idempotent'
     print(f'PASS: {len(fragments)} unchanged fragments; {len(expected_rows)} continuous D21 rows; all evidence retained')
     print(f'PASS: both wiring runs SHA-256 {sha256(ledger).hexdigest()}')
+
+    current_intro = ('The table below preserves upstream characterization and records the Wave-E fixes.\n'
+                     'Historical RED rows describe their named base; fix rows carry their own RED/GREEN evidence.\n')
+    historical_intro = ('The table below holds characterization rows for findings on the unmodified\n'
+                        'upstream base: **no fix has landed yet**, and no library source has been changed.\n')
+    (fixture / 'docs/fix-audit.md').write_text(ledger.decode().replace(current_intro, historical_intro, 1))
+    run = wire()
+    assert run.returncode == 0, run.stderr
+    assert (fixture / 'docs/fix-audit.md').read_bytes() == ledger, 'historical intro migration changed evidence'
+    run = wire()
+    assert run.returncode == 0, run.stderr
+    assert (fixture / 'docs/fix-audit.md').read_bytes() == ledger, 'intro migration is not idempotent'
 
     # A six-column measurement table is not a D21 table. Nor are literal rows
     # in a transcript or comment, even if they look exactly like ledger rows.

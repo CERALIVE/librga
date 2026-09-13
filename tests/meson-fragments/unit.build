@@ -51,7 +51,7 @@ candidate_a = executable('candidate-a', 'tests/repro/h1_init_race.cpp',
     include_directories : incdir,
     link_with : librga_so,
     dependencies : [libthreads_dep, golden_dl],
-    cpp_args : ['-DLINUX=1', '-fpermissive'],
+    cpp_args : ['-DLINUX=1', '-fpermissive', '-Wno-pedantic'],
     install : false)
 test('candidate-a-init', candidate_a, args : ['direct-init'],
     suite : 'concurrency', env : unit_session_env, depends : fake_rga, timeout : 30)
@@ -59,7 +59,7 @@ candidate_a_fds = executable('candidate-a-fds', 'tests/repro/h3_init_fd_leak.cpp
     include_directories : incdir,
     link_with : librga_so,
     dependencies : [libthreads_dep, golden_dl],
-    cpp_args : ['-DLINUX=1', '-fpermissive'],
+    cpp_args : ['-DLINUX=1', '-fpermissive', '-Wno-pedantic'],
     install : false)
 candidate_a_env = environment()
 candidate_a_env.set('LD_PRELOAD', fake_rga.full_path())
@@ -69,4 +69,15 @@ foreach api : ['RgaInit', 'improcess']
     test('candidate-a-fds-' + api, candidate_a_fds,
         args : [api, meson.current_build_dir() / ('candidate-a-' + api + '.csv')],
         env : candidate_a_env, depends : fake_rga, timeout : 120)
+endforeach
+
+candidate_b = executable('candidate-b', 'tests/repro/h2_teardown_race.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-Wno-pedantic'],
+    install : false)
+foreach scenario : ['deinit', 'exit', 'refcount']
+    test('candidate-b-' + scenario, candidate_b, args : [scenario],
+        suite : 'concurrency', env : unit_session_env, depends : fake_rga, timeout : 30)
 endforeach

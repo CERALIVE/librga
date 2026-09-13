@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Modified by CeraLive 2026-09-05: assemble the coordinator-owned test registration.
 # Modified by CeraLive 2026-09-06: separate D21 ledger rows from verbatim appendices.
+# Modified by CeraLive 2026-09-13: distinguish historical characterization from fix evidence.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 shopt -s nullglob
@@ -28,13 +29,21 @@ header="| Provenance SHA | Reproducer (path · RED · GREEN) | Hardware gate | A
 separator='|---|---|---|---|---|---|'
 awk -v header="$header" -v separator="$separator" '
   $0 == "The table below is **empty on purpose**: no fix has landed yet. Rows are appended" {
-    print "The table below holds characterization rows for findings on the unmodified"
-    print "upstream base: **no fix has landed yet**, and no library source has been changed."
+    print "The table below preserves upstream characterization and records the Wave-E fixes."
+    print "Historical RED rows describe their named base; fix rows carry their own RED/GREEN evidence."
     print "Rows and verbatim supporting evidence are assembled from the investigation"
     print "fragments by `scripts/wire-bootstrap.sh`; supporting prose follows in appendices."
     next
   }
   $0 == "by the fix todos, each writing its own fragment, and the coordinator wires them in." { next }
+  $0 == "The table below holds characterization rows for findings on the unmodified" ||
+  $0 == "The table below preserves upstream characterization and records the Wave-E fixes." {
+    print "The table below preserves upstream characterization and records the Wave-E fixes."
+    print "Historical RED rows describe their named base; fix rows carry their own RED/GREEN evidence."
+    next
+  }
+  $0 == "upstream base: **no fix has landed yet**, and no library source has been changed." ||
+  $0 == "Historical RED rows describe their named base; fix rows carry their own RED/GREEN evidence." { next }
   $0 == header { print header; print separator; found = 1; exit }
   { print }
   END { if (!found) { print "Missing D21 ledger header" > "/dev/stderr"; exit 1 } }
