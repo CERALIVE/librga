@@ -80,6 +80,9 @@ live until process termination; final context release drains in-flight operation
 
 These fixes are not release approval. Fresh evidence and the separate R0 ABI
 closure finding are in [`docs/fix-audit.d/wave-e-verification.md`](docs/fix-audit.d/wave-e-verification.md).
+The [matched-build reconciliation](docs/fix-audit.d/wave-e-abi-reconciliation.md)
+corrects the initial unlike-toolchain comparison: 18 inherited removals, no
+shipping-build or Wave-E removals. Strict numeric R0 containment is not waived.
 
 Before reaching for the im2d API, read
 [`docs/API-TRAPS.md`](docs/API-TRAPS.md). It documents the argument-unit and

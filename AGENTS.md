@@ -220,6 +220,16 @@ contracts a new reproducer registers itself through are in
 [`docs/SANITIZERS.md`](docs/SANITIZERS.md). Every `-Wanalyzer-*` finding carries a
 disposition in [`docs/ANALYZER-TRIAGE.md`](docs/ANALYZER-TRIAGE.md).
 
+Release-export comparisons must use matched shipping compiler/flags. The Wave-E
+GCC 16 debug-vs-GCC 14 release comparison's three extra missing weak `std::`
+symbols were measurement artifacts; the shipping comparison has exactly the 18
+documented upstream removals and no Wave-E removal. See
+[`docs/fix-audit.d/wave-e-abi-reconciliation.md`](docs/fix-audit.d/wave-e-abi-reconciliation.md).
+This does not waive the strict R0 superset contract or expand its recorded delta.
+The main-merge gating contract is `bash tests/test-build-check-gating.sh`, also
+run by `ci/build-check-steps.sh`: real sanitizer coverage must survive docs-only
+gating, and skipped code lanes must fail the terminal summary.
+
 Candidate C's scheduler-default regression [EXISTS] is now the green Meson
 `candidate-c` test, linked against the ordinary shared library. `imconfig` accepts
 the documented zero default as well as every previously accepted scheduler value;

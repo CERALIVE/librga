@@ -1,5 +1,12 @@
 ### Wave-E takeover verification — 2026-09-13
 
+**Measurement amendment:** the 21-name comparison below used unlike compiler and
+optimization configurations. [The matched-build reconciliation](wave-e-abi-reconciliation.md)
+resolves its three residuals as weak C++ emission artifacts: shipping R1 is
+missing exactly the 18 already documented upstream names, with zero removals
+introduced by Wave E. The original transcripts below remain historical evidence,
+not the current release-comparison method.
+
 This is fresh execution, not adoption of the killed lane's claims. The inherited
 C/D/A commits were pushed to `origin/fixes/wave-e` before any edit. All RED runs
 used a separate checkout of exactly

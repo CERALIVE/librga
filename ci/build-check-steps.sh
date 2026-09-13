@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Modified by CeraLive 2026-09-13: verify merged workflow gating before building.
 set -euo pipefail
 
 # The whole of build-check, in one script, so a developer runs EXACTLY what CI
@@ -104,6 +105,9 @@ printf '\nbuild-check-steps: debian:%s (%s leg) · %s · %s\n' \
 	"${suite}" "${role}" "${arch}" "$(g++ --version | sed -n 1p)"
 
 # --- Static package contract ------------------------------------------------------
+step "workflow gating contract"
+bash tests/test-build-check-gating.sh
+
 # First, because it reads the packaging sources and builds nothing: a contract
 # break should cost seconds, not a full compile.
 step "package contract (static)"
