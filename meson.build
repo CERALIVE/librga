@@ -315,6 +315,30 @@ candidate_d = executable('candidate-d', 'tests/repro/h6_polarity_fence.cpp',
     install : false)
 test('candidate-d', candidate_d, args : ['sync-only'],
     env : unit_session_env, depends : fake_rga, timeout : 30)
+
+candidate_a = executable('candidate-a', 'tests/repro/h1_init_race.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-fpermissive'],
+    install : false)
+test('candidate-a-init', candidate_a, args : ['direct-init'],
+    suite : 'concurrency', env : unit_session_env, depends : fake_rga, timeout : 30)
+candidate_a_fds = executable('candidate-a-fds', 'tests/repro/h3_init_fd_leak.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-fpermissive'],
+    install : false)
+candidate_a_env = environment()
+candidate_a_env.set('LD_PRELOAD', fake_rga.full_path())
+candidate_a_env.set('FAKE_RGA_FAIL', 'hwversion')
+candidate_a_env.set('FAKE_RGA_ERRNO', '5')
+foreach api : ['RgaInit', 'improcess']
+    test('candidate-a-fds-' + api, candidate_a_fds,
+        args : [api, meson.current_build_dir() / ('candidate-a-' + api + '.csv')],
+        env : candidate_a_env, depends : fake_rga, timeout : 120)
+endforeach
 # >>> fragment: board.build
 add_languages('c')
 board_cc = meson.get_compiler('c')

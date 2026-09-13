@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Host-only extension of H1/H3. Build with scripts/build-sanitized.sh first.
 set -euo pipefail
+iterations=${1:-20}
+[[ $iterations =~ ^[1-9][0-9]*$ ]] || exit 2
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 out=test-results/candidate-a
 mkdir -p "$out"
@@ -29,7 +31,7 @@ env LD_PRELOAD="$PWD/build-asan/libfake_rga.so" FAKE_RGA_LOG="$PWD/$out/canary.s
 printf 'scenario,run,exit,tsan_report\n' > "$out/races.csv"
 red=0
 for scenario in c-init singleton-get direct-init; do
-    for ((i=1; i<=20; i++)); do
+    for ((i=1; i<=iterations; i++)); do
         rc=0
         timeout 20s env LD_PRELOAD="$PWD/build-tsan/libfake_rga.so" \
             FAKE_RGA_LOG="$PWD/$out/$scenario-$i.shim.txt" \

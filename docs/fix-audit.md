@@ -67,6 +67,7 @@ can be checked rather than asserted:
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
+| Wave-E A; first-party initialization fix; commit resolved by `git log --format=%H --grep='fix(init): serialize context publication and unwind failed opens'` | `tests/repro/run-candidate-a.sh`: RED direct-init 20/20 TSan and 1000/1000 leaked fds per API; GREEN same command, then 200 processes per scenario twice; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: initialization ownership repair; not yet submitted upstream |
 | Wave-E C; first-party scheduler-default fix on `1bde9018d28092879978419f8e48f2b88debcbaa`; commit resolved by `git log --format=%H --grep='fix(imconfig): accept the documented default scheduler'` | `tests/repro/run-candidate-c.sh`: RED 2/5 assertions, GREEN 0/5 failures; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: documented enum acceptance; not yet submitted upstream |
 | Wave-E D; first-party wait-error ownership fix; commit resolved by `git log --format=%H --grep='fix(imsync): consume the fence after a failed wait'` | `tests/repro/run-candidate-d.sh`: RED 200/200 retained fds, GREEN 0/200; transcripts below | host-shim-only | Full-series ABI closure pending before PR handoff | Independent full-series review pending; not approved for merge | Downstream-only: error-path ownership repair; not yet submitted upstream |
 
@@ -981,6 +982,62 @@ The generator was run again after adding it, then a second invocation was checke
 for byte-identical `docs/fix-audit.md` and `meson.build` output. The baseline's
 `wire-bootstrap` test also passed its structure, preservation and idempotency
 checks. All historical characterization fragments remain unchanged.
+
+## Appendix — wave-e-a.md
+
+Source: [fix-audit.d/wave-e-a.md](fix-audit.d/wave-e-a.md). D21 rows are in the [ledger above](#rows).
+
+
+### Wave-E A — initialization ownership
+
+Mechanism: hold the legacy mutex across context discovery, its single device open,
+initialization, reference acquisition and publication; use atomic operations on the
+existing refcount storage and close uncommitted device fds on initialization failure.
+The modern im2d session has its own fd, so its failure paths are unwound independently.
+
+Fixes: `core/NormalRga.cpp` (`NormalRgaOpen`, atomic reference operations and
+`RgaInit` version-rejection unwind); `im2d_api/src/im2d_context.cpp`
+(`rga_device_init` failure exits and failed hardware-info initialization).
+The exported `volatile int32_t refCount` declaration/size is unchanged; library
+accesses use `__atomic_*`. No public structure, default, signature or symbol changes.
+
+RED on `1bde9018d28092879978419f8e48f2b88debcbaa`, exact command
+`bash tests/repro/run-candidate-a.sh`:
+
+```text
+Candidate A evidence: test-results/candidate-a/run.stdc06
+hwversion,RgaInit,iterations=1000,failed_calls=1000,start=0,end=1000,growing_rows=1000,verdict=RED
+unset,RgaInit,iterations=1000,failed_calls=0,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+hwversion,improcess,iterations=1000,failed_calls=1000,start=0,end=1000,growing_rows=1000,verdict=RED
+unset,improcess,iterations=1000,failed_calls=0,start=1,end=1,growing_rows=0,verdict=NOT-REPRODUCED
+Candidate A: exit=1; per-process evidence in test-results/candidate-a/run.stdc06
+```
+
+`races.csv` records all 20 direct-init processes with exit 66 and a TSan report;
+all 40 C-init/singleton controls exited zero without reports.
+
+GREEN after rebuilding both sanitizer trees with `meson compile -C build-asan`
+and `meson compile -C build-tsan`, same command:
+
+```text
+Candidate A evidence: test-results/candidate-a/run.mNrUYa
+hwversion,RgaInit,iterations=1000,failed_calls=1000,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+unset,RgaInit,iterations=1000,failed_calls=0,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+hwversion,improcess,iterations=1000,failed_calls=1000,start=0,end=0,growing_rows=0,verdict=NOT-REPRODUCED
+unset,improcess,iterations=1000,failed_calls=0,start=1,end=1,growing_rows=0,verdict=NOT-REPRODUCED
+Candidate A: exit=0; per-process evidence in test-results/candidate-a/run.mNrUYa
+```
+
+Long-race acceptance: `bash tests/repro/run-candidate-a.sh 200` run twice,
+`test-results/candidate-a/run.RWhWlo` and `run.OtqPmT`. Both exited zero;
+each ran 200 direct-init processes and 400 controls, with zero race reports,
+and repeated all four 1000-call censuses with the same flat GREEN rows above.
+Both sanitizer canaries were verified in every run. The optional count only
+extends the batch; the original default 20 and all original assertions remain.
+
+Disposition: direct-init is in Meson's green `concurrency` suite; both injected
+hardware-version-failure censuses are green baseline tests against the ordinary
+shared library. The long canary-verified batches remain explicit host-only QA.
 
 ## Appendix — wave-e-c.md
 
