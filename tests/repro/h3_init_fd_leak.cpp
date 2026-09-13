@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+/* Modified by CeraLive 2026-09-12: distinguish real legacy init from its no-op C alias. */
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -9,7 +10,10 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#include "NormalRga.h"
 #include "RgaApi.h"
+#undef RgaInit
+#undef RgaDeInit
 #include "im2d.hpp"
 
 static const int iterations = 1000;
@@ -55,9 +59,10 @@ static int image_fd(const char *name)
 
 int main(int argc, char **argv)
 {
-    if (argc != 3 || (std::strcmp(argv[1], "c_RkRgaInit") &&
+    if (argc != 3 || (std::strcmp(argv[1], "RgaInit") &&
+                      std::strcmp(argv[1], "c_RkRgaInit") &&
                       std::strcmp(argv[1], "improcess"))) {
-        std::fprintf(stderr, "usage: %s c_RkRgaInit|improcess CSV\n", argv[0]);
+        std::fprintf(stderr, "usage: %s RgaInit|c_RkRgaInit|improcess CSV\n", argv[0]);
         return 2;
     }
     if (!dlsym(RTLD_DEFAULT, "fake_rga_active")) fail("host shim not preloaded");
@@ -73,10 +78,12 @@ int main(int argc, char **argv)
     if (device_count() != 0) fail("case must start without a device/session fd");
 
     const bool legacy = !std::strcmp(argv[1], "c_RkRgaInit");
+    const bool direct = !std::strcmp(argv[1], "RgaInit");
+    void *context = nullptr;
     int src_fd = -1, dst_fd = -1;
     rga_buffer_t src = {}, dst = {}, pat = {};
     const im_rect rect = {};
-    if (!legacy) {
+    if (!legacy && !direct) {
         src_fd = image_fd("h3-src");
         dst_fd = image_fd("h3-dst");
         src = wrapbuffer_fd(src_fd, 64, 64, RK_FORMAT_RGBA_8888);
@@ -85,10 +92,15 @@ int main(int argc, char **argv)
     auto invoke = [&]() -> int {
         // On R1 the requested legacy entry point really is a no-op. Do not
         // substitute NormalRgaOpen and then attribute its result to this API.
+        if (direct) {
+            int status = RgaInit(&context);
+            if (status >= 0 && RgaDeInit(&context)) fail("direct init teardown");
+            return status >= 0 ? 0 : status;
+        }
         return legacy ? c_RkRgaInit() :
             static_cast<int>(improcess(src, dst, pat, rect, rect, rect, IM_SYNC));
     };
-    const int success = legacy ? 0 : IM_STATUS_SUCCESS;
+    const int success = legacy || direct ? 0 : IM_STATUS_SUCCESS;
     // Only the unset control is warmed up: its one live session is not a leak.
     // Failure cases retain the first call and never reset or close library fds.
     if (control && invoke() != success) fail("unset control warmup failed");
