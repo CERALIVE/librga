@@ -41,6 +41,22 @@ can be checked rather than asserted:
    submitted with a link, already fixed upstream at a named SHA, carried
    downstream-only with the reason, or not-applicable for packaging-shaped work.
 
+## R0 candidate acceptance
+
+This is a release-candidate review record, not a library-fix row. The
+owner-approved [R0 amendment](R0-NEUTRALITY.md) is the acceptance contract;
+the rejected literal contract and its raw failures remain unchanged.
+
+The reviewed runtime package SHA-256 is
+`7c59bade43e2f8bb4c31e0ae965bee480128aa128528fdc88e8bc082e98ec498`;
+the re-extracted library SHA-256 is
+`adf9e34934497092c30ba2ec3cf45141e058c368991d77524d9c0e38f5e29fc6`.
+Publication must reproduce this package or obtain new both-board evidence.
+
+| Provenance SHA | Reproducer and executed controls | Hardware gate | ABI closure and limits | Independent reviewer verdict · reviewer session id | `Upstream-status` |
+|---|---|---|---|---|---|
+| `037e208e4cd79b49172a53bfba722fac577bfed9` | [Amended acceptance procedure](R0-AMENDMENT-CHECK.md) rerun verbatim: 254/254 global deletions and 495/495 non-padding byte mutations rejected; 9/9 padding-only mutations accepted; named-byte and request-length controls rejected. Freshly compiled poison diagnostic returns 1 on both packaged libraries. Raw G8 remains FAIL. | [G-A receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5649766546): R1–R7 PASS on Rock 5B+ and Orange Pi 5+ for the exact package; no hardware rerun by this reviewer. Equal finite PSNR scores are not byte-identical image proof. No hardware sanitizer claim. | Radxa GLOBAL floor 254/254, including GLOBAL binding. Unfiltered containment remains FAIL for the three enumerated weak map helpers; historical `abidiff` FAIL preserved, not rerun or promoted to a type-ABI pass. No R1 exemption. | **APPROVE under the amended contract** · `ses_f677dc1b2ffeX5gh5fNM7YkXqp` · [independent review receipt](https://github.com/CERALIVE/librga/pull/2#issuecomment-5650165812). Formal approval refused because the token account authored the PR; verdict posted as the owner-authorized comment fallback. | Not applicable: R0 packaging/CI candidate and acceptance documentation; no library-source fix. |
+
 ## Rows
 
 | Provenance SHA | Reproducer (path · RED · GREEN) | Hardware gate | ABI closure (nm vs R0 · abidiff vs previous release) | Independent reviewer verdict · reviewer session id | `Upstream-status` |
