@@ -408,3 +408,77 @@ jobs:
             echo "When the shim lands, this job builds \`-fsanitize=address,undefined\`"
             echo "against it and becomes a real leg."
           } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # THE terminal summary job, and the only one. The branch ruleset on `main` and
+  # `release/*` requires the single status context `Build Check summary`, and a
+  # job's reported context is its `name:` verbatim — so this `name:` is
+  # load-bearing wire protocol, not a label. Renaming it renames the context and
+  # re-blocks every pull request in the repository on a check nothing produces,
+  # which is exactly the state this job was added to end. Adding a SECOND
+  # terminal sink is equally wrong: then neither is authoritative.
+  build-check-summary:
+    name: Build Check summary
+    # Every failure-bearing prerequisite, setup job included. `resolve-suite` is
+    # here for a reason that is easy to miss: if it fails, `build` and
+    # `test-results` SKIP rather than fail, so a summary watching only the lanes
+    # would see no failure and report green over a run that built nothing.
+    needs: [resolve-suite, build, test-results, analyzer, sanitizers]
+    # `always()` rather than the implicit success-gate. A summary that runs only
+    # when its dependencies already passed can never report red, and a required
+    # check that cannot fail is decorative.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every prerequisite to have succeeded
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          results = {
+              job: (data or {}).get('result')
+              for job, data in json.loads(os.environ['NEEDS_JSON']).items()
+          }
+          if not results:
+              raise SystemExit('needs context is empty; this job has no prerequisites to judge')
+
+          # No job in this workflow carries a job-level `if:` — there is no
+          # docs-only `changes` gate here and nothing has licence to skip. A
+          # `skipped` result therefore means an upstream prerequisite failed or
+          # the run was cancelled, never a legitimate no-op, so it is red. If a
+          # conditionally-gated lane is ever added to this workflow, this is the
+          # line to revisit: it must then stay red on skip whenever the gate
+          # claimed the lane's inputs were present.
+          #
+          # `analyzer` is advisory and carries its own `continue-on-error: true`,
+          # which makes GitHub report `success` for it even when its steps fail.
+          # That is where the advisory decision lives, so listing it in `needs`
+          # does not promote it to a gate by the back door.
+          bad = {job: res for job, res in results.items() if res != 'success'}
+
+          lines = ['## Build Check summary', '']
+          for job in sorted(results):
+              res = results[job]
+              lines.append(f"- `{job}`: **{res}**{'' if res == 'success' else '  ← blocking'}")
+          lines.append('')
+          if bad:
+              lines.append(
+                  'FAILED — '
+                  + ', '.join(f'`{job}` ({res})' for job, res in sorted(bad.items()))
+                  + '. This check is red on purpose; read the failing job above.'
+              )
+          else:
+              lines.append('Every prerequisite succeeded.')
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as handle:
+                  handle.write('\n'.join(lines) + '\n')
+          print('\n'.join(lines))
+
+          if bad:
+              raise SystemExit(1)
+          PY
