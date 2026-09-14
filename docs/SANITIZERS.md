@@ -27,6 +27,36 @@ TSan discovery matches the exact `:concurrency` suffix in Meson's project-prefix
 suite names, counting each test once. H10 uses Meson's `--suite h10` selection
 directly, without a separate discovery predicate.
 
+### H10 launcher startup failure (R1 PR #9)
+
+Run [34899237663](https://github.com/CERALIVE/librga/actions/runs/34899237663)
+passed the canary and 11 baseline tests on native arm64, then aborted all six H10
+cases at PC zero, thread `T-1`. The baseline executes instrumented binaries
+directly; H10 instead preloaded the instrumented shim into an uninstrumented Bash
+launcher. These are different sanitizer startup configurations.
+
+The unchanged GCC 14/Trixie arm64 build reproduced all six aborts under QEMU.
+The following reduced comparisons isolate startup without any library changes:
+
+| Invocation with the same instrumented shim | Observed result |
+|---|---|
+| `LD_PRELOAD=$shim bash -c 'printf "BASH-ENTERED\n"'` | PC-zero/T-1 abort before the marker; no librga or H10 code involved |
+| `LD_PRELOAD=$asan:$shim bash -c 'printf "BASH-ENTERED\n"'` | Marker reached |
+| `LD_PRELOAD=$shim build-asan/h10-job-handle control` | `CONTROL PASS: 200 config/end + 200 create/cancel; count=0 map=0` |
+| Bash started without preload, exporting it only before `exec` of that binary | Same complete control result |
+
+Both Bash-only comparisons were repeated with leak detection enabled and
+disabled. The shim-only startup abort is independent of leak detection. With
+leak detection enabled, the other three reach their markers but subsequently
+hit QEMU's separate LeakSanitizer fatal error; with it disabled locally they exit
+zero. This diagnostic override is not a CI setting or sanitizer-coverage claim.
+
+The six early aborts are therefore a launcher/runtime load-order failure, not
+evidence of an arm64 job-manager race: the reduced failure has neither librga
+nor worker threads. This does not establish that the unexecuted race cases are
+clean. Native arm64 CI must still execute all six H10 cases with the original
+sanitizer settings and reach the TSan stage before the blocker is closed.
+
 H10c remains driver-owned: its historical characterization script exits 1 for
 forwarding a second release even on a fixed library. The expected-pass H10
 suite instead verifies repeated imports/releases and recycled numeric handles
