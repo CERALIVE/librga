@@ -71,6 +71,13 @@ build.
 
 ### Wave-E regression checks (R1)
 
+H1 board characterization [EXISTS] lives in `tests/board/h1-board.cpp` and
+`run-h1-board.sh`. It requires the board driver's held-lock environment and
+measures real-device fd targets on pre/post-fix trees. Both Rock and OPi direct-init
+measured 200/200 base findings and 0/200 post-fix findings, with clean controls.
+Sanitizers remain host-shim-only. See
+[`docs/fix-audit.d/h1.md`](docs/fix-audit.d/h1.md).
+
 The scheduler default, failed `imsync` wait cleanup, legacy initialization and
 borrowed-last-reference teardown fixes have green Meson regression cases. Long
 host-only runs use `tests/repro/run-candidate-{a,b,c,d}.sh`; build the ASan and
