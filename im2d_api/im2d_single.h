@@ -15,9 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: route C macro diagnostics to stderr with context.
 #ifndef _im2d_single_h_
 #define _im2d_single_h_
 
+#include <stdio.h>
 #include "im2d_type.h"
 
 #ifdef __cplusplus
@@ -571,7 +573,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imcopy_t(src, dst, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -604,7 +606,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imresize_t(src, dst, __args[RGA_GET_MIN(__argc, 0)], __args[RGA_GET_MIN(__argc, 1)], (int)__args[RGA_GET_MIN(__argc, 2)], (int)__args[RGA_GET_MIN(__argc, 3)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -643,7 +645,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imcvtcolor_t(src, dst, sfmt, dfmt, (int)__args[RGA_GET_MIN(__argc, 0)], (int)__args[RGA_GET_MIN(__argc, 1)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -670,7 +672,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imcrop_t(src, dst, rect, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -698,7 +700,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imtranslate_t(src, dst, x, y, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -728,7 +730,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imrotate_t(src, dst, rotation, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -758,7 +760,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imflip_t(src, dst, mode, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -791,7 +793,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imblend_t(srcA, srcB, dst, (int)__args[RGA_GET_MIN(__argc, 0)], (int)__args[RGA_GET_MIN(__argc, 1)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -808,7 +810,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imblend_t(srcA, srcB, dst, (int)__args[RGA_GET_MIN(__argc, 0)], (int)__args[RGA_GET_MIN(__argc, 1)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -839,7 +841,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imcolorkey_t(src, dst, range, (int)__args[RGA_GET_MIN(__argc, 0)], (int)__args[RGA_GET_MIN(__argc, 1)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -866,7 +868,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imquantize_t(src, dst, nn_info, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -894,7 +896,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imrop_t(src, dst, rop_code, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -922,7 +924,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imfill_t(buf, rect, color, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -938,7 +940,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imfill_t(buf, rect, color, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -954,7 +956,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imfill_t(buf, rect, color, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -981,7 +983,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = impalette_t(src, dst, lut, (int)__args[RGA_GET_MIN(__argc, 0)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })
@@ -1023,7 +1025,7 @@ IM_C_API IM_STATUS imgaussianBlur_t(rga_buffer_t src, rga_buffer_t dst,
             __ret = imgaussianBlur_t(src, dst, gauss_width, gauss_height, sigma_x, (int)__args[RGA_GET_MIN(__argc, 0)], (int)__args[RGA_GET_MIN(__argc, 1)]); \
         } else { \
             __ret = IM_STATUS_INVALID_PARAM; \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         __ret; \
     })

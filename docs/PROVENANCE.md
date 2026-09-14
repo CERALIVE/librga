@@ -303,7 +303,11 @@ This repository descends from Rockchip's `linux-rga` through JeffyCN's
   Ideas only; no code is taken.
 - **nyanmisaka** for downstream fixes that are **candidate** donors. Any pick is
   taken with `git cherry-pick -x`, keeps its original author, and is recorded in
-  `docs/fix-audit.md` with a reproducer. No pick has been made in this commit.
+  `docs/fix-audit.md` with a reproducer. The R1 donor audit ports
+  `571a880951583a3b2a04e7e1fa900861653befde` (combined full-CSC configuration),
+  preserving its author and `-x` credit. CeraLive omits the new public feature
+  macro and preserves the original diagnostic argument; see
+  [`DONORS.md`](DONORS.md) for the reproducer and all four semantic verdicts.
 
 The Android Open Source Project, Google, Inc., Intel Corporation, Precision
 Insight, Inc., VA Linux Systems, Inc., Red Hat Inc., Tungsten Graphics, Inc.,

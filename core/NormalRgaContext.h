@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: route legacy diagnostics to stderr with context.
 
 #ifndef _rockchip_normal_rga_context_h_
 #define _rockchip_normal_rga_context_h_
@@ -23,11 +24,18 @@
 
 #include "rga_ioctl.h"
 #include "src/im2d_context.h"
+#include "src/im2d_log.h"
 
 #ifndef ANDROID
-#define ALOGI(...) { printf(__VA_ARGS__); printf("\n"); }
-#define ALOGD(...) { printf(__VA_ARGS__); printf("\n"); }
-#define ALOGE(...) { printf(__VA_ARGS__); printf("\n"); }
+#define ALOGI(...) do { \
+    RGA_LOG_STDERR(__VA_ARGS__); \
+    fprintf(stderr, "\n"); \
+} while (0)
+#define ALOGD(...) do { \
+    RGA_LOG_STDERR(__VA_ARGS__); \
+    fprintf(stderr, "\n"); \
+} while (0)
+#define ALOGE(...) do { RGA_LOG_STDERR(__VA_ARGS__); fprintf(stderr, "\n"); } while (0)
 #endif
 
 struct rgaContext {

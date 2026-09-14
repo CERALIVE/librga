@@ -71,6 +71,56 @@ build.
 
 ### Wave-E regression checks (R1)
 
+The R1 evidence ledger is checked by `bash scripts/check-ledger-reviews.sh`
+and the Meson suite. It distinguishes approved fixes from reviewed observations,
+requires different author/reviewer agent and model identities for GREEN fixes,
+and retains earlier rejection/approval history. See the
+[coordinator receipt](docs/fix-audit.d/coordinator-review.md). A passing receipt
+gate is not permission to release R1 or waive its outstanding ABI/board gates.
+It also compares every rendered row against the fragment inputs, rejecting row
+loss, duplication or changed evidence rather than trusting a positive count.
+
+H1 board characterization [EXISTS] lives in `tests/board/h1-board.cpp` and
+`run-h1-board.sh`. It requires the board driver's held-lock environment and
+measures real-device fd targets on pre/post-fix trees. Both Rock and OPi direct-init
+measured 200/200 base findings and 0/200 post-fix findings, with clean controls.
+Sanitizers remain host-shim-only. See
+[`docs/fix-audit.d/h1.md`](docs/fix-audit.d/h1.md).
+
+H4 board characterization [EXISTS] lives in `tests/board/h4-board.c` and
+`run-h4-board.sh`. It requires a held board lock and the forwarding timing and
+getenv-count interposers. The percentage method and undecided ≥2% gate are in
+[`docs/fix-audit.d/h4.md`](docs/fix-audit.d/h4.md). Rock follow-up repaired the
+calibration client and measured the untouched base plus three post-fix repeats:
+approximately 0.469%, with a warmed empirical envelope of 0–1.894%. The
+cold-inclusive result remains INCONCLUSIVE; do not generalize the warmed result.
+The original client needs the documented correction before reuse. OPi reused the
+already-built corrected client: three post-fix estimates of 0.470–0.479%, but a
+warmed envelope union of 0–3.015%. The cross-board todo-34 input is therefore
+INCONCLUSIVE; no optimization is authorized. Both-board measurements are complete,
+which is distinct from satisfying the downstream ≥2% prerequisite.
+
+H7 board characterization [EXISTS] lives in `tests/board/h7-board.c` and
+`run-h7-board.sh`. The held-lock runner escalates real G1 work through 4/6/8
+threads and stops at the first incident. Budget, recovery and hardware evidence
+boundaries are in [`docs/fix-audit.d/h7.md`](docs/fix-audit.d/h7.md).
+Rock follow-up measured all four libraries: each has a status-failure incident
+at eight threads after clean four/six-thread dwell, and each recovered. These
+are not progress stalls or NO-STALL-at-eight results. The common mapping-error
+signature is surfaced to island/driver investigation, not treated as permission
+for an R1 fix. OPi differs significantly: all four libraries completed the full
+4/6/8-thread dwell without incidents, each NO-STALL at eight. The item-43 H7 matrix
+is complete; the board-dependent contrast remains for driver/root-cause review,
+not a uniform both-board failure claim or R1-fix permission.
+
+H8 board characterization [EXISTS] lives in `tests/board/h8-data.c`, `h8-board.c`
+and `run-h8-board.sh`. References are prepared on the host using the inherited
+colour oracle; hardware conversion stays behind the board lock. The full matrix
+and negative controls are in [`docs/fix-audit.d/h8.md`](docs/fix-audit.d/h8.md).
+Rock and OPi each completed all 15 scored cells on both trees with identical
+scores and passing controls. Both-board characterization is complete; defaults
+are unchanged and sanitizers remain host-shim-only.
+
 The scheduler default, failed `imsync` wait cleanup, legacy initialization and
 borrowed-last-reference teardown fixes have green Meson regression cases. Long
 host-only runs use `tests/repro/run-candidate-{a,b,c,d}.sh`; build the ASan and
@@ -88,6 +138,16 @@ Before reaching for the im2d API, read
 [`docs/API-TRAPS.md`](docs/API-TRAPS.md). It documents the argument-unit and
 status-code surprises that this library's callers hit first, and most of them are
 silent.
+
+The [OSD layout limitation](docs/OSD-LAYOUT-LIMITATION.md) is confirmed
+librga-side but unreachable in the current CeraLive conversion/composition call
+set. The public layout stays unchanged pending a future major version.
+
+`bash ci/werror-steps.sh` [EXISTS] gates `im2d_context.cpp` and CeraLive test and
+reproducer translation units on trixie/arm64 with `-Wall -Wextra -Werror` and no
+warning suppressions. It is not a whole-upstream-tree warning-clean claim.
+Normal library builds now expose inherited warnings; see
+[build flags](docs/BUILD-FLAGS.md#scoped-warnings-as-errors-todo-37).
 
 The host-only H3 initialization-failure census is [EXISTS]: run
 `bash tests/repro/run-h3.sh` to build the unchanged shared library and measure
@@ -122,6 +182,28 @@ against the matching build before rebuilding it. The shim models ioctl handling,
 not hardware or driver-side ownership, so a forwarded second release is not
 evidence of a kernel double-free.
 
+### H10 regression gate (todo 38)
+
+The fixes decrement the job count only for a removed job and retain the manager
+mutex through CONFIG's ioctl, so cancel/submit cannot free borrowed task bytes
+before the driver copies them. This serializes other job-manager operations
+during CONFIG; no public structure, return status or message text changes.
+
+`meson test -C build --suite h10 --print-errorlogs` [EXISTS] gates accounting,
+serial lifecycle, CONFIG failure/unlock, driver-owned import reference counting
+and numeric reuse, plus two 2000-iteration config/end-versus-cancel runs. Each
+case resets its own shim log/dump. ASan/UBSan CI runs the H10 suite and TSan
+discovers both races through `concurrency`. All sanitizer evidence is
+**host-shim-only**.
+
+The original `run-h10.sh` characterization command intentionally still exits 1
+for `SECOND-RELEASE-FORWARDED` after the bookkeeping fixes: H10c is **driver-owned,
+not a librga defect**, not a remaining userspace fix. No released-handle
+tombstone is introduced. The opt-in `FAKE_RGA_REIMPORT` shim mode models one
+buffer with reference-counted imports and recycled numeric handle 1; it rejects
+an exhausted release itself. The normal shim behavior and goldens are unchanged.
+See [`docs/fix-audit.d/todo-38.md`](docs/fix-audit.d/todo-38.md) for evidence.
+
 ## Credits
 
 This repository descends from Rockchip's `linux-rga` through JeffyCN's
@@ -138,7 +220,9 @@ This repository descends from Rockchip's `linux-rga` through JeffyCN's
 - **nyanmisaka** for downstream fixes that are candidate donors. Any pick is taken
   with `git cherry-pick -x`, keeps its original author, and is recorded in
   `docs/fix-audit.md` with its reproducer. Picks are credited individually as they
-  land.
+  land. The R1 donor audit and the constrained port of nyanmisaka's
+  `571a880951583a3b2a04e7e1fa900861653befde` combined-CSC fix are recorded in
+  [`docs/DONORS.md`](docs/DONORS.md). No new public feature macro is exposed.
 
 `airockchip/librga` is consulted as a header and CHANGELOG reference only. That
 distribution is binary-only and is never a source donor.

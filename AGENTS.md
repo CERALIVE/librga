@@ -43,6 +43,7 @@ Two releases exist, versioned upstream-style rather than CalVer:
 | Import coordinate, licence census, credits | `docs/PROVENANCE.md` |
 | API usability traps every caller trips over | `docs/API-TRAPS.md` |
 | Per-fix evidence ledger | `docs/fix-audit.md` |
+| R1 donor semantic verdicts and constrained CSC port | `docs/DONORS.md` |
 | Sanitizer/analyzer recipes and their proof boundary | `docs/SANITIZERS.md` |
 | Disposition of every `-Wanalyzer-*` finding | `docs/ANALYZER-TRIAGE.md` |
 | Debian package build and contract | `packaging/` |
@@ -149,6 +150,49 @@ only widen the accepted input set. Deleting any of it is merge friction against
 an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
+
+Legacy `ALOGI`/`ALOGD` diagnostics [EXISTS] remain unconditional at the macro
+boundary: only their existing call sites select emission. Do not add im2d's
+global enable or severity gate there. Constructor notices must survive disabled
+logging. Gaussian framing and values share `IM_LOG_ENABLED`, including force and
+error bypasses. Tests capture output, not just return codes. The separate public
+setter probes remain RED because their private flags were already disconnected
+before todo 36; see `docs/fix-audit.d/logging-round-five.md`. Do not claim those
+setters were repaired by removing the macro gate.
+
+`bash scripts/check-ledger-reviews.sh` [EXISTS] validates the generated D21 table,
+also through Meson and `ci/build-check-steps.sh`. Every row has an explicit
+`status=... fix=...;` disposition and current review receipt. GREEN requires a
+fix commit and different author/reviewer agent names AND model IDs; observations,
+SKIPPED, NOT-REPRODUCED and WITHDRAWN carry `fix=none`. Historical review text
+follows the current receipt and never substitutes for it. Evidence-only review
+does not approve a fix or retroactively claim a hardware run. Receipt history is
+in `docs/fix-audit.d/coordinator-review.md`; edit fragments, then regenerate.
+The checker independently compares the complete rendered row multiset against
+the fragments, so a truncated, duplicated or altered ledger fails even when
+every surviving receipt is syntactically valid. The row count is derived from
+the inputs, never frozen to one release's count.
+
+The R1 `werror` CI leg [EXISTS] runs `bash ci/werror-steps.sh` on trixie/arm64.
+It strictly compiles the fork-modified `im2d_context.cpp` and CeraLive test and
+reproducer TUs without suppressions; inherited library TUs outside this scope
+still emit warnings in normal builds. The exact exclusions and warning canaries
+are documented in [`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md).
+
+H10 bookkeeping/lifetime regressions [EXISTS] run in the `h10` Meson suite;
+the two 2000-iteration races also belong to `concurrency`. CONFIG holds the job
+manager mutex through ioctl task copying; cancellation decrements only for a
+removed job. H10c duplicate release is driver-owned, not a librga defect:
+`FAKE_RGA_REIMPORT` is a test-only one-buffer refcount/reuse model, never a
+production released-handle tombstone. Details and host-only evidence are in
+[`docs/fix-audit.d/todo-38.md`](docs/fix-audit.d/todo-38.md).
+CI discovery matches Meson's project-prefixed `:concurrency` suite suffix;
+`tests/test-build-check-gating.sh` checks the actual predicate against fixtures.
+H10 passes the shim path as `H10_SHIM` through Bash and sets `LD_PRELOAD` only
+immediately before the test binary's `exec`. Preloading the instrumented shim
+into uninstrumented Bash crashes during arm64 ASan startup before any H10 code.
+The gating contract checks both registration and launcher, including unchanged
+sanitizer options, log/fault reset and child exit status; see `docs/SANITIZERS.md`.
 
 Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
 It adds direct exported-init coverage to H1 and H3; build both sanitizer trees
@@ -265,8 +309,10 @@ in [`docs/SANITIZERS.md`](docs/SANITIZERS.md#h2-concurrent-teardown-probe).
 
 - That the request bytes this library writes for the CeraLive call set are
   unchanged against the recorded goldens.
-- That every ioctl number and every shared struct layout matches the island
-  driver's UAPI at the pinned island tag, on aarch64.
+- That compared ioctl numbers and layouts match the pinned island UAPI on
+  aarch64, except the four exact OSD flag-offset divergences pinned by the
+  comparator. [The OSD limitation](docs/OSD-LAYOUT-LIMITATION.md) is librga-side,
+  unreachable in the current CeraLive call set, and deferred to a major version.
 - That the exported-symbol set of a release contains R0's, and that `abidiff`
   reports no incompatible change against the previous release.
 - On the board, only what the transcript for that run names: the exact package,

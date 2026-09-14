@@ -67,6 +67,39 @@ saying which diagnostic forced it.
 
 ## The flag set of record
 
+### Scoped warnings-as-errors (todo 37)
+
+The earlier `-w` measurement above is historical. R1 removes that flag from
+both shipped library targets and the golden-library fragment. Ordinary builds
+now expose inherited diagnostics. No warning cleanup of upstream code, public
+header change, or additional `-Wno-*` flag accompanies this removal.
+
+`bash ci/werror-steps.sh` is the required trixie/arm64 CI leg, also callable
+locally with `SKIP_DEPS=1` in a prepared target-suite container. Its explicit
+scope is the modified session-context translation unit `im2d_context.cpp` and
+all CeraLive `.c`/`.cpp` test/reproducer translation units. Deliberately broken
+sanitizer canaries and the generated-header island emitter are excluded; the
+latter remains covered by the independent UAPI gate. Board test sources are
+**compiled only**, not run against hardware. The scope was 22 translation units
+at `f04a90e`; glob discovery includes new test sources automatically.
+
+Each is compiled to an object using `-Wall -Wextra -Werror`, with no suppression,
+`-fpermissive`, or diagnostic filtering. Separate C/C++ warning-only canaries
+must fail with `unused-variable`, so a globally quiet compiler cannot pass.
+One owned reproducer needed a guard around its redundant `_GNU_SOURCE` define;
+no upstream implementation cleanup was made.
+
+The inherited `NormalRga.cpp` and `im2d.cpp` remain **outside** this strict
+scope even though earlier fork fixes touched them. A direct trixie/arm64 strict
+compile reports inherited unused-variable and class-memaccess
+diagnostics (`test-results/werror/inherited-red.txt`). Cleaning those large
+translation units is a separate upstream-risk change, not evidence for a
+runtime fix. Their ordinary build warnings remain visible. This narrower gate
+is the owner's authorized deviation from a whole-tree `-Werror` acceptance.
+
+H9a's unused legacy-driver address branches remain deferred as recorded in the
+prior characterization; this change does not claim a new address-handling fix.
+
 `dpkg-buildflags` on trixie/arm64 supplies, unmodified:
 
 ```text

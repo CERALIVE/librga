@@ -14,6 +14,64 @@ may cite a sanitizer result as a hardware claim.
 
 ## Recipes
 
+H10 regression coverage [EXISTS] is registered in `h10`, with both 2000-iteration
+race repeats also in `concurrency`. After `build-sanitized.sh`, run
+`meson test -C build-asan --no-rebuild --suite h10 --print-errorlogs` using the
+ASAN/UBSAN options below, or the equivalent TSan tree/options. The explicit
+build already compiled these targets. `--no-rebuild` avoids Meson's aggregate
+test-dependency rebuild pulling the unrelated static UAPI emitters into a
+sanitizer link (`-static` is incompatible with ASan/TSan). It skips no selected
+test, and the UAPI emitters still run in the unsanitized build gate.
+
+TSan discovery matches the exact `:concurrency` suffix in Meson's project-prefixed
+suite names, counting each test once. H10 uses Meson's `--suite h10` selection
+directly, without a separate discovery predicate.
+
+### H10 launcher startup failure (R1 PR #9)
+
+Run [34899237663](https://github.com/CERALIVE/librga/actions/runs/34899237663)
+passed the canary and 11 baseline tests on native arm64, then aborted all six H10
+cases at PC zero, thread `T-1`. The baseline executes instrumented binaries
+directly; H10 instead preloaded the instrumented shim into an uninstrumented Bash
+launcher. These are different sanitizer startup configurations.
+
+The unchanged GCC 14/Trixie arm64 build reproduced all six aborts under QEMU.
+The following reduced comparisons isolate startup without any library changes:
+
+| Invocation with the same instrumented shim | Observed result |
+|---|---|
+| `LD_PRELOAD=$shim bash -c 'printf "BASH-ENTERED\n"'` | PC-zero/T-1 abort before the marker; no librga or H10 code involved |
+| `LD_PRELOAD=$asan:$shim bash -c 'printf "BASH-ENTERED\n"'` | Marker reached |
+| `LD_PRELOAD=$shim build-asan/h10-job-handle control` | `CONTROL PASS: 200 config/end + 200 create/cancel; count=0 map=0` |
+| Bash started without preload, exporting it only before `exec` of that binary | Same complete control result |
+
+Both Bash-only comparisons were repeated with leak detection enabled and
+disabled. The shim-only startup abort is independent of leak detection. With
+leak detection enabled, the other three reach their markers but subsequently
+hit QEMU's separate LeakSanitizer fatal error; with it disabled locally they exit
+zero. This diagnostic override is not a CI setting or sanitizer-coverage claim.
+
+The six early aborts are therefore a launcher/runtime load-order failure, not
+evidence of an arm64 job-manager race: the reduced failure has neither librga
+nor worker threads. This does not establish that the unexecuted race cases are
+clean. Native arm64 CI must still execute all six H10 cases with the original
+sanitizer settings and reach the TSan stage before the blocker is closed.
+
+The launcher now receives the path as inert `H10_SHIM` and exports `LD_PRELOAD`
+only immediately before `exec` of the instrumented test. This retains the
+original shim-first order in the binary, all instrumentation, leak checking,
+scenario assertions, and both 2000-iteration race budgets. No runtime suppression
+or production-code change is involved. `tests/test-build-check-gating.sh` checks
+the actual Meson preload key and executes the launcher: it rejects a preloaded
+Bash, verifies the child's preload/options and isolated log/fault reset, and
+requires child exit statuses 0, 23 and 66 to propagate. Before the fix it failed
+with `AssertionError: (91, 'shim preloaded into Bash\n')`.
+
+H10c remains driver-owned: its historical characterization script exits 1 for
+forwarding a second release even on a fixed library. The expected-pass H10
+suite instead verifies repeated imports/releases and recycled numeric handles
+against the opt-in single-buffer refcount model. No production tombstone exists.
+
 | Command | Tree | Instrumentation |
 |---|---|---|
 | `bash scripts/build-sanitized.sh asan` | `build-asan/` | `-fsanitize=address,undefined` |

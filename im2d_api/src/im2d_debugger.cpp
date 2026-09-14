@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: route debug matrix framing through the stderr logger.
 
 #ifdef LOG_TAG
 #undef LOG_TAG
@@ -245,12 +246,14 @@ static void rga_dump_gauss_matrix(int log_level, im_size_t ksize, double *matrix
 
     IM_LOG(log_level, "\t\tkernel_matrix[%p]:\n", matrix);
     for (i = 0; i < ksize.height; i++) {
-        printf("\t\t\t");
+        if (IM_LOG_ENABLED(log_level))
+            RGA_LOG_STDERR("\t\t\t");
         for (j = 0; j < ksize.width; j++) {
             IM_LOG(log_level, "%.6f ",
                    matrix[i * ksize.width + j]);
         }
-        printf("\n");
+        if (IM_LOG_ENABLED(log_level))
+            RGA_LOG_STDERR("\n");
     }
 }
 

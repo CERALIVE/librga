@@ -41,13 +41,8 @@ incdir = include_directories(
     'core/3rdparty/libdrm/include/drm',
     'core/3rdparty/android_hal')
 
-# Upstream silences every warning on the library sources. Keep that by default —
-# this tree is imported and re-linting it is merge friction — but let
-# scripts/run-analyzer.sh turn it off. GCC's `-w` is global and order-independent,
-# so with it on the command line NO -Wanalyzer-* diagnostic is ever emitted, no
-# matter where -fanalyzer appears. Dropping it is the only way to run the analyzer
-# through meson at all.
-librga_quiet_args = get_option('analyzer') ? [] : ['-w']
+# Modified by CeraLive 2026-09-14: expose inherited warnings without a cleanup sweep.
+# ci/werror-steps.sh separately gates the explicitly documented fork-owned scope.
 
 librga = shared_library(
     'rga',
@@ -55,7 +50,6 @@ librga = shared_library(
     dependencies : [libthreads_dep],
     include_directories : incdir,
     version : meson.project_version(),
-    cpp_args : librga_quiet_args,
     install : true,
 )
 
@@ -65,7 +59,6 @@ librga = static_library(
     librga_srcs,
     dependencies : [libthreads_dep],
     include_directories : incdir,
-    cpp_args : librga_quiet_args,
     install : true,
 )
 
@@ -237,7 +230,7 @@ golden_dl = meson.get_compiler('c').find_library('dl')
 golden_librga = static_library('rga-golden-host', librga_srcs,
     include_directories : incdir,
     dependencies : [libthreads_dep],
-    cpp_args : ['-w', '-ftrivial-auto-var-init=zero'],
+    cpp_args : ['-ftrivial-auto-var-init=zero'],
     install : false)
 fake_rga = shared_library('fake_rga', 'tests/shim/fake_rga.c',
     include_directories : incdir,
@@ -294,9 +287,55 @@ unit_session_env.set('LD_PRELOAD', fake_rga.full_path())
 unit_session_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'unit-session-interposed.log')
 test('unit-session', unit_session, env : unit_session_env, depends : fake_rga, timeout : 30)
 
+# Modified by CeraLive 2026-09-14: keep the H9 stdout-sink regression in Meson.
+unit_logging = executable('unit-logging', 'tests/unit/unit_logging.cpp',
+    include_directories : [incdir, unit_incdir],
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings,
+    install : false)
+test('unit-logging-no-device', unit_logging, args : ['no-device'], timeout : 30)
+test('unit-logging-fake-device', unit_logging, args : ['fake-device'],
+    env : unit_session_env, depends : fake_rga, timeout : 30)
+
+unit_macro_logging = executable('unit-macro-logging', 'tests/unit/unit_macro_logging.c',
+    include_directories : [incdir, unit_incdir],
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    c_args : unit_warnings,
+    install : false)
+test('unit-macro-logging', unit_macro_logging, timeout : 30)
+
+# Modified by CeraLive 2026-09-14: cover forced and unforced Gaussian framing.
+unit_gaussian_logging = executable('unit-gaussian-logging', 'tests/unit/unit_gaussian_logging.cpp',
+    include_directories : [incdir, unit_incdir],
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings,
+    install : false)
+test('unit-gaussian-logging', unit_gaussian_logging, timeout : 30)
+
+donor_full_csc = executable('donor-full-csc', 'tests/repro/donor_full_csc.c',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : golden_dl,
+    c_args : unit_warnings,
+    install : false)
+donor_csc_env = environment()
+donor_csc_env.set('LD_PRELOAD', fake_rga.full_path())
+donor_csc_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'donor-csc-interposed.log')
+donor_csc_env.set('FAKE_RGA_DUMP', meson.current_build_dir() / 'donor-csc-request.bin')
+test('donor-full-csc', donor_full_csc,
+    env : donor_csc_env, depends : fake_rga, timeout : 30)
+
 # Modified by CeraLive 2026-09-06: gate evidence assembly alongside the host tests.
 test('wire-bootstrap', find_program('bash'),
     args : [meson.current_source_dir() / 'tests/test-wire-bootstrap.sh'], timeout : 30)
+
+test('ledger-review-contract', find_program('bash'),
+    args : [meson.current_source_dir() / 'tests/test-ledger-reviews.sh'], timeout : 30)
+test('ledger-reviews', find_program('bash'),
+    args : [meson.current_source_dir() / 'scripts/check-ledger-reviews.sh'], timeout : 30)
 
 # Modified by CeraLive 2026-09-13: promote the fixed scheduler-default probe.
 candidate_c = executable('candidate-c', 'tests/repro/candidate_c_scheduler.cpp',
@@ -338,6 +377,28 @@ foreach api : ['RgaInit', 'improcess']
     test('candidate-a-fds-' + api, candidate_a_fds,
         args : [api, meson.current_build_dir() / ('candidate-a-' + api + '.csv')],
         env : candidate_a_env, depends : fake_rga, timeout : 120)
+endforeach
+
+# Modified by CeraLive 2026-09-14: gate H10 bookkeeping and host-only task lifetime.
+# Modified by CeraLive 2026-09-14: pass the shim inertly through the Bash launcher.
+h10 = executable('h10-job-handle', 'tests/repro/h10_job_handle.cpp',
+    include_directories : [incdir, unit_incdir], link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl], cpp_args : unit_warnings,
+    install : false)
+foreach scenario : ['count', 'control', 'errors', 'reimport', 'race-1', 'race-2']
+    h10_env = environment()
+    h10_env.set('H10_SHIM', fake_rga.full_path())
+    h10_env.set('FAKE_RGA_LOG', meson.current_build_dir() / ('h10-' + scenario + '.log'))
+    h10_env.set('FAKE_RGA_DUMP', meson.current_build_dir() / ('h10-' + scenario + '.bin'))
+    h10_args = [scenario]
+    h10_suites = ['h10']
+    if scenario.startswith('race-')
+        h10_args = ['race', '2000']
+        h10_suites += ['concurrency']
+    endif
+    test('h10-' + scenario, find_program('bash'),
+        args : [files('tests/repro/run-h10-case.sh'), h10.full_path()] + h10_args,
+        env : h10_env, depends : [h10, fake_rga], suite : h10_suites, timeout : 60)
 endforeach
 
 candidate_b = executable('candidate-b', 'tests/repro/h2_teardown_race.cpp',

@@ -34,6 +34,9 @@ static atomic_ulong getenv_calls;
 static int device_fds[4096];
 static size_t device_count;
 static uint32_t next_handle = 1, next_request = 1;
+/* Modified by CeraLive 2026-09-14: opt-in single-buffer driver refcount model. */
+static uint64_t reimport_memory;
+static uint32_t reimport_type, reimport_refs;
 
 static void resolve_symbols(void)
 {
@@ -276,6 +279,18 @@ static int handle_ioctl(unsigned long command, void *arg)
     case RGA_IOC_IMPORT_BUFFER: {
         struct rga_buffer_pool *pool = arg;
         struct rga_external_buffer *buffers = (void *)(uintptr_t)pool->buffers;
+        if (next_getenv("FAKE_RGA_REIMPORT")) {
+            if (pool->size != 1 || (reimport_refs &&
+                (buffers[0].memory != reimport_memory || buffers[0].type != reimport_type))) {
+                errno = EINVAL;
+                return -1;
+            }
+            reimport_memory = buffers[0].memory;
+            reimport_type = buffers[0].type;
+            buffers[0].handle = 1;
+            reimport_refs++;
+            break;
+        }
         for (uint32_t i = 0; i < pool->size; ++i) buffers[i].handle = next_handle++;
         break;
     }
@@ -291,6 +306,16 @@ static int handle_ioctl(unsigned long command, void *arg)
         ((struct rga_req *)arg)->out_fence_fd = out_fence;
         break;
     case RGA_IOC_RELEASE_BUFFER:
+        if (next_getenv("FAKE_RGA_REIMPORT")) {
+            struct rga_buffer_pool *pool = arg;
+            struct rga_external_buffer *buffers = (void *)(uintptr_t)pool->buffers;
+            if (pool->size != 1 || buffers[0].handle != 1 || !reimport_refs) {
+                errno = EINVAL;
+                return -1;
+            }
+            reimport_refs--;
+        }
+        break;
     case RGA_IOC_REQUEST_CANCEL:
     case RGA_FLUSH:
     case RGA_GET_RESULT:
