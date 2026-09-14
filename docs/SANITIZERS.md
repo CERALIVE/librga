@@ -57,6 +57,16 @@ nor worker threads. This does not establish that the unexecuted race cases are
 clean. Native arm64 CI must still execute all six H10 cases with the original
 sanitizer settings and reach the TSan stage before the blocker is closed.
 
+The launcher now receives the path as inert `H10_SHIM` and exports `LD_PRELOAD`
+only immediately before `exec` of the instrumented test. This retains the
+original shim-first order in the binary, all instrumentation, leak checking,
+scenario assertions, and both 2000-iteration race budgets. No runtime suppression
+or production-code change is involved. `tests/test-build-check-gating.sh` checks
+the actual Meson preload key and executes the launcher: it rejects a preloaded
+Bash, verifies the child's preload/options and isolated log/fault reset, and
+requires child exit statuses 0, 23 and 66 to propagate. Before the fix it failed
+with `AssertionError: (91, 'shim preloaded into Bash\n')`.
+
 H10c remains driver-owned: its historical characterization script exits 1 for
 forwarding a second release even on a fixed library. The expected-pass H10
 suite instead verifies repeated imports/releases and recycled numeric handles

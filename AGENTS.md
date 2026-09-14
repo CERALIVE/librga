@@ -179,6 +179,11 @@ production released-handle tombstone. Details and host-only evidence are in
 [`docs/fix-audit.d/todo-38.md`](docs/fix-audit.d/todo-38.md).
 CI discovery matches Meson's project-prefixed `:concurrency` suite suffix;
 `tests/test-build-check-gating.sh` checks the actual predicate against fixtures.
+H10 passes the shim path as `H10_SHIM` through Bash and sets `LD_PRELOAD` only
+immediately before the test binary's `exec`. Preloading the instrumented shim
+into uninstrumented Bash crashes during arm64 ASan startup before any H10 code.
+The gating contract checks both registration and launcher, including unchanged
+sanitizer options, log/fault reset and child exit status; see `docs/SANITIZERS.md`.
 
 Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
 It adds direct exported-init coverage to H1 and H3; build both sanitizer trees
