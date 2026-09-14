@@ -53,6 +53,10 @@ can be checked rather than asserted:
 | Candidate D; no fix. Base `b886777023e0c503134e340be348d6c1b11c8adc`, unchanged R1 library | H6 `sync-only` via `bash tests/repro/run-candidate-d.sh`; **DEMONSTRATED**, 200/200 failure calls retain the positive fence fd, 200/200 success controls consume it. Exit 1, transcript below; no GREEN/fix | host-shim-only | Not run; no library or ABI change, fence polarity unchanged | Not dispatched; no reviewer session or fix approval claimed | Not reported; error-branch cleanup evidence only |
 | `GAP: no fix landed` — H1 is characterisation of the unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. Nothing was cherry-picked and nothing was changed under `core/` or `im2d_api/`. | `tests/repro/h1_init_race.cpp` + `tests/repro/run-h1-host.sh`, scenario `c-init`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier`. Every iteration identical: `ok=8 refcount_after_init=0 fds_after_init=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. `c_RkRgaInit()` is `return 0;` at `core/RgaApi.cpp:27` — the C shim was hollowed out and `include/RgaApi.h:41-45` documents it — so this entry point opens no device and increments no counter. Teardown returns `-19` (`-ENODEV`, "Try to exit uninit"), which is the evidence the scenario left no session. GREEN: n/a, no fix. Transcripts: `test-results/h1/c-init.{log,csv}`. | `host-shim-only` (`tests/shim/fake_rga.c`, mock device is a `memfd_create("fake-rga")`; TSan build via `scripts/build-sanitized.sh tsan`). No board contacted. | n/a — no library change, so nothing to close. `librga.so.2.1.0` in `build-tsan/` is the unmodified tree. | `GAP: no review dispatched` — this row is a host-side observation, not a landed fix. | n/a — nothing to report upstream from a NOT-REPRODUCED control. |
 | `GAP: no fix landed` — as above, unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. | Same pair, scenario `singleton-get`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier` into `RockchipRga::get()` → `RkRgaInit()` → `RgaInit()` → `NormalRgaOpen()`. Every iteration identical: `ok=8 ctx_agreed=1 refcount_after_init=1 fds_after_init=1 deinit_calls=1 refcount_after_teardown=0 fds_after_teardown=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. The unguarded `if (!rgaCtx)` at `core/NormalRga.cpp:66` is real — only `refCount++` is inside `mMutex` — but on this host it is never reached concurrently, because `Singleton::getInstance()` (`include/RgaSingleton.h:33-40`) holds `sLock` across the whole null-check-and-construct. The eight threads serialise one level above the defect. GREEN: n/a, no fix. Transcripts: `test-results/h1/singleton-get.{log,csv}`. | `host-shim-only`, same build and shim as the row above. No board contacted. | n/a — no library change. | `GAP: no review dispatched` — host-side observation, not a landed fix. | n/a — the latent unguarded check is recorded here, not reported, because no reproducer turned it RED. |
+| Untouched source base `57a1067a246c71fa6c9a355d1668884fda155dd5`; no fix in this measurement | `tests/board/h1-board.cpp`, `run-h1-board.sh`: **RED**, direct-init bypassing singleton serialization, 200/200 fresh eight-thread processes. All eight initializations succeeded; 194 processes opened eight RGA fds and retained seven after eight deinitializations, six opened seven and retained six. Refcount was eight after init and zero after teardown. C-stub and singleton controls each had 0/200 findings; all one-thread controls passed. | **Rock 5B+ measured 2026-09-14 UTC**, real `/dev/rga` census; no device mock. Sanitizers **host-shim-only**. OPi not contacted. | n/a — measurement only, no library or ABI change | GAP: independent board-evidence review pending; not release approval | Characterization only; no upstream submission in this dispatch |
+| Post-fix `5dfe897d206a52f770137e15553c48f84964cf02`, distinct from the untouched base | Same board runner: direct-init **0/200 findings**; every process had eight successful initializations, one RGA fd, refcount eight, eight deinitializations, then zero fds/refcount. C-stub and singleton each 0/200 findings; all one-thread controls passed. **Repair confirmation**, not retroactive evidence that hardware RED preceded the already-merged fixes. | **Rock 5B+ measured 2026-09-14 UTC**; sanitizers **host-shim-only**. OPi pending separate authorization. | n/a — no library or ABI change | GAP: independent board-evidence review pending | No new fix or upstream submission |
+| Untouched source base `57a1067a246c71fa6c9a355d1668884fda155dd5`; OPi measurement | Same real-device runner: direct-init **RED 200/200** fresh eight-thread processes. All eight initializations succeeded. 193 processes opened eight fds/retained seven, six opened seven/retained six, one opened five/retained four. C-stub and singleton controls each 0/200 findings; all one-thread controls clean. | **Orange Pi 5+ measured 2026-09-14 UTC**, real `/dev/rga`, no mock. Sanitizers **host-shim-only**. | n/a — no library or ABI change | GAP: independent board-evidence review pending | Characterization only; no new fix or upstream submission |
+| Post-fix `5dfe897d206a52f770137e15553c48f84964cf02`; OPi measurement | Same runner: direct-init **0/200 findings**, one fd after eight successful initializations and zero after teardown. C-stub/singleton each 0/200 findings; all one-thread controls clean. Repair confirmation, not retroactive pre-merge board RED. | **Orange Pi 5+ measured 2026-09-14 UTC**; sanitizers **host-shim-only** | n/a — unchanged library | GAP: independent board-evidence review pending | No new fix authorized |
 | H10a observation; **no fix**. Execution base `96c9a53ba94c487f9fae938c73347f5bc00e624d`; library source unchanged from `57a1067a246c71fa6c9a355d1668884fda155dd5`. | `tests/repro/h10_job_handle.cpp count`, via `bash tests/repro/run-h10.sh asan` or `tsan`. **RED: counter drift.** Unknown ID `2147483647`: count/map `0/0 -> -1/0`; 64 subsequent creates yield `63/64`; valid cancellation of all 64 leaves `-1/0`. Both sanitizer builds reproduce it. RED transcripts: `test-results/h10/asan-eS80sZZq/count/transcript.txt`, `test-results/h10/tsan-KHb1J64S/count/transcript.txt` (exit 1 each). `im2d_api/src/im2d_impl.cpp:2445` decrements even when lookup finds no job. No premature creation limit found within this bounded check; all 64 creates succeed and there is no userspace count-limit gate in this source. Re-run 2026-09-06 reproduces the same line in both modes: `test-results/h10/asan-eK4JCCKy/count/`, `test-results/h10/tsan-a3eySo3y/count/`. **GREEN: none; no fix tested.** | `host-shim-only`; native x86_64, GCC 16.2.1, 2026-09-06. No board access. | Not run: QA test/docs only; no library, header, or ABI change. | Not requested; no independent reviewer session or fix approval claimed. | Not reported upstream; characterization only. CeraLive does not call this job API (task scope). |
 | H10b observation; **no fix**. Execution base `96c9a53ba94c487f9fae938c73347f5bc00e624d`; library source unchanged from `57a1067a246c71fa6c9a355d1668884fda155dd5`. | `tests/repro/h10_job_handle.cpp race 2000`, run twice per mode by `tests/repro/run-h10.sh`. One real queued copy task; thread A calls `rga_job_config` then `imendJob`, thread B calls `imcancelJob` on the same job. **RED:** ASan reports a 504-byte heap-use-after-free in both runs (exit 1); TSan reports a data race and a heap-use-after-free respectively (exit 66). Transcripts: `test-results/h10/asan-eS80sZZq/race-{1,2}/transcript.txt` and `test-results/h10/tsan-KHb1J64S/race-{1,2}/transcript.txt`. Offline `addr2line` identifies `rga_job_cancel` freeing at `im2d_api/src/im2d_impl.cpp:2442` while the shim reads the config task pointer at `tests/shim/fake_rga.c:77,205`, called from `rga_job_config` at `im2d_impl.cpp:2560` after its mutex unlock. Reports stop runs early, before `imendJob` in the failing iteration; **not 2000 completed iterations**. Both canaries report; serial `control` passes 200 config/end and 200 separate create/cancel lifecycles in both modes. Re-run 2026-09-06 reproduces both: ASan heap-use-after-free (`test-results/h10/asan-eK4JCCKy/race-1/`, exit 1) and TSan heap-use-after-free (`test-results/h10/tsan-a3eySo3y/race-1/`, exit 66). **GREEN: none; no fix tested.** | `host-shim-only`; native x86_64, GCC 16.2.1, 2026-09-06. The unchanged shim captures task bytes synchronously; no claim about actual driver timing or concurrent same-handle API guarantees. | Not run: QA test/docs only; no library, header, or ABI change. | Not requested; no independent reviewer session or fix approval claimed. | Not reported upstream; same-handle lifetime finding under the host model. CeraLive does not call this job API (task scope). |
 | H10c observation; **no fix**. Execution base `96c9a53ba94c487f9fae938c73347f5bc00e624d`; library source unchanged from `57a1067a246c71fa6c9a355d1668884fda155dd5`. | `tests/repro/h10_job_handle.cpp release`, via `tests/repro/run-h10.sh` in both modes. **SECOND-RELEASE-FORWARDED**, not ignored: import returns handle 1, both release statuses are `IM_STATUS_SUCCESS` (1), release ioctl counts are `0 -> 1 -> 2`. Transcripts/logs: `test-results/h10/asan-eS80sZZq/release/{transcript.txt,interposed.log}` and `test-results/h10/tsan-KHb1J64S/release/{transcript.txt,interposed.log}`; exit 1 marks the observed forwarding, not a sanitizer failure. `releasebuffer_handle` at `im2d_api/src/im2d.cpp:181-182` forwards to `rga_release_buffer`, then the ioctl at `im2d_impl.cpp:1490`. The mock accepts every release and does not track driver ownership: this proves missing userspace deduplication, **not a kernel double-free or an idempotency contract violation**. Nothing further found within the time budget. Re-run 2026-09-06 reproduces `0->1->2` in both modes, and `grep -c RELEASE_BUFFER` on the shim log counts **2** release entries, not 1: `test-results/h10/asan-eK4JCCKy/release/`, `test-results/h10/tsan-a3eySo3y/release/`. **GREEN: none; no fix tested.** | `host-shim-only`; native x86_64, GCC 16.2.1, 2026-09-06. No board access; mock release behavior only. | Not run: QA test/docs only; no library, header, or ABI change. | Not requested; no independent reviewer session or fix approval claimed. | Not reported upstream; boundary observation only. The guide describes releasing driver resources, not repeated-release semantics. |
@@ -315,6 +319,69 @@ Source: [fix-audit.d/h1.md](fix-audit.d/h1.md). D21 rows are in the [ledger abov
 
 
 Board-side static-ASan real-hardware leg deferred — boards temporarily unavailable, to be appended by a follow-up task without modifying the host rows above.
+
+## Rock execution — hardware census appended (2026-09-14 UTC)
+
+The two original host rows remain verbatim. The preparation/deferred text below
+is historical; this dispatch measures Rock only and creates **no board sanitizer
+leg**. Item 43 remains open for OPi and the separately recorded H4 measurement gap.
+
+Primary evidence run `20260914T023538Z-2107123`: per-tree `h1/fdcensus.csv`,
+`iterations.txt`, and `control.csv` in the retained execution archive. Each tree
+has 600 census records, three scenarios × 200 fresh processes. C-init opens no
+fd; singleton-get opens one, holds one reference, and closes it. Neither control
+is proof that unsynchronized direct initialization is race-free. A prior
+unprivileged run also observed 200/200 base direct-init findings and zero
+post-fix findings; its later H4 permission failure is preserved separately.
+
+Both libraries and their separately header-matched clients are aarch64 Debian
+GCC/G++ 14.2.0-19, `-O2 -g`, unstripped, without LTO or sanitizers; the libraries
+use Meson debugoptimized/C++14/`-fpermissive`, the H1 clients C++17. The staged
+payload was verified on the board by SHA-256, not package metadata. Library
+digests: base `1d6ca938bf6374074e8415681d133ef21e8fbfd72bbc77a62fddfc2d90773022`;
+post-fix `1bc56ff2d89a29cbeef37475a9fb3aad81be006d1ca68048351f83fe940f2a19`.
+
+## Board preparation — no hardware result (2026-09-13)
+
+The host rows above are unchanged. `tests/board/h1-board.cpp` and
+`run-h1-board.sh` are separate hardware infrastructure, not edits to the host
+reproducer. Both boards remain occupied; **no board command ran**. Hardware
+rows will be inserted immediately beside the host rows only after transcripts
+exist. Sanitizers remain **host-shim-only**; the historical static-ASan wording
+above is not a claim that such a board leg exists.
+
+The runner uses real `/dev/rga` fd targets and rejects `fake_rga_active`. It runs
+200 fresh processes for each of `c-init`, `singleton-get`, and `direct-init`,
+with eight threads, plus one-thread controls. Direct init deliberately bypasses
+the singleton serialization; the C stub and singleton remain distinct controls.
+It reports failures/200 and census rows, not a false clean result after failed init.
+
+Measure **both** untouched `57a1067a246c71fa6c9a355d1668884fda155dd5` and
+post-fix `5dfe897d206a52f770137e15553c48f84964cf02`. Each H1 executable is compiled
+against its matching tree's inline singleton header. Post-fix results characterize
+the already-merged fix, not historical RED or retroactive dependency satisfaction.
+Artifacts: `test-results/h1/<board>/<lib>/{fdcensus.csv,iterations.txt,control.csv}`.
+
+## OPi execution — hardware census appended (2026-09-14 UTC)
+
+Run `20260914T130553Z-3452424` retains `h1/<tree>/fdcensus.csv`,
+`iterations.txt`, and `control.csv`: 600 census records per tree, three scenarios
+times 200 fresh processes, plus the three one-thread controls. The original host
+and Rock rows above are unchanged. Both boards now demonstrate the direct-init
+base RED and current post-fix cleanliness; neither control exercises concurrent
+direct initialization, so neither control alone could have established this result.
+
+Artifacts are the same header-matched clients and library hashes described above:
+Debian GCC/G++ 14.2.0-19, aarch64, `-O2 -g`, unstripped, no LTO or sanitizer.
+No binary was rebuilt. All 28 original payload checksums passed on the OPi.
+The board ran `7.2.0-ceralive-rk3588`. This run freshly **OWNED**, not inherited,
+both host locks and both remote markers, held by one detached collector from
+13:05:54 to release at 13:20:22 UTC. There was no collector timeout or lease gap.
+Before/after: B booted, A/B good, budgets 3/3, configuration and CeraUI unchanged.
+
+This completes H1's item-43 board measurements. Historical deferred/preparation
+and pending-OPi statements above remain the record of their respective runs,
+not the current verdict. It creates **no board sanitizer row**.
 
 <!--
 Notes for whoever appends the board leg or wires this fragment.
