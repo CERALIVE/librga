@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: add context to legacy gralloc diagnostics.
 #ifdef ANDROID
 
 #include <inttypes.h>
@@ -266,7 +267,7 @@ int RkRgaGetHandleFd(buffer_handle_t handle, int *fd) {
         ALOGE("GraphicBufferGetHandldFd fail %d for:%s",ret,strerror(ret));
     else if (false) {
         ALOGD("fd = %d",*fd);
-        fprintf(stderr,"fd = %d\n", *fd);
+        fprintf(stderr,"librga: fd = %d\n", *fd);
     }
 
     return ret;
@@ -331,7 +332,7 @@ int RkRgaGetHandleAttributes(buffer_handle_t handle,
         ALOGD("%d,%d,%d,%d,%d,%d",
               attrs->at(0),attrs->at(1),attrs->at(2),
               attrs->at(3),attrs->at(4),attrs->at(5));
-        fprintf(stderr, "%d, %d, %d, %d, %d, %d\n",
+        fprintf(stderr, "librga: %d, %d, %d, %d, %d, %d\n",
                 attrs->at(0),attrs->at(1),attrs->at(2),
                 attrs->at(3),attrs->at(4),attrs->at(5));
     }

@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: send legacy API diagnostics to stderr with context.
 
 #include <string.h>
 
@@ -274,7 +275,7 @@ int NormalRgaGetRects(buffer_handle_t src,
         ret = RkRgaGetHandleAttributes(src, &srcAttrs);
     if (ret) {
         ALOGE("dst handle get Attributes fail ret = %d,hnd=%p",ret,&src);
-        printf("dst handle get Attributes fail ret = %d,hnd=%p",ret,&src);
+        RGA_LOG_STDERR("dst handle get Attributes fail ret = %d,hnd=%p",ret,&src);
         return ret;
     }
 
@@ -282,7 +283,7 @@ int NormalRgaGetRects(buffer_handle_t src,
         ret = RkRgaGetHandleAttributes(dst, &dstAttrs);
     if (ret) {
         ALOGE("dst handle get Attributes fail ret = %d,hnd=%p",ret,&dst);
-        printf("dst handle get Attributes fail ret = %d,hnd=%p",ret,&dst);
+        RGA_LOG_STDERR("dst handle get Attributes fail ret = %d,hnd=%p",ret,&dst);
         return ret;
     }
 
@@ -323,7 +324,7 @@ int NormalRgaGetRect(buffer_handle_t hnd, rga_rect_t *rect) {
     ret = RkRgaGetHandleAttributes(hnd, &dstAttrs);
     if (ret) {
         ALOGE("dst handle get Attributes fail ret = %d,hnd=%p", ret, &hnd);
-        printf("dst handle get Attributes fail ret = %d,hnd=%p", ret, &hnd);
+        RGA_LOG_STDERR("dst handle get Attributes fail ret = %d,hnd=%p", ret, &hnd);
         return ret;
     }
 
@@ -350,7 +351,7 @@ int NormalRgaGetMmuType(buffer_handle_t hnd, int *mmuType) {
     ret = RkRgaGetHandleAttributes(hnd, &dstAttrs);
     if (ret) {
         ALOGE("dst handle get Attributes fail ret = %d,hnd=%p", ret, &hnd);
-        printf("dst handle get Attributes fail ret = %d,hnd=%p", ret, &hnd);
+        RGA_LOG_STDERR("dst handle get Attributes fail ret = %d,hnd=%p", ret, &hnd);
         return ret;
     }
 

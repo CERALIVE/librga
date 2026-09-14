@@ -25,6 +25,25 @@ unit_session_env.set('LD_PRELOAD', fake_rga.full_path())
 unit_session_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'unit-session-interposed.log')
 test('unit-session', unit_session, env : unit_session_env, depends : fake_rga, timeout : 30)
 
+# Modified by CeraLive 2026-09-14: keep the H9 stdout-sink regression in Meson.
+unit_logging = executable('unit-logging', 'tests/unit/unit_logging.cpp',
+    include_directories : [incdir, unit_incdir],
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings,
+    install : false)
+test('unit-logging-no-device', unit_logging, args : ['no-device'], timeout : 30)
+test('unit-logging-fake-device', unit_logging, args : ['fake-device'],
+    env : unit_session_env, depends : fake_rga, timeout : 30)
+
+unit_macro_logging = executable('unit-macro-logging', 'tests/unit/unit_macro_logging.c',
+    include_directories : [incdir, unit_incdir],
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    c_args : unit_warnings,
+    install : false)
+test('unit-macro-logging', unit_macro_logging, timeout : 30)
+
 # Modified by CeraLive 2026-09-06: gate evidence assembly alongside the host tests.
 test('wire-bootstrap', find_program('bash'),
     args : [meson.current_source_dir() / 'tests/test-wire-bootstrap.sh'], timeout : 30)

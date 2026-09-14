@@ -28,8 +28,18 @@ look. The split follows that fact, not the subject matter:
                 (b) the imcheck validation matrix
                 (c) default colour-space resolution, read out of the
                     constructed rga_req
-                (f) the RT-1 imconfig(IM_CONFIG_SCHEDULER_CORE,
-                    IM_SCHEDULER_DEFAULT) reproducer
+                 (f) the RT-1 imconfig(IM_CONFIG_SCHEDULER_CORE,
+                     IM_SCHEDULER_DEFAULT) reproducer
+
+   unit-logging     runs once without a device and once under the LD_PRELOAD shim
+                    (g) H9b error diagnostics and the API-version banner reach
+                        stderr with a `librga:` context prefix; their historical
+                        message text remains a substring and stdout stays empty
+
+   unit-macro-logging
+                    (g) C macro overload errors in im2d_single.h,
+                        im2d_buffer.h and im2d_common.h keep their original
+                        text on stderr with `librga:` context and emit no stdout
 
 Each binary guards its own group: `unit-pure` REFUSES to run if the shim is
 preloaded (its purity claim would be vacuous), and `unit-session` refuses to run

@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 // Modified by CeraLive 2026-09-13: serialize context publication and unwind failed initialization.
+// Modified by CeraLive 2026-09-14: send legacy error diagnostics to stderr with context.
 #include "NormalRga.h"
 #include "NormalRgaContext.h"
 
@@ -295,13 +296,19 @@ int NormalRgaPaletteTable(buffer_handle_t dst,
     }
 
     if (rects && (ctx->mLogAlways || ctx->mLogOnce)) {
-        ALOGD("Src:[%d,%d,%d,%d][%d,%d,%d]=>Dst:[%d,%d,%d,%d][%d,%d,%d]",
+        ALOGD("Src:[%d,%d,%d,%d][%d,%d,%d]=>Dst:[%d,%d,%d,%d][%d,%d,%d]"
+              " src_format=%s w=%d h=%d wstride=%d hstride=%d"
+              " dst_format=%s w=%d h=%d wstride=%d hstride=%d",
               rects->src.xoffset,rects->src.yoffset,
               rects->src.width, rects->src.height,
               rects->src.wstride,rects->src.format, rects->src.size,
               rects->dst.xoffset,rects->dst.yoffset,
               rects->dst.width, rects->dst.height,
-              rects->dst.wstride,rects->dst.format, rects->dst.size);
+              rects->dst.wstride,rects->dst.format, rects->dst.size,
+              translate_format_str(rects->src.format), rects->src.width,
+              rects->src.height, rects->src.wstride, rects->src.hstride,
+              translate_format_str(rects->dst.format), rects->dst.width,
+              rects->dst.height, rects->dst.wstride, rects->dst.hstride);
     }
 
     memset(&rgaReg, 0, sizeof(struct rga_req));
@@ -328,20 +335,32 @@ int NormalRgaPaletteTable(buffer_handle_t dst,
         memcpy(&relRects, &tmpRects, sizeof(drm_rga_t));
 
     if (ctx->mLogAlways || ctx->mLogOnce) {
-        ALOGD("Src:[%d,%d,%d,%d][%d,%d,%d]=>Dst:[%d,%d,%d,%d][%d,%d,%d]",
+        ALOGD("Src:[%d,%d,%d,%d][%d,%d,%d]=>Dst:[%d,%d,%d,%d][%d,%d,%d]"
+              " src_format=%s w=%d h=%d wstride=%d hstride=%d"
+              " dst_format=%s w=%d h=%d wstride=%d hstride=%d",
               tmpRects.src.xoffset,tmpRects.src.yoffset,
               tmpRects.src.width, tmpRects.src.height,
               tmpRects.src.wstride,tmpRects.src.format, tmpRects.src.size,
               tmpRects.dst.xoffset,tmpRects.dst.yoffset,
               tmpRects.dst.width, tmpRects.dst.height,
-              tmpRects.dst.wstride,tmpRects.dst.format, tmpRects.dst.size);
-        ALOGD("Src:[%d,%d,%d,%d][%d,%d,%d]=>Dst:[%d,%d,%d,%d][%d,%d,%d]",
+              tmpRects.dst.wstride,tmpRects.dst.format, tmpRects.dst.size,
+              translate_format_str(tmpRects.src.format), tmpRects.src.width,
+              tmpRects.src.height, tmpRects.src.wstride, tmpRects.src.hstride,
+              translate_format_str(tmpRects.dst.format), tmpRects.dst.width,
+              tmpRects.dst.height, tmpRects.dst.wstride, tmpRects.dst.hstride);
+        ALOGD("Src:[%d,%d,%d,%d][%d,%d,%d]=>Dst:[%d,%d,%d,%d][%d,%d,%d]"
+              " src_format=%s w=%d h=%d wstride=%d hstride=%d"
+              " dst_format=%s w=%d h=%d wstride=%d hstride=%d",
               relRects.src.xoffset,relRects.src.yoffset,
               relRects.src.width, relRects.src.height,
               relRects.src.wstride,relRects.src.format, relRects.src.size,
               relRects.dst.xoffset,relRects.dst.yoffset,
               relRects.dst.width, relRects.dst.height,
-              relRects.dst.wstride,relRects.dst.format, relRects.dst.size);
+              relRects.dst.wstride,relRects.dst.format, relRects.dst.size,
+              translate_format_str(relRects.src.format), relRects.src.width,
+              relRects.src.height, relRects.src.wstride, relRects.src.hstride,
+              translate_format_str(relRects.dst.format), relRects.dst.width,
+              relRects.dst.height, relRects.dst.wstride, relRects.dst.hstride);
     }
 
     RkRgaGetHandleMapAddress(dst, &dstBuf);
@@ -400,7 +419,6 @@ int NormalRgaPaletteTable(buffer_handle_t dst,
         NormalRgaLogOutRgaReq(rgaReg);
 
     if(ioctl(ctx->rgaFd, RGA_BLIT_SYNC, &rgaReg)) {
-        printf(" %s(%d) RGA_BLIT fail: %s",__FUNCTION__, __LINE__,strerror(errno));
         ALOGE(" %s(%d) RGA_BLIT fail: %s",__FUNCTION__, __LINE__,strerror(errno));
     }
 
@@ -559,7 +577,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
 #endif
         if ((srcFd < 0 || srcFd == 0) && srcBuf == NULL) {
             ALOGE("src handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src->hnd);
-            printf("src handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src->hnd);
+        RGA_LOG_STDERR("src handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src->hnd);
             return ret;
         }
         else {
@@ -571,7 +589,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
         ret = NormalRgaGetRect(src->hnd, &tmpSrcRect);
         if (ret) {
             ALOGE("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &src->hnd);
-            printf("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &src->hnd);
+        RGA_LOG_STDERR("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &src->hnd);
             return ret;
         }
         memcpy(&relSrcRect, &tmpSrcRect, sizeof(rga_rect_t));
@@ -621,7 +639,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
 #endif
             if ((src1Fd < 0 || src1Fd == 0) && src1Buf == NULL) {
                 ALOGE("src1 handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src1->hnd);
-                printf("src1 handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src1->hnd);
+        RGA_LOG_STDERR("src1 handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src1->hnd);
                 return ret;
             }
             else {
@@ -633,7 +651,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
             ret = NormalRgaGetRect(src1->hnd, &tmpSrc1Rect);
             if (ret) {
                 ALOGE("src1 handleGetRect fail ,ret = %d,hnd=%p", ret, &src1->hnd);
-                printf("src1 handleGetRect fail ,ret = %d,hnd=%p", ret, &src1->hnd);
+        RGA_LOG_STDERR("src1 handleGetRect fail ,ret = %d,hnd=%p", ret, &src1->hnd);
                 return ret;
             }
             memcpy(&relSrc1Rect, &tmpSrc1Rect, sizeof(rga_rect_t));
@@ -683,7 +701,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
 #endif
         if ((dstFd < 0 || dstFd == 0) && dstBuf == NULL) {
             ALOGE("dst handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &dst->hnd);
-            printf("dst handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &dst->hnd);
+        RGA_LOG_STDERR("dst handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &dst->hnd);
             return ret;
         }
         else {
@@ -695,7 +713,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
         ret = NormalRgaGetRect(dst->hnd, &tmpDstRect);
         if (ret) {
             ALOGE("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &dst->hnd);
-            printf("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &dst->hnd);
+        RGA_LOG_STDERR("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &dst->hnd);
             return ret;
         }
         memcpy(&relDstRect, &tmpDstRect, sizeof(rga_rect_t));
@@ -813,7 +831,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
     if (src) {
         ret = checkRectForRga(relSrcRect);
         if (ret) {
-            printf("Error srcRect\n");
+        RGA_LOG_STDERR("Error srcRect\n");
             ALOGE("[%s,%d]Error srcRect \n", __func__, __LINE__);
             return ret;
         }
@@ -822,7 +840,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
     if (src1) {
         ret = checkRectForRga(relSrc1Rect);
         if (ret) {
-            printf("Error src1Rect\n");
+        RGA_LOG_STDERR("Error src1Rect\n");
             ALOGE("[%s,%d]Error src1Rect \n", __func__, __LINE__);
             return ret;
         }
@@ -831,7 +849,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
     if (dst) {
         ret = checkRectForRga(relDstRect);
         if (ret) {
-            printf("Error dstRect\n");
+        RGA_LOG_STDERR("Error dstRect\n");
             ALOGE("[%s,%d]Error dstRect \n", __func__, __LINE__);
             return ret;
         }
@@ -1515,7 +1533,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
             break;
 
         default:
-            printf("unknow driver[0x%x]\n", ctx->driver);
+        RGA_LOG_STDERR("unknow driver[0x%x]\n", ctx->driver);
             return -errno;
     }
 
@@ -1523,7 +1541,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
         ret = ioctl(ctx->rgaFd, sync_mode, ioc_req);
     } while (ret == -1 && (errno == EINTR || errno == 512));   /* ERESTARTSYS is 512. */
     if(ret) {
-        printf(" %s(%d) RGA_BLIT fail: %s\n",__FUNCTION__, __LINE__,strerror(errno));
+        RGA_LOG_STDERR(" %s(%d) RGA_BLIT fail: %s\n",__FUNCTION__, __LINE__,strerror(errno));
         ALOGE(" %s(%d) RGA_BLIT fail: %s",__FUNCTION__, __LINE__,strerror(errno));
         return -errno;
     }
@@ -1553,7 +1571,7 @@ int RgaFlush() {
     }
 
     if(ioctl(ctx->rgaFd, RGA_FLUSH, NULL)) {
-        printf(" %s(%d) RGA_FLUSH fail: %s",__FUNCTION__, __LINE__,strerror(errno));
+        RGA_LOG_STDERR(" %s(%d) RGA_FLUSH fail: %s",__FUNCTION__, __LINE__,strerror(errno));
         ALOGE(" %s(%d) RGA_FLUSH fail: %s",__FUNCTION__, __LINE__,strerror(errno));
         return -errno;
     }
@@ -1612,7 +1630,7 @@ int RgaCollorFill(rga_info *dst) {
         ret = RkRgaGetHandleFd(dst->hnd, &dstFd);
         if (ret) {
             ALOGE("dst handle get fd fail ret = %d,hnd=%p", ret, &dst->hnd);
-            printf("-dst handle get fd fail ret = %d,hnd=%p", ret, &dst->hnd);
+        RGA_LOG_STDERR("-dst handle get fd fail ret = %d,hnd=%p", ret, &dst->hnd);
             return ret;
         }
         if (!isRectValid(relDstRect)) {
@@ -1804,7 +1822,7 @@ int RgaCollorFill(rga_info *dst) {
             break;
 
         default:
-            printf("unknow driver[0x%x]\n", ctx->driver);
+        RGA_LOG_STDERR("unknow driver[0x%x]\n", ctx->driver);
             return -errno;
     }
 
@@ -1812,7 +1830,7 @@ int RgaCollorFill(rga_info *dst) {
         ret = ioctl(ctx->rgaFd, sync_mode, ioc_req);
     } while (ret == -1 && (errno == EINTR || errno == 512));   /* ERESTARTSYS is 512. */
     if(ret) {
-        printf(" %s(%d) RGA_COLORFILL fail: %s\n",__FUNCTION__, __LINE__,strerror(errno));
+        RGA_LOG_STDERR(" %s(%d) RGA_COLORFILL fail: %s\n",__FUNCTION__, __LINE__,strerror(errno));
         ALOGE(" %s(%d) RGA_COLORFILL fail: %s",__FUNCTION__, __LINE__,strerror(errno));
         return -errno;
     }
@@ -1932,7 +1950,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
 #endif
         if ((srcFd < 0 || srcFd == 0) && srcBuf == NULL) {
             ALOGE("src handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src->hnd);
-            printf("src handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src->hnd);
+        RGA_LOG_STDERR("src handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &src->hnd);
             return ret;
         }
         else {
@@ -1944,7 +1962,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
         ret = NormalRgaGetRect(src->hnd, &tmpSrcRect);
         if (ret) {
             ALOGE("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &src->hnd);
-            printf("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &src->hnd);
+        RGA_LOG_STDERR("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &src->hnd);
             return ret;
         }
         memcpy(&relSrcRect, &tmpSrcRect, sizeof(rga_rect_t));
@@ -1989,7 +2007,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
 #endif
         if ((dstFd < 0 || dstFd == 0) && dstBuf == NULL) {
             ALOGE("dst handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &dst->hnd);
-            printf("dst handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &dst->hnd);
+        RGA_LOG_STDERR("dst handle get fd and vir_addr fail ret = %d,hnd=%p", ret, &dst->hnd);
             return ret;
         }
         else {
@@ -2001,7 +2019,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
         ret = NormalRgaGetRect(dst->hnd, &tmpDstRect);
         if (ret) {
             ALOGE("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &dst->hnd);
-            printf("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &dst->hnd);
+        RGA_LOG_STDERR("dst handleGetRect fail ,ret = %d,hnd=%p", ret, &dst->hnd);
             return ret;
         }
         memcpy(&relDstRect, &tmpDstRect, sizeof(rga_rect_t));
@@ -2046,7 +2064,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
 #endif
         if ((lutFd < 0 || lutFd == 0) && lutBuf == NULL) {
             ALOGE("No lut address,not using update palette table mode.\n");
-            printf("No lut address,not using update palette table mode.\n");
+        RGA_LOG_STDERR("No lut address,not using update palette table mode.\n");
         }
         else {
             lutType = 1;
@@ -2059,7 +2077,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
         ret = NormalRgaGetRect(lut->hnd, &tmpLutRect);
         if (ret) {
             ALOGE("lut handleGetRect fail ,ret = %d,hnd=%p", ret, &lut->hnd);
-            printf("lut handleGetRect fail ,ret = %d,hnd=%p", ret, &lut->hnd);
+        RGA_LOG_STDERR("lut handleGetRect fail ,ret = %d,hnd=%p", ret, &lut->hnd);
         }
         memcpy(&relLutRect, &tmpLutRect, sizeof(rga_rect_t));
     }
@@ -2101,7 +2119,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
     if (src) {
         ret = checkRectForRga(relSrcRect);
         if (ret) {
-            printf("Error srcRect\n");
+        RGA_LOG_STDERR("Error srcRect\n");
             ALOGE("[%s,%d]Error srcRect \n", __func__, __LINE__);
             return ret;
         }
@@ -2110,7 +2128,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
     if (dst) {
         ret = checkRectForRga(relDstRect);
         if (ret) {
-            printf("Error dstRect\n");
+        RGA_LOG_STDERR("Error dstRect\n");
             ALOGE("[%s,%d]Error dstRect \n", __func__, __LINE__);
             return ret;
         }
@@ -2404,7 +2422,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
         rgaReg.render_mode = update_palette_table_mode;
 
         if(ioctl(ctx->rgaFd, RGA_BLIT_SYNC, &rgaReg) != 0) {
-            printf("update palette table mode ioctl err\n");
+        RGA_LOG_STDERR("update palette table mode ioctl err\n");
             return -1;
         }
     }
@@ -2428,7 +2446,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
             break;
 
         default:
-            printf("unknow driver[0x%x]\n", ctx->driver);
+        RGA_LOG_STDERR("unknow driver[0x%x]\n", ctx->driver);
             return -errno;
     }
 
@@ -2436,7 +2454,7 @@ int RgaCollorPalette(rga_info *src, rga_info *dst, rga_info *lut) {
         ret = ioctl(ctx->rgaFd, RGA_BLIT_SYNC, &ioc_req);
     } while (ret == -1 && (errno == EINTR || errno == 512));   /* ERESTARTSYS is 512. */
     if(ret) {
-        printf(" %s(%d) RGA_COLOR_PALETTE fail: %s\n",__FUNCTION__, __LINE__,strerror(errno));
+        RGA_LOG_STDERR(" %s(%d) RGA_COLOR_PALETTE fail: %s\n",__FUNCTION__, __LINE__,strerror(errno));
         ALOGE(" %s(%d) RGA_COLOR_PALETTE fail: %s",__FUNCTION__, __LINE__,strerror(errno));
         return -errno;
     }

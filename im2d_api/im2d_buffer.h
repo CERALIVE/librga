@@ -15,9 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: route C macro diagnostics to stderr with context.
 #ifndef _im2d_buffer_h_
 #define _im2d_buffer_h_
 
+#include <stdio.h>
 #include "im2d_type.h"
 
 /**
@@ -109,7 +111,7 @@ IM_EXPORT_API IM_STATUS releasebuffer_handle(rga_buffer_handle_t handle);
             im2d_api_buffer = wrapbuffer_handle_t(handle, width, height, __args[0], __args[1], format); \
         } else { \
             memset(&im2d_api_buffer, 0x0, sizeof(im2d_api_buffer)); \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         im2d_api_buffer; \
     })
@@ -125,7 +127,7 @@ IM_EXPORT_API IM_STATUS releasebuffer_handle(rga_buffer_handle_t handle);
             im2d_api_buffer = wrapbuffer_virtualaddr_t(vir_addr, width, height, __args[0], __args[1], format); \
         } else { \
             memset(&im2d_api_buffer, 0x0, sizeof(im2d_api_buffer)); \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         im2d_api_buffer; \
     })
@@ -141,7 +143,7 @@ IM_EXPORT_API IM_STATUS releasebuffer_handle(rga_buffer_handle_t handle);
             im2d_api_buffer = wrapbuffer_physicaladdr_t(phy_addr, width, height, __args[0], __args[1], format); \
         } else { \
             memset(&im2d_api_buffer, 0x0, sizeof(im2d_api_buffer)); \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         im2d_api_buffer; \
     })
@@ -157,7 +159,7 @@ IM_EXPORT_API IM_STATUS releasebuffer_handle(rga_buffer_handle_t handle);
             im2d_api_buffer = wrapbuffer_fd_t(fd, width, height, __args[0], __args[1], format); \
         } else { \
             memset(&im2d_api_buffer, 0x0, sizeof(im2d_api_buffer)); \
-            printf("invalid parameter\n"); \
+            fprintf(stderr, "librga: invalid parameter\n"); \
         } \
         im2d_api_buffer; \
     })

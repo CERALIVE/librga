@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: add context to DRM allocation diagnostics.
 
 #define LOG_NDEBUG 0
 #ifdef LOG_TAG
@@ -157,7 +158,7 @@ RGA_SINGLETON_STATIC_INSTANCE(RockchipRga)
 
         ret = local_drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &arg);
         if (ret) {
-            fprintf(stderr, "failed to create dumb buffer: %s\n", strerror(errno));
+            fprintf(stderr, "librga: failed to create dumb buffer: %s\n", strerror(errno));
             return ret;
         }
 
@@ -178,7 +179,7 @@ RGA_SINGLETON_STATIC_INSTANCE(RockchipRga)
         arg.handle = bo_info->handle;
         ret = local_drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg);
         if (ret) {
-            fprintf(stderr, "failed to destroy dumb buffer: %s\n", strerror(errno));
+            fprintf(stderr, "librga: failed to destroy dumb buffer: %s\n", strerror(errno));
             return -errno;
         }
         bo_info->handle = 0;
@@ -199,7 +200,7 @@ RGA_SINGLETON_STATIC_INSTANCE(RockchipRga)
         bo_info->handle = 0;
         drm_fd = open(card, flag);
         if (drm_fd < 0) {
-            fprintf(stderr, "Fail to open %s: %m\n", card);
+            fprintf(stderr, "librga: Fail to open %s: %m\n", card);
             return -errno;
         }
         ret = RkRgaAllocBuffer(drm_fd, bo_info, width, height, bpp, flags);
@@ -330,4 +331,3 @@ RGA_SINGLETON_STATIC_INSTANCE(RockchipRga)
 #ifdef ANDROID
 }; // namespace android
 #endif
-
