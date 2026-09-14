@@ -157,6 +157,8 @@ removed job. H10c duplicate release is driver-owned, not a librga defect:
 `FAKE_RGA_REIMPORT` is a test-only one-buffer refcount/reuse model, never a
 production released-handle tombstone. Details and host-only evidence are in
 [`docs/fix-audit.d/todo-38.md`](docs/fix-audit.d/todo-38.md).
+CI discovery matches Meson's project-prefixed `:concurrency` suite suffix;
+`tests/test-build-check-gating.sh` checks the actual predicate against fixtures.
 
 Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
 It adds direct exported-init coverage to H1 and H3; build both sanitizer trees

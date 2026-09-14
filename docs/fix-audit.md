@@ -1063,6 +1063,40 @@ ABI inputs are `build-abi-base/librga.so.2.1.0` and
 This is a same-R1-base change comparison, **not** a waiver of inherited R0→R1
 export removals.
 
+### CI discovery repair after independent review — 2026-09-14
+
+Review `ses_f5f17f6e7ffeDBxkvfDovEpWDs` rejected the CI coverage claim at
+`b58df2b`: the bare list-membership predicate missed Meson's project-prefixed
+suite names and reported zero concurrency tests. The repair matches the exact
+`:concurrency` suffix and counts each test once, retaining `--no-rebuild`.
+No sibling discovery predicate exists: H10 is selected directly by `--suite h10`.
+The existing CI-gating test now executes the actual discovery block against seven
+fixtures (prefixed names, multiple suites, near-matches and empty/missing suites).
+It failed on the old predicate (`librga:concurrency`: expected 1, got 0), then
+passed 7/7 after the repair; all seven existing summary-gate cases still pass.
+
+`SKIP_DEPS=1 bash ci/sanitizers-steps.sh` at `7f4c69d` ran in the native amd64
+Debian trixie tools container, GCC 14.2.0, Meson 1.7.0, with
+`seccomp=unconfined`. Both sanitizer trees rebuilt; the complete gate exited 0
+in 11 seconds. Logs: `test-results/todo38-ci-gate.log`,
+`test-results/todo38-ci-gate.exit`, and `test-results/sanitizers-summary.txt`.
+
+- ASan/UBSan baseline: 11/11 OK; H10: 6/6 OK (`asan-h10-testlog.txt`).
+- ASan/UBSan and TSan canaries reported their deliberate faults.
+- Summary: **`concurrency tests: 6`**. `test-results/tsan-testlog.txt` records
+  `candidate-a-init`, `candidate-b-deinit`, `candidate-b-refcount`,
+  `candidate-b-exit`, `h10-race-1`, and `h10-race-2`: **6/6 OK**, zero failures.
+- Both TSan H10 races completed 2000 iterations, with 95/112 successful CONFIG
+  calls and final count/map 0/0. Durations were 1.40/1.41 seconds; the other
+  newly discovered tests took 0.02–1.03 seconds each. No new failure surfaced.
+  These are absolute timings, not a measured before/after CI speed comparison.
+
+The README H10 CI claim, AGENTS suite registration contract, and SANITIZERS
+discovery contract now agree with an executed gate, not just a manual suite run.
+Evidence remains **amd64 host-shim-only**, not an arm64 CI-run or board claim.
+The production fixes and their regressions were unchanged. This repair is not
+an independent APPROVE receipt; review/merge remains with the coordinator.
+
 ## Appendix — wave-e-a.md
 
 Source: [fix-audit.d/wave-e-a.md](fix-audit.d/wave-e-a.md). D21 rows are in the [ledger above](#rows).
