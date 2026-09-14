@@ -65,6 +65,10 @@ can be checked rather than asserted:
 | H6b · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C2 · RED 200/200, fd 0 remains open after successful legacy async submit; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | H6c · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C3 · RED 200/200, failed async `improcess` retains stale release fd 10 rather than -1; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
+| Measurement preparation only; base `57a1067a246c71fa6c9a355d1668884fda155dd5`, post-fix `5dfe897d206a52f770137e15553c48f84964cf02` | `tests/board/h8-board.c`, `h8-data.c`, `run-h8-board.sh`; PSNR unmeasured; RED not applicable | **NOT-RUN: PREP ONLY**, Orange Pi 5+ and Rock 5B+ occupied; sanitizers **host-shim-only** | n/a: no library or default changes | GAP: independent hardware review pending; no measurement claimed | not-applicable: characterization, not a defect claim |
+| Untouched `57a1067a246c71fa6c9a355d1668884fda155dd5` | Existing H8 binary/runner: **MEASURED**, all 15 scored cells below plus CSC rejection and explicit-709 improvement controls; no fix or default change | Rock 5B+, 2026-09-14 UTC, real DMA-BUF/RGA; sanitizers **host-shim-only**; OPi not contacted | n/a — no ABI change | GAP: independent board review pending | Characterization only |
+| Post-fix `5dfe897d206a52f770137e15553c48f84964cf02` | Existing H8 binary/runner: **MEASURED**, all 15 scores identical to the base; both controls satisfied. This is post-fix characterization, not historical RED | Rock 5B+ only; OPi pending; sanitizers **host-shim-only** | n/a — no ABI change | GAP: independent board review pending | No new defect or fix claimed |
+| Untouched `57a1067a246c71fa6c9a355d1668884fda155dd5` and post-fix `5dfe897d206a52f770137e15553c48f84964cf02`; separate OPi columns below | Existing H8 binary/runner: **all 15 scored cells per tree MEASURED**, identical scores across both trees and to Rock. Explicit-709 improves by 25.968579 dB; inappropriate YUV→YUV CSC rejected with −4. | **Orange Pi 5+, 2026-09-14 UTC**, real RGA/DMA-BUF; sanitizers **host-shim-only** | n/a — no library, default or ABI change | GAP: independent hardware review pending | Characterization only; no new fix |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | Wave-E A; first-party initialization fix; commit resolved by `git log --format=%H --grep='fix(init): serialize context publication and unwind failed opens'` | `tests/repro/run-candidate-a.sh`: RED direct-init 20/20 TSan and 1000/1000 leaked fds per API; GREEN same command, then 200 processes per scenario twice; transcripts below; fresh takeover run in `wave-e-verification.md` | host-shim-only | No removal or incompatible change vs pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent full-series review pending; not approved for merge | Downstream-only: initialization ownership repair; not yet submitted upstream |
@@ -643,6 +647,123 @@ e65914080601fdcfd064fd0b1db2c10491cdce567112eba934872667a246642c  iterations.csv
 36e1d89d401e44d1f79ba4d418286677f11eb187c9ef8cec5650f79070a0e164  requests.bin
 89eb998b392c4d2677f5a96be0906d83c974107b2932bd38722da71eb2b398ee  librga.so.2.1.0
 ```
+
+## Appendix — h8.md
+
+Source: [fix-audit.d/h8.md](fix-audit.d/h8.md). D21 rows are in the [ledger above](#rows).
+
+
+## Prepared colour matrix
+
+Host-generated 4K colour bars use the fork-owned `tests/oracle/oracle.c` from
+todo 20. Nothing is copied from the BT.601-bent downstream oracle associated
+with `77b3bcb0`. BGR→NV12 and NV12→BGR each test default, explicit 601 limited,
+explicit 709 limited against **both** references (12 scores). NV16 is generated
+as 709-coded YUV with repeated chroma rows; NV16→NV12 is a no-CSC resampling
+cell against the same-colourimetry NV12 reference. An additional inappropriate
+CSC request must be rejected and is recorded separately, never worked around.
+
+The 4K→1080p NV12 downscale compares default and explicit
+`IM_INTERP(IM_INTERP_CUBIC, IM_INTERP_CUBIC)` against a separable antialiased
+Lanczos-3 reference: pixel-centred half scale, 12 taps per axis, edge clamping,
+normalized weights, floating-point intermediate, rounding only at final output.
+Constant and interior affine anchors are host-testable. The inherited oracle's
+literal 601/709 colour anchors remain authoritative for colour conversion.
+
+`psnr.csv` contains 15 scored rows plus the YUV-YUV rejection record per tree
+per board. Explicit-709 BGR→NV12 must beat default against 709 by at least 1 dB;
+otherwise the leg exits invalid for investigation, not MEASURED. The hardware
+fragment becomes MEASURED only after actual board results are imported. All
+CPU DMA-BUF reads/writes are synchronized; library defaults remain unchanged.
+No board command has been executed.
+
+## Rock PSNR measurements (2026-09-14 UTC)
+
+The preparation record above is historical. Run `20260914T023538Z-2107123`
+completed the unchanged H8 script with exit 0 on both trees. The table lists
+**all 15 scored cells per tree**, in dB; the negative control is separate.
+
+| Cell | Requested mode | Reference | Untouched `57a1067` dB | Post-fix `5dfe897` dB |
+|---|---|---|---:|---:|
+| BGR→NV12 | default | 601 limited | 52.825289 | 52.825289 |
+| BGR→NV12 | default | 709 limited | 27.002087 | 27.002087 |
+| BGR→NV12 | explicit 601 limited | 601 limited | 52.825289 | 52.825289 |
+| BGR→NV12 | explicit 601 limited | 709 limited | 27.002087 | 27.002087 |
+| BGR→NV12 | explicit 709 limited | 601 limited | 27.000895 | 27.000895 |
+| BGR→NV12 | explicit 709 limited | 709 limited | 52.970666 | 52.970666 |
+| NV12→BGR | default | 601 limited | 53.264029 | 53.264029 |
+| NV12→BGR | default | 709 limited | 28.041012 | 28.041012 |
+| NV12→BGR | explicit 601 limited | 601 limited | 53.264029 | 53.264029 |
+| NV12→BGR | explicit 601 limited | 709 limited | 28.041012 | 28.041012 |
+| NV12→BGR | explicit 709 limited | 601 limited | 27.920087 | 27.920087 |
+| NV12→BGR | explicit 709 limited | 709 limited | 53.859821 | 53.859821 |
+| NV16→NV12 | default, no CSC | 709 same-colourimetry | ∞ | ∞ |
+| NV12 4K→1080p | default interpolation | Lanczos-3 | 54.344714 | 54.344714 |
+| NV12 4K→1080p | explicit cubic/cubic | Lanczos-3 | 54.344714 | 54.344714 |
+
+All scored operations returned `IM_STATUS_SUCCESS=1`. For **both trees**:
+
+- The inappropriate NV16→NV12 CSC request returned **-4**; its `nan` PSNR is
+  unscored, not zero or a missing positive cell.
+- Explicit-709 BGR→NV12 beat default against the 709 reference by
+  **25.968579 dB**, exceeding the required 1 dB negative-control separation.
+- Default and explicit 601 coincide on these bars; wrong-reference scores are
+  intentional characterization, not failures to be fixed by changing defaults.
+- Identical interpolation scores describe this fixture only; they do not prove
+  that default and cubic are generally equivalent.
+
+Raw evidence: per-tree `h8/<tree>/psnr.csv` and `control.txt` in the retained
+execution archive. The 4K references and binaries are the original payload,
+SHA-256 `aa07266832b924f1a4443c85ceb437cbb9ecef755fcbc8494fa1a04ef3005201`,
+verified per file on the Rock before execution and again on resume. No QEMU
+fixture or fake device entered this run.
+
+Both libraries: aarch64 Debian GCC/G++ 14.2.0-19, Meson debugoptimized `-O2 -g`,
+C++14/`-fpermissive`, unstripped, no LTO/sanitizers. H8 client: same compiler,
+GNU C11, `-O2 -g`, unstripped. No library, reference, default, or package changed.
+**Item 43 remains open**: OPi has no row, and Rock's H4 gap is separate from
+these completed colour measurements.
+
+## OPi PSNR measurements (2026-09-14 UTC)
+
+Run `20260914T130553Z-3452424`, `h8/<tree>/{psnr.csv,control.txt}`:
+all 15 scored cells on **each** tree, with the negative control separate.
+The earlier pending-OPi statements are historical; no Rock command ran here.
+
+| Cell | Requested mode | Reference | Untouched `57a1067` dB | Post-fix `5dfe897` dB |
+|---|---|---|---:|---:|
+| BGR→NV12 | default | 601 limited | 52.825289 | 52.825289 |
+| BGR→NV12 | default | 709 limited | 27.002087 | 27.002087 |
+| BGR→NV12 | explicit 601 limited | 601 limited | 52.825289 | 52.825289 |
+| BGR→NV12 | explicit 601 limited | 709 limited | 27.002087 | 27.002087 |
+| BGR→NV12 | explicit 709 limited | 601 limited | 27.000895 | 27.000895 |
+| BGR→NV12 | explicit 709 limited | 709 limited | 52.970666 | 52.970666 |
+| NV12→BGR | default | 601 limited | 53.264029 | 53.264029 |
+| NV12→BGR | default | 709 limited | 28.041012 | 28.041012 |
+| NV12→BGR | explicit 601 limited | 601 limited | 53.264029 | 53.264029 |
+| NV12→BGR | explicit 601 limited | 709 limited | 28.041012 | 28.041012 |
+| NV12→BGR | explicit 709 limited | 601 limited | 27.920087 | 27.920087 |
+| NV12→BGR | explicit 709 limited | 709 limited | 53.859821 | 53.859821 |
+| NV16→NV12 | default, no CSC | 709 same-colourimetry | ∞ | ∞ |
+| NV12 4K→1080p | default interpolation | Lanczos-3 | 54.344714 | 54.344714 |
+| NV12 4K→1080p | explicit cubic/cubic | Lanczos-3 | 54.344714 | 54.344714 |
+
+Every scored status is success 1. Both trees reject the inappropriate CSC with
+**−4**, whose unscored PSNR is `nan`. Both improve explicit-709 BGR→NV12 against
+the 709 reference from **27.002087 to 52.970666 dB**, separation **25.968579 dB**.
+Wrong-reference scores remain intentional controls, not default-change requests.
+Equal default/cubic scores apply only to this fixture, not all scaling inputs.
+
+The original payload, including the precomputed references, was unchanged and
+verified by all 28 per-file SHA-256 checks on the board. The library/client build
+identity remains Debian GCC/G++ 14.2.0-19, aarch64, `-O2 -g`, unstripped, without
+LTO or sanitizer; library flags Meson debugoptimized/C++14/`-fpermissive`, client
+GNU C11. No rebuild, mock device, package install, or camera/default change.
+
+Fresh **OWNED** two-contract lease, 13:05:54–13:20:22 UTC, with a continuously
+detached collector and normal exact-marker release. Before/after CeraUI public
+assets, running executable and configuration hashes match; both RAUC slots remain
+good, B booted, budgets 3/3. H8's both-board item-43 matrix is now complete.
 
 ## Appendix — h9.md
 

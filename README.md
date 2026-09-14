@@ -71,6 +71,14 @@ build.
 
 ### Wave-E regression checks (R1)
 
+H8 board characterization [EXISTS] lives in `tests/board/h8-data.c`, `h8-board.c`
+and `run-h8-board.sh`. References are prepared on the host using the inherited
+colour oracle; hardware conversion stays behind the board lock. The full matrix
+and negative controls are in [`docs/fix-audit.d/h8.md`](docs/fix-audit.d/h8.md).
+Rock and OPi each completed all 15 scored cells on both trees with identical
+scores and passing controls. Both-board characterization is complete; defaults
+are unchanged and sanitizers remain host-shim-only.
+
 The scheduler default, failed `imsync` wait cleanup, legacy initialization and
 borrowed-last-reference teardown fixes have green Meson regression cases. Long
 host-only runs use `tests/repro/run-candidate-{a,b,c,d}.sh`; build the ASan and
