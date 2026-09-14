@@ -71,6 +71,19 @@ build.
 
 ### Wave-E regression checks (R1)
 
+H7 board characterization [EXISTS] lives in `tests/board/h7-board.c` and
+`run-h7-board.sh`. The held-lock runner escalates real G1 work through 4/6/8
+threads and stops at the first incident. Budget, recovery and hardware evidence
+boundaries are in [`docs/fix-audit.d/h7.md`](docs/fix-audit.d/h7.md).
+Rock follow-up measured all four libraries: each has a status-failure incident
+at eight threads after clean four/six-thread dwell, and each recovered. These
+are not progress stalls or NO-STALL-at-eight results. The common mapping-error
+signature is surfaced to island/driver investigation, not treated as permission
+for an R1 fix. OPi differs significantly: all four libraries completed the full
+4/6/8-thread dwell without incidents, each NO-STALL at eight. The item-43 H7 matrix
+is complete; the board-dependent contrast remains for driver/root-cause review,
+not a uniform both-board failure claim or R1-fix permission.
+
 The scheduler default, failed `imsync` wait cleanup, legacy initialization and
 borrowed-last-reference teardown fixes have green Meson regression cases. Long
 host-only runs use `tests/repro/run-candidate-{a,b,c,d}.sh`; build the ASan and

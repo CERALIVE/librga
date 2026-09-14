@@ -65,6 +65,13 @@ can be checked rather than asserted:
 | H6b · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C2 · RED 200/200, fd 0 remains open after successful legacy async submit; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | H6c · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C3 · RED 200/200, failed async `improcess` retains stale release fd 10 rather than -1; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
+| Measurement preparation only; source base `57a1067a246c71fa6c9a355d1668884fda155dd5`, post-fix `5dfe897d206a52f770137e15553c48f84964cf02` | `tests/board/h7-board.c` and `run-h7-board.sh`; RED/GREEN not measured | **NOT-RUN: PREP ONLY**, Orange Pi 5+ and Rock 5B+ occupied; sanitizers **host-shim-only** | n/a: no library or public ABI change | GAP: no independent hardware review; no result claimed | not-applicable: characterization pending, no defect claim |
+| Radxa `librga2 2.2.0-1`, SHA-256 `0b455344259c37fec821955e2de85bb5f76a34e69682217b514c407d8a35c6c3` | Existing H7 runner: **RED incident, IM_STATUS_FAILURE at eight threads after 4.605350 s**; four/six threads completed their 60 s budgets. **Not a five-second STALL**, and not NO-STALL at eight. Stop-at-first-incident honored; one-worker recovery passed. | Rock 5B+, 2026-09-14 UTC; real RGA/DMA-BUF. Host collector/descriptor-lock interruption noted below. Sanitizers **host-shim-only** | n/a — measurement only, no library or ABI change | GAP: independent incident review pending; no R1-fix authorization | Surface driver diagnostics; no kernel or library fix made |
+| R0 `f4c3ee62ab354c2cbe22718f543fc0ba6e58365c`; untouched `57a1067a246c71fa6c9a355d1668884fda155dd5`; post-fix `5dfe897d206a52f770137e15553c48f84964cf02` | **NOT-RUN** for H7: the preceding Radxa incident stopped all later libraries. No base RED and no post-fix confirmation exist for this leg. | Rock rows unmeasured; OPi not contacted. Sanitizers **host-shim-only** | n/a | GAP: later-library board matrix and independent review pending | Radxa-only RED does not license an R1 fix |
+| R0 rebuild `f4c3ee62ab354c2cbe22718f543fc0ba6e58365c` | Existing H7 binary: four/six-thread dwell complete; **IM_STATUS_FAILURE at eight after 0.400651 s**; same-library recovery OK. Not a five-second stall. | Rock 5B+, follow-up 2026-09-14 UTC; sanitizers **host-shim-only** | n/a: no library change | GAP: independent incident review pending | Common four-library status incident; surface to island/driver investigation |
+| Untouched `57a1067a246c71fa6c9a355d1668884fda155dd5` | Existing H7 binary: four/six-thread dwell complete; **IM_STATUS_FAILURE at eight after 0.500773 s**; same-library recovery OK. This establishes a base status-failure RED, not a progress-stall RED. | Rock 5B+, follow-up 2026-09-14 UTC; sanitizers **host-shim-only** | n/a: no library change | GAP: independent incident/root-cause review pending | Not Radxa-specific; does not establish a userspace-fix mechanism |
+| Post-fix `5dfe897d206a52f770137e15553c48f84964cf02` | Existing H7 binary: four/six-thread dwell complete; **IM_STATUS_FAILURE at eight after 0.901518 s**; same-library recovery OK. Not NO-STALL at eight. | Rock 5B+, follow-up 2026-09-14 UTC; sanitizers **host-shim-only** | n/a: no library change | GAP: independent incident/root-cause review pending | Same incident class survives current fixes; no R1 fix authorized here |
+| Radxa `2.2.0-1`; R0 rebuild `f4c3ee62ab354c2cbe22718f543fc0ba6e58365c`; untouched `57a1067a246c71fa6c9a355d1668884fda155dd5`; post-fix `5dfe897d206a52f770137e15553c48f84964cf02` | Existing H7 binary, **all four libraries NO-STALL at eight threads**, full 60-second N=4/6/8 dwell plus five-second N=1 controls. No status-failure incident; no stop/recovery branch invoked. Per-library times below. | **Orange Pi 5+, 2026-09-14 UTC**; real RGA/DMA-BUF; sanitizers **host-shim-only** | n/a — no library or ABI change | GAP: independent hardware/root-cause review pending | Significant board-dependent contrast to Rock; no R1 fix authorized |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | Wave-E A; first-party initialization fix; commit resolved by `git log --format=%H --grep='fix(init): serialize context publication and unwind failed opens'` | `tests/repro/run-candidate-a.sh`: RED direct-init 20/20 TSan and 1000/1000 leaked fds per API; GREEN same command, then 200 processes per scenario twice; transcripts below; fresh takeover run in `wave-e-verification.md` | host-shim-only | No removal or incompatible change vs pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent full-series review pending; not approved for merge | Downstream-only: initialization ownership repair; not yet submitted upstream |
@@ -643,6 +650,178 @@ e65914080601fdcfd064fd0b1db2c10491cdce567112eba934872667a246642c  iterations.csv
 36e1d89d401e44d1f79ba4d418286677f11eb187c9ef8cec5650f79070a0e164  requests.bin
 89eb998b392c4d2677f5a96be0906d83c974107b2932bd38722da71eb2b398ee  librga.so.2.1.0
 ```
+
+## Appendix — h7.md
+
+Source: [fix-audit.d/h7.md](fix-audit.d/h7.md). D21 rows are in the [ledger above](#rows).
+
+
+## Prepared escalation
+
+Real DMA-BUFs from `/dev/dma_heap/system`, one source/destination pair per worker;
+3840×2160 NV16→NV12 `improcess(IM_SYNC)`. For each board: Radxa, R0, untouched
+57a1067, then post-fix confirmation. N=1 five-second control, then N=4,6,8 for
+60 seconds each. Any worker with no completed operation for five seconds is a
+STALL; any failed IM_STATUS is an incident. The first incident stops further
+levels **and libraries**. Therefore an early Radxa incident leaves the R1 base
+unmeasured and cannot license an R1 fix.
+
+The watchdog writes per-worker FPS and an incident marker before stopping the
+process for stack collection. The runner captures kernel journal, counters and
+sudo stack availability, kills only its process, then requires responsive load
+and a successful one-worker recovery workload. No reboot/module reload. Failed
+recovery exits 86 and requires owner/island-track intervention. A complete clean
+budget records `NO-STALL at 8 threads`; no QEMU fixture is a hardware result.
+
+Artifacts: `test-results/h7/<board>/<lib>/levels.csv` and per-level FPS, journal,
+stack/recovery and counter transcripts. No board command has been executed.
+
+## Rock escalation — stopped at first incident (2026-09-14 UTC)
+
+The preparation record above is historical. Actual evidence is retained under
+run `20260914T023538Z-2107123`, `h7/radxa/`, with the unchanged runner's
+`h7.exit=3`. All libraries were isolated copies, never installed.
+
+The Radxa one-thread five-second control passed; later libraries' controls were
+not reached.
+
+| Library | N=4 | N=6 | N=8 | Stall / incident threshold |
+|---|---|---|---|---|
+| Radxa | 60.175039 s OK | 60.174391 s OK | IM_STATUS_FAILURE at 4.605350 s; remaining dwell not run | **First status-failure incident at 8; progress-stall threshold unestablished** |
+| R0 rebuild | NOT-RUN | NOT-RUN | NOT-RUN | Stopped after Radxa incident |
+| Untouched `57a1067` | NOT-RUN | NOT-RUN | NOT-RUN | No historical base RED established |
+| Post-fix `5dfe897` | NOT-RUN | NOT-RUN | NOT-RUN | No current repair confirmation established |
+
+At eight threads, worker 4 returned status **0**, while the other seven workers'
+last statuses remained success **1**. The aggregate incident label is printed
+on every worker row; that does **not** mean all eight calls failed. Workers had
+completed 108–114 frames each. The `levels.csv` value `seconds=60` is the
+**requested** budget, not elapsed time; the per-worker `fps.csv` gives the actual
+4.605350 s before this stop. No five-second no-progress incident was reported.
+
+Kernel journal for the test process records repeated
+`Failed to map attachment, ret[-5]`. This is supporting driver evidence, not a
+proved kernel root cause. Captured stacks show `do_signal_stop`, consistent with
+the harness's deliberate stop for capture; they are not proof of a mutex deadlock.
+Missing `mm` and alternate debugfs paths are recorded UNAVAILABLE, never invented.
+No driver module, kernel, or library was changed in response.
+
+Recovery: `/proc/rkrga/load` remained responsive, and the **same Radxa library**
+completed a one-worker run with **157 frames in 1.101792 s**, status 1, verdict OK.
+The test process was killed by the incident runner. Final locked health inspection
+confirmed the process absent, all three RGA schedulers at 0% load, and both RAUC
+slots good (B booted, A inactive). No reboot, reload, or slot mutation occurred.
+
+**Execution discipline gap:** the host tool timeout terminated the original
+collector after 120 s while the detached remote runner continued and stopped
+itself. Its remote ownership marker remained intact, but uninterrupted possession
+of the host descriptor lock is **not claimed**. The collector was reattached with
+a fully detached session, acquired the host lock, verified this lane's exact
+retained marker, and retrieved the completed incident/recovery archive without
+restarting a workload. It then released ownership. Every additional remote
+command was issued under an acquired host lock; no OPi connection or lock was used.
+
+Radxa is its stripped vendor binary, compiler/optimization unknown. The prepared
+R0/base/post libraries use aarch64 Debian GCC/G++ 14.2.0-19, Meson debugoptimized
+`-O2 -g`, C++14/`-fpermissive`, unstripped, no LTO or sanitizers; those libraries
+were **not reached by H7**. H7 client: same GCC, GNU C11, `-O2 -g`, unstripped.
+
+**Item 45 scope input:** investigate the Radxa incident and its driver diagnostics;
+do not label it an R1 stall or authorize an R1 fix. **Item 43 remains open** for the
+missing H7 library rows, the H4 calibration gap, and the separately authorized OPi
+dispatch. Continuing past this incident was deliberately not attempted.
+
+## Rock follow-up — missing library matrix measured (2026-09-14 UTC)
+
+The NOT-RUN entries above preserve the first run's history. Owner-authorized
+follow-up `h7-20260914T032730Z-2926571` measures only R0, base and post-fix.
+The existing binary and runner body are unchanged. An execution adapter selects
+one library per invocation, retaining the first-incident stop and same-library
+recovery requirement; only a completed recovery permits the next invocation.
+There is no retry of the failed eight-thread dwell and no invented 60-second pass.
+
+| Library | N=1 control | N=4 elapsed | N=6 elapsed | N=8 incident elapsed | Failed worker / status | One-worker recovery |
+|---|---|---|---|---|---|---|
+| R0 rebuild | 5.106143 s OK | 60.177739 s OK | 60.175414 s OK | **0.400651 s** | 6 / 0 | 143 frames / 1.101724 s, OK |
+| Untouched base | 5.106664 s OK | 60.174696 s OK | 60.177585 s OK | **0.500773 s** | 4 / 0 | 155 frames / 1.101622 s, OK |
+| Post-fix | 5.106911 s OK | 60.175719 s OK | 60.176356 s OK | **0.901518 s** | 7 / 0 | 152 frames / 1.101648 s, OK |
+
+All three failures are `IM_STATUS_FAILURE`. Other workers still have last status
+1; the shared verdict column does not mean every worker failed. Together with the
+retained Radxa row (4.605350 s), **the first status incident is at eight threads
+for all four libraries**. No five-second progress-stall threshold was observed or
+established. No library completed the eight-thread budget, so none earns
+`NO-STALL at 8 threads`.
+
+Each incident's kernel journal contains `Failed to map attachment, ret[-5]`
+attributed to that test process. This common signature makes the island/driver
+DMA-BUF mapping path the next investigation owner, not a Radxa-only compatibility
+patch. It is supporting evidence, **not a proved driver root cause**: common
+userspace request handling or harness pressure is not excluded by this matrix.
+The base now has a real-device status-failure RED, but that alone neither proves
+an R1 mutex stall nor authorizes an R1 code change. No library or driver was fixed.
+
+H7 held freshly **owned** host locks and matching remote markers for both the
+canonical board harness and the inherited librga lock contract. A detached host
+collector held them continuously from 03:27:32 through release at 03:34:10 UTC;
+this run did not inherit the previous lane's marker and suffered no collector
+timeout. Logs and archives were collected incrementally. RAUC before/after:
+both slots good, B booted/A inactive, attempt budgets 3/3. Load remained responsive;
+the immediate post-recovery sample still showed 27% on one scheduler, so it is
+not described as a zero-load observation.
+
+Hashes of all staged payload entries were verified before measurement. The
+R0/base/post compiler and optimization identities above apply unchanged; Radxa's
+toolchain remains unknown/stripped. No rebuild, package install, driver reload,
+serial write, reboot or slot mutation. Raw `fps.csv`, `levels.csv`, counters,
+kernel journals, stacks and recovery outputs are retained with the run.
+**Item 43 remains OPEN for the OPi legs**, which this lane never contacted or
+locked; this follow-up closes only the Rock H7 missing-library measurement gap.
+
+## OPi escalation — all four libraries complete eight threads (2026-09-14 UTC)
+
+Run `20260914T130553Z-3452424`, `h7/<library>/`: each library ran the unchanged
+H7 executable and runner body in a separately selected invocation. The adapter
+retains first-incident stop and permits another library only after clean completion
+or successful same-library recovery. **No incident occurred**, so every library
+completed every level and all four per-library exits are zero. No failed dwell
+was retried. Recovery is **not invoked**, not an invented recovery PASS.
+
+| Library | N=1 control elapsed | N=4 elapsed | N=6 elapsed | N=8 elapsed | Threshold / verdict | Incident recovery |
+|---|---|---|---|---|---|---|
+| Radxa | 5.105583 s | 60.171312 s | 60.173267 s | 60.177481 s | **NO-STALL at 8** | not invoked |
+| R0 rebuild | 5.106846 s | 60.170418 s | 60.171520 s | 60.175651 s | **NO-STALL at 8** | not invoked |
+| Untouched base | 5.106433 s | 60.174285 s | 60.170043 s | 60.172038 s | **NO-STALL at 8** | not invoked |
+| Post-fix | 5.106355 s | 60.178206 s | 60.178994 s | 60.179594 s | **NO-STALL at 8** | not invoked |
+
+Every worker's final status is success 1 and verdict OK. Per-worker frame counts,
+FPS, before/during/after counters and kernel journals are retained. This is the
+finite 60-second-per-level result, not a claim about higher concurrency or long
+soaks. The load interface was responsive after completion; its immediate rolling
+load sample was 35% / 35% / 48%, **not zero load**, with no session rows listed.
+
+**The OPi does not agree with the Rock's incident outcome.** The exact same four
+library artifacts fail at eight on Rock but complete eight on OPi. This preserves
+the Rock-local evidence against a Radxa-specific explanation, while rejecting a
+uniform both-board failure claim. Board/kernel-runtime/DMA-BUF mapping differences
+remain the investigation target; this experiment does not establish their root
+cause or isolate memory pressure, request routing, or driver state. No OPi base
+RED exists for H7; Rock base status-failure RED does not prove an R1 mutex stall.
+**No R1 fix is authorized.** Surface the contrast to the island/driver investigation.
+
+Payload hashes were verified before execution; no client, library or driver was
+rebuilt or installed. Rebuilt libraries and client: Debian GCC/G++ 14.2.0-19,
+aarch64, `-O2 -g`, unstripped, no LTO/sanitizers; libraries are Meson
+debugoptimized C++14/`-fpermissive`. Radxa remains stripped with unknown vendor
+compiler/optimization. These are observations of named artifacts, not ABI claims.
+
+Fresh **OWNED** canonical and legacy host locks plus exact remote markers were
+held continuously by the detached collector 13:05:54–13:20:22 UTC, then released.
+Before/after: `7.2.0-ceralive-rk3588`, unchanged boot ID/packages/configuration and
+CeraUI/service state, B booted/A inactive, both RAUC slots good, budgets 3/3.
+No Rock contact, serial write, reboot, driver reload, camera or service change.
+The Rock follow-up above already closed its cut-short library matrix; **no H7
+library measurement remains owed for item 43**. Root-cause review remains separate.
 
 ## Appendix — h9.md
 
