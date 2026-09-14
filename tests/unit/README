@@ -35,6 +35,14 @@ look. The split follows that fact, not the subject matter:
                     (g) H9b error diagnostics and the API-version banner reach
                         stderr with a `librga:` context prefix; their historical
                         message text remains a substring and stdout stays empty
+                    (h) legacy constructor notices and all three ALOG severities
+                        emit with ROCKCHIP_RGA_LOG unset, at both default and
+                        error-only im2d thresholds
+
+   unit-gaussian-logging
+                    (i) captured matrix values, indentation and row breaks agree
+                        for forced options, explicit force, unforced errors,
+                        disabled logging and threshold-selected logging
 
    unit-macro-logging
                     (g) C macro overload errors in im2d_single.h,
@@ -53,6 +61,15 @@ leaves partly uninitialized (NormalRgaApi.cpp:825, :913).
 
 Notes on what is asserted
 -------------------------
+
+The explicit `unit-logging legacy-once` and `legacy-always` modes are RED
+characterization probes, not passing regressions in the Meson gate. Run each
+with `LD_PRELOAD=<build>/libfake_rga.so`; they refuse to run without the shim.
+They call the public setter, then capture a successful fill separately from
+construction. Both require a debug diagnostic and currently fail: the private
+RockchipRga flags have no reader, including before todo 36. The macro correction
+does not repair that inherited wiring. These probes retain their positive-output
+assertion; see `docs/fix-audit.d/logging-round-five.md` for the scope boundary.
 
 get_perPixel_stride_from_format() returns BITS per pixel, not bytes. The tests
 pin the bit values so a "tidy-up" to bytes is caught: rga_check_align()

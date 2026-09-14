@@ -151,6 +151,15 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+Legacy `ALOGI`/`ALOGD` diagnostics [EXISTS] remain unconditional at the macro
+boundary: only their existing call sites select emission. Do not add im2d's
+global enable or severity gate there. Constructor notices must survive disabled
+logging. Gaussian framing and values share `IM_LOG_ENABLED`, including force and
+error bypasses. Tests capture output, not just return codes. The separate public
+setter probes remain RED because their private flags were already disconnected
+before todo 36; see `docs/fix-audit.d/logging-round-five.md`. Do not claim those
+setters were repaired by removing the macro gate.
+
 `bash scripts/check-ledger-reviews.sh` [EXISTS] validates the generated D21 table,
 also through Meson and `ci/build-check-steps.sh`. Every row has an explicit
 `status=... fix=...;` disposition and current review receipt. GREEN requires a
