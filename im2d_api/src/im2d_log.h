@@ -33,12 +33,15 @@ typedef enum {
     IM_LOG_ERROR        = 0x6,
     IM_LOG_LEVEL_MASK   = 0xff,
 
-    IM_LOG_FORCE        = 0x1 << 8,         /* This will force output to stdout, not to internal error messages. */
-    IM_LOG_DIRECT       = 0x1 << 9,         /* This will output to stdout directly, not to internal error messages. */
+    IM_LOG_FORCE        = 0x1 << 8,         /* Force output to stderr (Android: logcat), without updating internal error messages. */
+    IM_LOG_DIRECT       = 0x1 << 9,         /* Omit timestamp/thread metadata from stderr output; does not force emission. */
 } IM_LOG_LEVEL;
 
 #define GET_LOG_LEVEL(level) ((level) & IM_LOG_LEVEL_MASK)
 #define LOG_LEVEL_CHECK(level) ((level) >= rga_log_level_get())
+#define IM_LOG_ENABLED(level) \
+    ((rga_log_enable_get() > 0 && LOG_LEVEL_CHECK(level)) || \
+     GET_LOG_LEVEL(level) == IM_LOG_ERROR || ((level) & IM_LOG_FORCE))
 
 #define RGA_LOG_STDERR(_str, ...) \
     do { fprintf(stderr, "librga: " _str, ## __VA_ARGS__); } while(0)
@@ -64,9 +67,7 @@ size_t rga_get_start_time_ms(void);
     do { \
         if (!((level) & IM_LOG_FORCE)) \
             rga_error_msg_set(__VA_ARGS__); \
-        if ((rga_log_enable_get() > 0 && LOG_LEVEL_CHECK(level)) || \
-            GET_LOG_LEVEL(level) == ANDROID_LOG_ERROR || \
-            (level) & IM_LOG_FORCE) \
+        if (IM_LOG_ENABLED(level)) \
             ((void)__android_log_print(GET_LOG_LEVEL(level), LOG_TAG, __VA_ARGS__)); \
     } while(0)
 #define IM_LOGD(_str, ...) IM_LOG(ANDROID_LOG_DEBUG, _str , ## __VA_ARGS__)
@@ -87,9 +88,7 @@ size_t rga_get_start_time_ms(void);
     do { \
         if (!((level) & IM_LOG_FORCE)) \
             rga_error_msg_set(_str, ## __VA_ARGS__); \
-        if ((rga_log_enable_get() > 0 && LOG_LEVEL_CHECK(level)) || \
-            GET_LOG_LEVEL(level) == IM_LOG_ERROR || \
-            (level) & IM_LOG_FORCE) { \
+        if (IM_LOG_ENABLED(level)) { \
             if ((level) & IM_LOG_DIRECT) { \
                 RGA_LOG_STDERR(_str "\n", ## __VA_ARGS__); \
             } else { \
@@ -108,9 +107,7 @@ size_t rga_get_start_time_ms(void);
     do { \
         if (!((level) & IM_LOG_FORCE)) \
             rga_error_msg_set(_str, ## __VA_ARGS__); \
-        if ((rga_log_enable_get() > 0 && LOG_LEVEL_CHECK(level)) || \
-            GET_LOG_LEVEL(level) == IM_LOG_ERROR || \
-            (level) & IM_LOG_FORCE) { \
+        if (IM_LOG_ENABLED(level)) { \
             if ((level) & IM_LOG_DIRECT) {\
                 RGA_LOG_STDERR(_str "\n", ## __VA_ARGS__); \
             } else { \

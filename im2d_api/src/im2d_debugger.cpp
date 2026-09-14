@@ -246,13 +246,13 @@ static void rga_dump_gauss_matrix(int log_level, im_size_t ksize, double *matrix
 
     IM_LOG(log_level, "\t\tkernel_matrix[%p]:\n", matrix);
     for (i = 0; i < ksize.height; i++) {
-        if (rga_log_enable_get() > 0 && LOG_LEVEL_CHECK(log_level))
+        if (IM_LOG_ENABLED(log_level))
             RGA_LOG_STDERR("\t\t\t");
         for (j = 0; j < ksize.width; j++) {
             IM_LOG(log_level, "%.6f ",
                    matrix[i * ksize.width + j]);
         }
-        if (rga_log_enable_get() > 0 && LOG_LEVEL_CHECK(log_level))
+        if (IM_LOG_ENABLED(log_level))
             RGA_LOG_STDERR("\n");
     }
 }

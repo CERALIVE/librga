@@ -306,6 +306,15 @@ unit_macro_logging = executable('unit-macro-logging', 'tests/unit/unit_macro_log
     install : false)
 test('unit-macro-logging', unit_macro_logging, timeout : 30)
 
+# Modified by CeraLive 2026-09-14: cover forced and unforced Gaussian framing.
+unit_gaussian_logging = executable('unit-gaussian-logging', 'tests/unit/unit_gaussian_logging.cpp',
+    include_directories : [incdir, unit_incdir],
+    link_with : golden_librga,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings,
+    install : false)
+test('unit-gaussian-logging', unit_gaussian_logging, timeout : 30)
+
 donor_full_csc = executable('donor-full-csc', 'tests/repro/donor_full_csc.c',
     include_directories : incdir,
     link_with : librga_so,
