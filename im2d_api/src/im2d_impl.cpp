@@ -2555,9 +2555,10 @@ IM_STATUS rga_job_config(im_job_handle_t job_handle, int sync_mode, int acquire_
     config_request.id = job->id;
     config_request.acquire_fence_fd = acquire_fence_fd;
 
-    pthread_mutex_unlock(&g_im2d_job_manager.mutex);
-
+    // Modified by CeraLive 2026-09-14: config borrows job->req until ioctl returns;
+    // cancel/submit must not free it while the driver copies those task bytes.
     ret = ioctl(session->rga_dev_fd, RGA_IOC_REQUEST_CONFIG, &config_request);
+    pthread_mutex_unlock(&g_im2d_job_manager.mutex);
     if (ret < 0) {
         IM_LOGE(" %s(%d) request config fail: %s",__FUNCTION__, __LINE__,strerror(errno));
         return IM_STATUS_FAILED;
