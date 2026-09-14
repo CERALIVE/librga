@@ -4,7 +4,7 @@ golden_dl = meson.get_compiler('c').find_library('dl')
 golden_librga = static_library('rga-golden-host', librga_srcs,
     include_directories : incdir,
     dependencies : [libthreads_dep],
-    cpp_args : ['-w', '-ftrivial-auto-var-init=zero'],
+    cpp_args : ['-ftrivial-auto-var-init=zero'],
     install : false)
 fake_rga = shared_library('fake_rga', 'tests/shim/fake_rga.c',
     include_directories : incdir,

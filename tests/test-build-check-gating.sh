@@ -18,8 +18,13 @@ assert 'run: bash ci/sanitizers-steps.sh' in sanitizers
 assert 'placeholder' not in sanitizers
 summary = workflow.split('  build-check-summary:\n', 1)[1]
 assert 'if: always()' in summary
-for dependency in ('changes', 'resolve-suite', 'build', 'test-results', 'sanitizers'):
+for dependency in ('changes', 'resolve-suite', 'build', 'test-results', 'sanitizers', 'werror'):
     assert f'      - {dependency}\n' in summary, dependency
+werror = workflow.split('  werror:\n', 1)[1].split('  sanitizers:\n', 1)[0]
+assert 'needs: [changes, resolve-suite]' in werror
+assert "if: needs.changes.outputs.code == 'true'" in werror
+assert 'run: bash ci/werror-steps.sh' in werror
+assert 'continue-on-error' not in werror
 assert 'CODE_CHANGED: ${{ needs.changes.outputs.code }}' in summary
 script = textwrap.dedent(summary.split('        run: |\n', 1)[1])
 cases = [

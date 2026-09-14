@@ -318,10 +318,7 @@ jobs:
       # `docker run --rm --platform linux/arm64 -v "$PWD":/src -w /src
       # debian:trixie-slim bash scripts/run-analyzer.sh` reproduces it exactly.
       #
-      # The script configures with `-Danalyzer=true`, which is what drops
-      # meson.build's blanket `-w`. GCC's `-w` sets a global inhibit flag checked
-      # when a diagnostic is emitted, so with it on the command line no
-      # -Wanalyzer-* finding is ever reported no matter where `-fanalyzer` sits.
+      # Normal builds now expose warnings too; analyzer adds -fanalyzer.
       - name: Run the analyzer and reconcile against docs/ANALYZER-TRIAGE.md
         run: bash scripts/run-analyzer.sh
 
@@ -337,8 +334,7 @@ jobs:
             echo "## GCC -fanalyzer — ADVISORY"
             echo
             echo "This job does not gate a merge. It reports what the GCC static"
-            echo "analyzer sees in the library sources, which meson.build's \`-w\`"
-            echo "hides from every other build in this repository. Every finding"
+            echo "analyzer sees in the library sources. Every finding"
             echo "is dispositioned in \`docs/ANALYZER-TRIAGE.md\`; an untriaged one"
             echo "is printed above."
             echo
@@ -352,6 +348,37 @@ jobs:
           name: analyzer-log
           path: test-results/
           if-no-files-found: warn
+
+  werror:
+    name: Werror · fork-owned context and tests · arm64
+    needs: [changes, resolve-suite]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: werror-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: werror-${{ runner.arch }}-
+      - name: Compile owned TUs without suppressions and prove warning rejection
+        run: bash ci/werror-steps.sh
+      - uses: actions/cache/save@v6
+        if: github.event_name != 'pull_request'
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: werror-${{ runner.arch }}-${{ github.sha }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: werror-logs
+          path: test-results/werror/*.txt
+          if-no-files-found: error
 
   sanitizers:
     name: ASan/UBSan + TSan (host shim)
@@ -425,6 +452,7 @@ jobs:
       - build
       - test-results
       - sanitizers
+      - werror
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any dependency failed or was cancelled
