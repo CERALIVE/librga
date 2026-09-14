@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Modified by CeraLive 2026-09-13: protect the merged sanitizer and summary gates.
 # Modified by CeraLive 2026-09-14: exercise project-prefixed Meson suite discovery.
+# Modified by CeraLive 2026-09-14: keep shim preload out of the H10 shell launcher.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 python3 - <<'PY'
 import os
 import json
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -69,4 +71,42 @@ with tempfile.TemporaryDirectory(prefix='suite-discovery-', dir=results_dir) as 
         assert run.returncode == 0, run.stderr
         assert int(run.stdout) == expected, (tests, expected, run.stdout)
 print(f'PASS: sanitizer suite discovery {len(suite_cases)}/{len(suite_cases)} cases')
+
+# Use the registration's actual preload key: checking only the shell would miss
+# Meson injecting LD_PRELOAD before the shell can execute its first statement.
+fragment = Path('tests/meson-fragments/unit.build').read_text()
+assert fragment in Path('meson.build').read_text(), 'generated unit fragment drift'
+preload_keys = re.findall(r"h10_env\.set\('([^']+)', fake_rga\.full_path\(\)\)", fragment)
+assert len(preload_keys) == 1, preload_keys
+launcher = Path('tests/repro/run-h10-case.sh').resolve()
+with tempfile.TemporaryDirectory(prefix='h10-launcher-', dir=results_dir) as directory:
+    scratch = Path(directory).resolve()
+    startup = scratch / 'bash-startup.sh'
+    startup.write_text('[[ ! -v LD_PRELOAD ]] || { printf "shim preloaded into Bash\\n" >&2; exit 91; }\n')
+    log, dump = scratch / 'shim log', scratch / 'shim dump'
+    # libc is a valid preload on both tested architectures; this contract checks
+    # the process boundary. The real H10 binary separately requires the real shim.
+    env = {key: value for key, value in os.environ.items() if key != 'LD_PRELOAD'}
+    env.update({preload_keys[0]: 'libc.so.6', 'BASH_ENV': str(startup),
+                'FAKE_RGA_LOG': str(log), 'FAKE_RGA_DUMP': str(dump),
+                'FAKE_RGA_REIMPORT': 'stale', 'FAKE_RGA_FAIL': 'stale',
+                'ASAN_OPTIONS': 'detect_leaks=1:verify_asan_link_order=0:abort_on_error=1',
+                'UBSAN_OPTIONS': 'print_stacktrace=1:halt_on_error=1',
+                'TSAN_OPTIONS': 'halt_on_error=1:exitcode=66'})
+    log.write_text('stale log')
+    dump.write_bytes(b'stale dump')
+    run = subprocess.run(['bash', str(launcher), '/usr/bin/env'], env=env,
+                         capture_output=True, text=True, timeout=10)
+    assert run.returncode == 0, (run.returncode, run.stderr)
+    child = dict(line.split('=', 1) for line in run.stdout.splitlines() if '=' in line)
+    assert child['LD_PRELOAD'] == 'libc.so.6', child
+    assert 'FAKE_RGA_REIMPORT' not in child and 'FAKE_RGA_FAIL' not in child
+    assert log.read_bytes() == dump.read_bytes() == b''
+    for key in ('ASAN_OPTIONS', 'UBSAN_OPTIONS', 'TSAN_OPTIONS'):
+        assert child[key] == env[key], (key, child)
+    for status in (0, 23, 66):
+        run = subprocess.run(['bash', str(launcher), '/bin/sh', '-c', f'exit {status}'],
+                             env=env, capture_output=True, text=True, timeout=10)
+        assert run.returncode == status, (status, run.returncode, run.stderr)
+print('PASS: H10 preloads only the child; log reset, fault reset, options and exit status preserved')
 PY

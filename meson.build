@@ -371,13 +371,14 @@ foreach api : ['RgaInit', 'improcess']
 endforeach
 
 # Modified by CeraLive 2026-09-14: gate H10 bookkeeping and host-only task lifetime.
+# Modified by CeraLive 2026-09-14: pass the shim inertly through the Bash launcher.
 h10 = executable('h10-job-handle', 'tests/repro/h10_job_handle.cpp',
     include_directories : [incdir, unit_incdir], link_with : librga_so,
     dependencies : [libthreads_dep, golden_dl], cpp_args : unit_warnings,
     install : false)
 foreach scenario : ['count', 'control', 'errors', 'reimport', 'race-1', 'race-2']
     h10_env = environment()
-    h10_env.set('LD_PRELOAD', fake_rga.full_path())
+    h10_env.set('H10_SHIM', fake_rga.full_path())
     h10_env.set('FAKE_RGA_LOG', meson.current_build_dir() / ('h10-' + scenario + '.log'))
     h10_env.set('FAKE_RGA_DUMP', meson.current_build_dir() / ('h10-' + scenario + '.bin'))
     h10_args = [scenario]
