@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Modified by CeraLive 2026-09-14: discover Meson's project-prefixed concurrency suite.
 set -euo pipefail
 
 # The whole of the sanitizers job, in one script, so a developer runs EXACTLY
@@ -168,7 +169,7 @@ step "meson test under TSan (concurrency suite)"
 concurrency_count="$(python3 - <<'PY'
 import json, pathlib
 tests = json.loads(pathlib.Path('build-tsan/meson-info/intro-tests.json').read_text())
-print(sum(1 for t in tests if 'concurrency' in t.get('suite', [])))
+print(sum(1 for t in tests if any(s.endswith(':concurrency') for s in t.get('suite', []))))
 PY
 )"
 if [ "${concurrency_count}" -gt 0 ]; then
