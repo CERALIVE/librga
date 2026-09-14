@@ -2427,6 +2427,7 @@ error_cancel_job:
     return ret;
 }
 
+// Modified by CeraLive 2026-09-14: account only for jobs actually removed.
 IM_STATUS rga_job_cancel(im_job_handle_t job_handle) {
     im_rga_job_t *job = NULL;
     rga_session_t *session;
@@ -2441,9 +2442,8 @@ IM_STATUS rga_job_cancel(im_job_handle_t job_handle) {
     if (job != NULL) {
         rga_map_delete_job(&g_im2d_job_manager.job_map, job_handle);
         free(job);
+        g_im2d_job_manager.job_count--;
     }
-
-    g_im2d_job_manager.job_count--;
 
     pthread_mutex_unlock(&g_im2d_job_manager.mutex);
 
@@ -2556,9 +2556,10 @@ IM_STATUS rga_job_config(im_job_handle_t job_handle, int sync_mode, int acquire_
     config_request.id = job->id;
     config_request.acquire_fence_fd = acquire_fence_fd;
 
-    pthread_mutex_unlock(&g_im2d_job_manager.mutex);
-
+    // Modified by CeraLive 2026-09-14: config borrows job->req until ioctl returns;
+    // cancel/submit must not free it while the driver copies those task bytes.
     ret = ioctl(session->rga_dev_fd, RGA_IOC_REQUEST_CONFIG, &config_request);
+    pthread_mutex_unlock(&g_im2d_job_manager.mutex);
     if (ret < 0) {
         IM_LOGE(" %s(%d) request config fail: %s",__FUNCTION__, __LINE__,strerror(errno));
         return IM_STATUS_FAILED;

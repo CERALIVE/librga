@@ -132,6 +132,28 @@ against the matching build before rebuilding it. The shim models ioctl handling,
 not hardware or driver-side ownership, so a forwarded second release is not
 evidence of a kernel double-free.
 
+### H10 regression gate (todo 38)
+
+The fixes decrement the job count only for a removed job and retain the manager
+mutex through CONFIG's ioctl, so cancel/submit cannot free borrowed task bytes
+before the driver copies them. This serializes other job-manager operations
+during CONFIG; no public structure, return status or message text changes.
+
+`meson test -C build --suite h10 --print-errorlogs` [EXISTS] gates accounting,
+serial lifecycle, CONFIG failure/unlock, driver-owned import reference counting
+and numeric reuse, plus two 2000-iteration config/end-versus-cancel runs. Each
+case resets its own shim log/dump. ASan/UBSan CI runs the H10 suite and TSan
+discovers both races through `concurrency`. All sanitizer evidence is
+**host-shim-only**.
+
+The original `run-h10.sh` characterization command intentionally still exits 1
+for `SECOND-RELEASE-FORWARDED` after the bookkeeping fixes: H10c is **driver-owned,
+not a librga defect**, not a remaining userspace fix. No released-handle
+tombstone is introduced. The opt-in `FAKE_RGA_REIMPORT` shim mode models one
+buffer with reference-counted imports and recycled numeric handle 1; it rejects
+an exhausted release itself. The normal shim behavior and goldens are unchanged.
+See [`docs/fix-audit.d/todo-38.md`](docs/fix-audit.d/todo-38.md) for evidence.
+
 ## Credits
 
 This repository descends from Rockchip's `linux-rga` through JeffyCN's

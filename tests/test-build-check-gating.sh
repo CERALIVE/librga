@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Modified by CeraLive 2026-09-13: protect the merged sanitizer and summary gates.
+# Modified by CeraLive 2026-09-14: exercise project-prefixed Meson suite discovery.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 python3 - <<'PY'
 import os
+import json
 from pathlib import Path
 import subprocess
+import tempfile
 import textwrap
 
 workflow = Path('.github/workflows/build-check.yml').read_text()
@@ -41,4 +44,29 @@ for code, results, expected in cases:
                          env={**os.environ, 'CODE_CHANGED': code, 'RESULTS': results})
     assert (run.returncode == 0) == expected, (code, results, run.stdout, run.stderr)
 print(f'PASS: real sanitizer lane retained; summary gate {len(cases)}/{len(cases)} cases')
+
+# Execute the gate's actual discovery block, not a duplicate of its predicate.
+gate = Path('ci/sanitizers-steps.sh').read_text()
+discovery = gate.split("concurrency_count=\"$(python3 - <<'PY'\n", 1)[1].split('\nPY\n', 1)[0]
+suite_cases = [
+    ([{'suite': ['librga:concurrency']}], 1),
+    ([{'suite': ['librga:h10', 'librga:concurrency']}], 1),
+    ([{'suite': ['other:concurrency', 'librga:concurrency']}], 1),
+    ([{'suite': ['librga:h10']}], 0),
+    ([{'suite': ['librga:not-concurrency', 'librga:concurrency-extra', 'concurrency:h10']}], 0),
+    ([{'suite': []}, {}], 0),
+    ([], 0),
+]
+results_dir = Path('test-results')
+results_dir.mkdir(exist_ok=True)
+with tempfile.TemporaryDirectory(prefix='suite-discovery-', dir=results_dir) as directory:
+    intro = Path(directory) / 'build-tsan/meson-info/intro-tests.json'
+    intro.parent.mkdir(parents=True)
+    for tests, expected in suite_cases:
+        intro.write_text(json.dumps(tests))
+        run = subprocess.run(['python3', '-c', discovery], cwd=directory,
+                             capture_output=True, text=True)
+        assert run.returncode == 0, run.stderr
+        assert int(run.stdout) == expected, (tests, expected, run.stdout)
+print(f'PASS: sanitizer suite discovery {len(suite_cases)}/{len(suite_cases)} cases')
 PY

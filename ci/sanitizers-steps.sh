@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Modified by CeraLive 2026-09-14: discover Meson's project-prefixed concurrency suite.
 set -euo pipefail
 
 # The whole of the sanitizers job, in one script, so a developer runs EXACTLY
@@ -135,9 +136,14 @@ printf 'asan-canary: both runtimes reported under the test configuration\n'
 # `board-*` tests belong to the board harness.
 step "meson test under ASan+UBSan (unit, goldens, shim)"
 ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_TEST_OPTIONS}" \
-	meson test -C build-asan --print-errorlogs \
+	meson test -C build-asan --no-rebuild --print-errorlogs \
 	unit-pure unit-session shim-contract goldens
 cp build-asan/meson-logs/testlog.txt test-results/asan-testlog.txt
+
+step "H10 bookkeeping, error paths, handle reuse and races under ASan+UBSan"
+ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_TEST_OPTIONS}" \
+    meson test -C build-asan --no-rebuild --print-errorlogs --suite h10
+cp build-asan/meson-logs/testlog.txt test-results/asan-h10-testlog.txt
 
 # --- ThreadSanitizer -------------------------------------------------------------
 # Host-only, permanently. TSan cannot be statically linked reliably, so there is
@@ -163,12 +169,12 @@ step "meson test under TSan (concurrency suite)"
 concurrency_count="$(python3 - <<'PY'
 import json, pathlib
 tests = json.loads(pathlib.Path('build-tsan/meson-info/intro-tests.json').read_text())
-print(sum(1 for t in tests if 'concurrency' in t.get('suite', [])))
+print(sum(1 for t in tests if any(s.endswith(':concurrency') for s in t.get('suite', []))))
 PY
 )"
 if [ "${concurrency_count}" -gt 0 ]; then
 	TSAN_OPTIONS='halt_on_error=1:exitcode=66' \
-		meson test -C build-tsan --print-errorlogs --suite concurrency
+		meson test -C build-tsan --no-rebuild --print-errorlogs --suite concurrency
 	cp build-tsan/meson-logs/testlog.txt test-results/tsan-testlog.txt
 	printf 'TSan: %s concurrency test(s) ran\n' "${concurrency_count}"
 else

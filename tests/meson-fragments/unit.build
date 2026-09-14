@@ -90,6 +90,27 @@ foreach api : ['RgaInit', 'improcess']
         env : candidate_a_env, depends : fake_rga, timeout : 120)
 endforeach
 
+# Modified by CeraLive 2026-09-14: gate H10 bookkeeping and host-only task lifetime.
+h10 = executable('h10-job-handle', 'tests/repro/h10_job_handle.cpp',
+    include_directories : [incdir, unit_incdir], link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl], cpp_args : unit_warnings,
+    install : false)
+foreach scenario : ['count', 'control', 'errors', 'reimport', 'race-1', 'race-2']
+    h10_env = environment()
+    h10_env.set('LD_PRELOAD', fake_rga.full_path())
+    h10_env.set('FAKE_RGA_LOG', meson.current_build_dir() / ('h10-' + scenario + '.log'))
+    h10_env.set('FAKE_RGA_DUMP', meson.current_build_dir() / ('h10-' + scenario + '.bin'))
+    h10_args = [scenario]
+    h10_suites = ['h10']
+    if scenario.startswith('race-')
+        h10_args = ['race', '2000']
+        h10_suites += ['concurrency']
+    endif
+    test('h10-' + scenario, find_program('bash'),
+        args : [files('tests/repro/run-h10-case.sh'), h10.full_path()] + h10_args,
+        env : h10_env, depends : [h10, fake_rga], suite : h10_suites, timeout : 60)
+endforeach
+
 candidate_b = executable('candidate-b', 'tests/repro/h2_teardown_race.cpp',
     include_directories : incdir,
     link_with : librga_so,

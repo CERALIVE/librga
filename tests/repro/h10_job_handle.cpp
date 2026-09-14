@@ -139,6 +139,39 @@ static int control_case() {
     return 0;
 }
 
+// Modified by CeraLive 2026-09-14: pin lock release on errors and valid handle reuse.
+static int errors_case() {
+    Buffers buffers;
+    const im_job_handle_t h = buffers.create();
+    require(setenv("FAKE_RGA_FAIL", "RGA_IOC_REQUEST_CONFIG", 1) == 0, "set failure");
+    require(rga_job_config(h, IM_SYNC, -1, nullptr) == IM_STATUS_FAILED, "config error status");
+    require(unsetenv("FAKE_RGA_FAIL") == 0, "clear failure");
+    require(rga_job_config(h, IM_SYNC, -1, nullptr) == IM_STATUS_SUCCESS, "config after error");
+    require(imcancelJob(h) == IM_STATUS_SUCCESS, "cancel after config error");
+    require(imcancelJob(h) == IM_STATUS_SUCCESS, "unchanged repeated cancel status");
+    require(snapshot().count == 0 && snapshot().entries == 0, "error-path accounting");
+    std::puts("H10 errors PASS: config failure unlocks; repeated cancel preserves status/count");
+    return 0;
+}
+
+static int reimport_case() {
+    require(setenv("FAKE_RGA_REIMPORT", "1", 1) == 0, "enable refcount model");
+    char memory[4096] = {};
+    const auto first = importbuffer_virtualaddr(memory, sizeof(memory));
+    const auto second = importbuffer_virtualaddr(memory, sizeof(memory));
+    require(first != 0 && first == second, "same buffer must reuse live handle");
+    require(releasebuffer_handle(first) == IM_STATUS_SUCCESS, "release first import");
+    require(releasebuffer_handle(second) == IM_STATUS_SUCCESS, "release second import");
+    require(releasebuffer_handle(second) == IM_STATUS_FAILED, "driver rejects exhausted refcount");
+    const auto recycled = importbuffer_virtualaddr(memory, sizeof(memory));
+    require(recycled == first, "driver recycles numeric handle");
+    require(releasebuffer_handle(recycled) == IM_STATUS_SUCCESS, "release recycled handle");
+    require(ioctl_count("RGA_IOC_IMPORT_BUFFER") == 3, "all imports forwarded");
+    require(ioctl_count("RGA_IOC_RELEASE_BUFFER") == 4, "all releases forwarded, including driver error");
+    std::puts("H10 reimport PASS: two imports/two releases; exhausted driver refs reject; numeric reuse succeeds");
+    return 0;
+}
+
 static void rendezvous(pthread_barrier_t *barrier) {
     const int ret = pthread_barrier_wait(barrier);
     require(ret == 0 || ret == PTHREAD_BARRIER_SERIAL_THREAD, "barrier wait");
@@ -207,6 +240,8 @@ int main(int argc, char **argv) {
     if (!std::strcmp(argv[1], "count")) return count_case();
     if (!std::strcmp(argv[1], "release")) return release_case();
     if (!std::strcmp(argv[1], "control")) return control_case();
+    if (!std::strcmp(argv[1], "errors")) return errors_case();
+    if (!std::strcmp(argv[1], "reimport")) return reimport_case();
     if (!std::strcmp(argv[1], "race")) {
         char *end = nullptr;
         errno = 0;
