@@ -60,6 +60,14 @@ can be checked rather than asserted:
 | No fix; H2 exit tested at `96c9a53ba94c487f9fae938c73347f5bc00e624d`; library source unchanged from `57a1067a246c71fa6c9a355d1668884fda155dd5` | Same reproducer and driver, `exit(0)` scenario, 200 fresh processes per sanitizer. **ASan/UBSan: 200/200 clean, no finding. TSan: RED, 200/200 reports** involving the singleton's static mutex (invalid mutex, invalid unlock, or destruction/use data race). No timeouts or invalid cases in either complete batch. Same raw result directories and attached output as above. The heap singleton is not automatically deleted; this does not establish a `RockchipRga` destructor/free race. **GREEN: not run; no library fix or two-run GREEN claim.** | host-shim-only; no physical board access | Not run: test-only change; no ABI closure claimed | Not dispatched; no reviewer session id or fix approval claimed | Not reported upstream; characterization of the pinned R1 source, not a production fix |
 | H3: no fix applied; tested R1 source `57a1067a246c71fa6c9a355d1668884fda155dd5` through infrastructure base `96c9a53ba94c487f9fae938c73347f5bc00e624d` | `tests/repro/h3_init_fd_leak.cpp`; RED: `test-results/h3/fdcensus.csv`, `hwversion-improcess.txt` and `hwversion-improcess.interposed.log`; GREEN: not run, no fix in todo 23; unset controls: `test-results/h3/control-fdcensus.csv` | host-shim-only | Not run: nm containment vs R0 and abidiff vs previous release; no library source, headers or build flags changed by this reproducer | Not dispatched; reviewer session id unavailable; this is a pre-fix finding, not a reviewed/landed fix | Unreported; 1.10.6 repeated-open fix is a plan hint only, not verified at a source SHA; no donor attribution or upstream-closure claim |
 | n/a (measurement only — no fix landed) | `tests/repro/h4_getenv_count.cpp`, `tests/repro/run-h4-host.sh` · counts recorded below, no RED/GREEN pair because nothing was changed | `host-shim-only` (board leg **DEFERRED**, see below) | n/a (measurement only — no exported symbol added, removed or changed) | GAP: no independent review dispatched for a measurement-only row | not-applicable (upstream behaviour measured as-is, not modified) |
+| Untouched `57a1067a246c71fa6c9a355d1668884fda155dd5`, measurement only | `tests/board/h4-board.c`: **INVALID**, process exit 139 during calibration, after warmups and before scored samples; no 2,000-sample result or percentage. Crash is not promoted to a library RED. | Rock 5B+, 2026-09-14 UTC; real DMA-BUF and forwarding-only instrumentation; sanitizers **host-shim-only**. OPi not contacted. | n/a — unchanged binary/library | GAP: calibration precondition and independent review unresolved | No fix authorized |
+| Post-fix `5dfe897d206a52f770137e15553c48f84964cf02`, measurement only | Same binary: **2,000 G1 samples**, userspace median/p95/p99 **28.292/31.792/47.834 µs**. Printed percentage **0.423593%**, printed empirical envelope **0.161764217–1.061936370%**, but its inclusive upper-cost calibration is inconsistent; decision **INCONCLUSIVE**, not accepted below-gate evidence. | Rock 5B+ measured, OPi pending; sanitizers **host-shim-only** | n/a — no ABI change | GAP: corrected calibration and independent review required before item 44 / todo 34 | No fix authorized |
+| Radxa package `2.2.0-1` and matched-toolchain R0 rebuild `f4c3ee62ab354c2cbe22718f543fc0ba6e58365c`, separate comparison rows below | 2,000 G1 samples each; raw timings and empirical percentages retained below. These are comparison artifacts, not substitutes for the missing untouched-base row. | Rock 5B+ only; no package installation; sanitizers **host-shim-only** | n/a — not an ABI comparison | GAP: independent review pending | Measurement only |
+| Untouched `57a1067a246c71fa6c9a355d1668884fda155dd5`, follow-up measurement | Corrected calibration client: **2,000 G1 samples**, userspace median/p95/p99 **27.418/30.334/36.168 µs**; matched logging-refresh estimate **0.443840543%**, warmed empirical envelope **0–0.968484686%**. Runtime probe establishes the missing legacy-context precondition. | Rock 5B+ only, 2026-09-14 UTC; sanitizers **host-shim-only** | n/a — library binary unchanged | GAP: independent measurement review pending | Calibration-client defect, not a new library RED |
+| Post-fix `5dfe897d206a52f770137e15553c48f84964cf02`, follow-up measurement | **Three 2,000-frame repeats**; point estimates **0.468938750–0.472452994%**; union of matched-warm empirical envelopes **0–1.893894432%**, all calibration checks valid. **MEASUREMENT-BELOW-GATE for the warmed steady-state protocol only**; cold-inclusive bound remains INCONCLUSIVE. | Rock 5B+ only; OPi pending; sanitizers **host-shim-only** | n/a — library binary unchanged | GAP: independent measurement review pending; no optimization licensed | Item 44 / todo 34 input is scoped below; no general cold-path or cross-board verdict |
+| Untouched `57a1067a246c71fa6c9a355d1668884fda155dd5`; OPi measurement | Existing corrected client, 2,000 G1 frames: userspace median/p95/p99 **26.833/30.332/39.084 µs**; valid matched calibration, estimate **0.494021987%**, warmed envelope **0–1.395794425%**. | Orange Pi 5+, 2026-09-14 UTC; sanitizers **host-shim-only** | n/a — unchanged library and client | GAP: independent measurement review pending | No new library defect or fix |
+| Post-fix `5dfe897d206a52f770137e15553c48f84964cf02`; OPi measurement | Three 2,000-frame repeats, valid calibration: estimates **0.469814269–0.479471490%**, warmed envelope union **0–3.014690673%**. **INCONCLUSIVE**: two repeats cross 2%; do not select only the below-gate repeat. | Orange Pi 5+, 2026-09-14 UTC; sanitizers **host-shim-only** | n/a — no library or ABI change | GAP: independent measurement review pending; todo-34 prerequisite unresolved | No optimization permission |
+| Radxa `2.2.0-1` and R0 rebuild `f4c3ee62ab354c2cbe22718f543fc0ba6e58365c`; OPi comparisons | Original client, 2,000 frames each: userspace median/p95/p99 **26.834/29.458/37.332** and **28.584/30.917/36.458 µs** respectively. Original proxy-calibration estimates are comparison-only, not matched R1 decision inputs. | Orange Pi 5+; isolated libraries, no installation; sanitizers **host-shim-only** | n/a — no ABI comparison | GAP: independent measurement review pending | No fix authorized |
 | H5 (RT-1) `imconfig(IM_CONFIG_SCHEDULER_CORE, IM_SCHEDULER_DEFAULT)` rejected: **RED, no fix landed**. Base `96c9a53ba94c487f9fae938c73347f5bc00e624d` (`integration/1.10.5-ceralive.1`), library source unchanged by this row. Site: `im2d_api/src/im2d.cpp:862-871`; `IM_SCHEDULER_DEFAULT` is `0` (`im2d_api/im2d_type.h:117`) and the setter gates on `value & IM_SCHEDULER_MASK`, so the one documented "let the driver choose" value is the one value it refuses. | `tests/unit/unit_session.cpp` group (f) `check_imconfig_rt1()`. **RED (host, x86_64)**, via `meson setup build-host -Dlibrga_demo=false -Dcpp_args=-fpermissive && meson test -C build-host unit-session --verbose`:<br>`== (f) RT-1 reproducer: imconfig scheduler core ==`<br>`0 536462 536462 E im2d_rga: IM2D: It's not legal rga_core[0x0], it needs to be a 'IM_SCHEDULER_CORE'.`<br>`0 536462 536462 E im2d_rga: IM2D: It's not legal rga_core[0x10], it needs to be a 'IM_SCHEDULER_CORE'.`<br>`0 536462 536462 E im2d_rga: IM2D: It's not legal priority[0x7], it needs to be a 'int', and it should be in the range of 0~6.`<br>`0 536462 536462 E im2d_rga: IM2D: Unsupported config name!`<br>`-- (f) RT-1 reproducer: imconfig scheduler core: 8 assertions --`<br>`unit-session: 85 assertions, 0 failures`<br>**RED (board, aarch64)**, cross-built with `scripts/cross-build-harness.sh`, staged to `/tmp/librga-bench/unit/`, run as `LD_PRELOAD=/tmp/librga-bench/unit/libfake_rga.so ./unit-session`:<br>`rga_api version 1.10.5_[11]`<br>`== (f) RT-1 reproducer: imconfig scheduler core ==`<br>`1 327759 327759 E im2d_rga: IM2D: It's not legal rga_core[0x0], it needs to be a 'IM_SCHEDULER_CORE'.`<br>`1 327759 327759 E im2d_rga: IM2D: It's not legal rga_core[0x10], it needs to be a 'IM_SCHEDULER_CORE'.`<br>`1 327759 327759 E im2d_rga: IM2D: It's not legal priority[0x7], it needs to be a 'int', and it should be in the range of 0~6.`<br>`1 327759 327759 E im2d_rga: IM2D: Unsupported config name!`<br>`-- (f) RT-1 reproducer: imconfig scheduler core: 8 assertions --`<br>`unit-session: 85 assertions, 0 failures`<br>`exit=0`<br>Both legs return `IM_STATUS_ILLEGAL_PARAM` (-4) for value `0`, and `IM_STATUS_SUCCESS` for `IM_SCHEDULER_RGA3_CORE0` / `IM_SCHEDULER_RGA2_CORE1`, so the rejection is specific to the mask gate and not a blanket refusal. **GREEN: none.** The fix is todo 31 (D20); the assertion flips there and nowhere else. | Board drill `h5-rt1-board`, Orange Pi 5+ `192.168.78.151`. Kernel `Linux 7.2.0-ceralive-rk3588 aarch64`, `Debian GNU/Linux 13 (trixie)`, `/dev/rga` present (`crw-rw---- root video 10, 258`). Read-only: one binary plus its preload staged to `/tmp` and removed on exit; no package installed or removed. Board lock and marker taken through `tests/board/lib.sh`. | n/a. No library source changed, so there is no export-set or `abidiff` delta to close. Re-checked at the fix in todo 31. | No independent review dispatched: this row lands no fix, only the RED characterization the fix will have to flip. | not-applicable for this row: nothing is proposed upstream by a RED transcript. The upstream disposition is decided with the todo-31 fix. |
 | H6a · WITHDRAWN · no fix SHA | Positive-success polarity: WITHDRAWN, not tested; no real positive-success submit path exists on the island. | host-shim-only | Not applicable: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not applicable: withdrawn hypothesis |
 | H6b · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C2 · RED 200/200, fd 0 remains open after successful legacy async submit; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
@@ -534,6 +542,273 @@ Both bench boards were unreachable when this leg was written, so it is
 **DEFERRED**, not failed and not skipped-as-unnecessary. It is appended here as
 its own section and its own row when a board is available. The host rows above
 are complete as they stand and do not change when it lands.
+
+## Board preparation — no measurements yet (2026-09-13)
+
+`tests/board/h4-board.c`, `getenv-meter.c` and `run-h4-board.sh` add a separate
+real-DMA-BUF G1 runner, leaving the host reproducer and library unchanged.
+Valgrind is still absent on the development host; the documented skip stays.
+Both boards are occupied and **no board command ran**. Sanitizers: host-shim-only.
+
+Per board it measures Radxa, an R0 source rebuild, untouched `57a1067`, and
+post-fix `5dfe897`, 32 warmups then 2,000 synchronous 3840×2160 NV16→NV12 calls.
+The unchanged forwarding timing shim supplies operation total and individual
+ioctl durations. The reader advances from the warmup file offset after each
+scope, sums its ioctl durations, and never sums duplicated operation totals.
+`perf.csv` has the six required columns; `summary.txt` gives median/p95/p99.
+
+Todo 34's percentage is **debug-property reread cost / userspace-side time**,
+not ioctl fraction and not frame-wall-time fraction. `counts.csv` measures actual
+in-scope debug getenv calls. Thirty-one 100,000-call calibrations measure exported
+`get_int_property` (getenv + parsing) net of a no-op call, and inclusive
+`is_debug_log` as a conservative upper estimate. No environment value is cached,
+changed or suppressed. All getenv calls forward to libc.
+
+Raw denominator is `t_total_us - sum(t_ioctl_us)`. It includes forwarding probe
+overhead, so an observed envelope also allows four times the largest calibrated
+fd-readlink/two-clock cost plus 1 µs per ioctl, and the inclusive debug-call cost
+per measured lookup. This is an **empirical conservative allowance, not a proven
+hard bound**. The lower percentage uses the smallest property cost / largest
+observed userspace sample; the upper uses the largest inclusive debug cost /
+smallest sample minus that allowance. Nonpositive corrected time or an envelope
+crossing 2% gives `INCONCLUSIVE-REPEAT-PROFILE`, never a fix or a below-gate row.
+An envelope wholly below 2% supplies `MEASUREMENT-BELOW-GATE`; one wholly at or
+above supplies the ≥2% decision input. Inspect/repeat noisy or boundary results
+before making the todo 34 decision. Post-fix is the operative decision tree;
+pre-fix records the ordering inversion rather than undoing it.
+
+## Rock execution — timing measured, decision blocked (2026-09-14 UTC)
+
+The original host row and sections above remain unchanged; their deferred/prep
+statements describe the earlier run. Item 43 is **still open**, both for OPi and
+for the incomplete/invalid Rock H4 calibration. Do not use the executable's
+printed `MEASUREMENT-BELOW-GATE` as the accepted post-fix verdict.
+
+32 warmups precede each measured library's 2,000 synchronous 3840×2160 G1 calls.
+Values below are **median / p95 / p99**, in microseconds per frame. Userspace is
+computed per sample as operation total minus the sum of that scope's ioctl
+durations. Quantiles of the separate columns are not subtracted from one another.
+
+| Library / tree | Samples | Total µs/frame | Summed ioctl µs/frame | Userspace µs/frame |
+|---|---:|---|---|---|
+| Radxa `2.2.0-1` | 2,000 | 6974.508 / 7058.803 / 7135.221 | 6952.633 / 7033.427 / 7095.553 | 21.875 / 32.376 / 57.460 |
+| R0 source rebuild `f4c3ee6` | 2,000 | 6412.453 / 7021.177 / 7111.304 | 6383.577 / 6998.718 / 7085.053 | 28.293 / 31.792 / 53.085 |
+| Untouched `57a1067` | 0 scored | INVALID: calibration exit 139 | Warmup rows only | Unmeasured |
+| Post-fix `5dfe897` | 2,000 | 6419.453 / 6513.956 / 7041.011 | 6391.160 / 6480.996 / 7019.719 | 28.292 / 31.792 / 47.834 |
+
+Each completed row counted **two debug getenv calls per operation**. These are
+userspace-side wall-time remainders, including observer overhead, not CPU time.
+
+| Library | Printed estimate | Printed empirical envelope | Interpretation |
+|---|---:|---|---|
+| Radxa | 0.474705% | 0.131370460–0.952478594% | Comparison-only below-gate measurement; not R1 authorization |
+| R0 rebuild | 0.415166% | 0.145913095–1.012919201% | Comparison-only below-gate measurement; not R1 authorization |
+| Untouched `57a1067` | unavailable | unavailable | INVALID: no scored samples |
+| Post-fix `5dfe897` | 0.423593% | 0.161764217–1.061936370% | **INCONCLUSIVE: invalid upper-cost calibration**, not an accepted uncertainty bound |
+
+The post-fix summary's `debug_upper_us=0.051045860` is smaller than
+`property_lower_us=0.059921510`. An alleged inclusive getenv-plus-parse upper
+cost cannot be accepted on this evidence. The calibration calls exported legacy
+`is_debug_log()` directly; the base implementation dereferences legacy `rgaCtx`,
+while post-fix guards a missing context and can return without the property read.
+The base's zero-byte `calibration.csv` after warmup and the post-fix cost inversion
+are consistent with a missing legacy-context precondition. No runtime backtrace
+was available, so that mechanism remains a hypothesis, not a proven crash cause.
+No calibration or tested binary was rebuilt or patched in this execution lane.
+
+**Item 44 / todo 34 input: INCONCLUSIVE.** Repair/validate the calibration and
+repeat the missing base timing before deciding. An envelope crossing 2% must
+likewise remain INCONCLUSIVE; this run grants no fix permission. Valgrind's
+historical host skip is unchanged.
+
+Evidence run `20260914T023538Z-2107123` preserves per-library `h4/` summaries,
+`perf.csv`, `counts.csv`, `calibration.csv`, forwarding `timing.csv`, original
+`h4.exit=139`, and resumed `h4-post.exit=0`. The first unprivileged attempt failed
+DMA-heap access before H4 sampling; sudo was used for the retry without changing
+device permissions or installing libraries. The payload SHA-256 remained
+`aa07266832b924f1a4443c85ceb437cbb9ecef755fcbc8494fa1a04ef3005201` and its
+per-file checksums were verified on the board.
+
+Rebuilt R0/base/post libraries: Debian GCC/G++ 14.2.0-19, aarch64, Meson
+debugoptimized `-O2 -g`, C++14, `-fpermissive`, unstripped, no LTO/sanitizer.
+H4 client: same compiler, GNU C11, `-O2 -g`, unstripped. Radxa: stripped vendor
+binary, compiler/optimization unknown. Cross-library latency differences are
+observations of these artifacts, not an unlike-build ABI or optimization claim.
+
+## Rock calibration repair and repeat (2026-09-14 UTC)
+
+The original rows above remain historical, including their rejected percentages.
+The missing base measurement is now obtained. The old calibration client is not
+safe to reuse unchanged: the execution-only corrected client and its exact build
+inputs are retained with follow-up run `h4-20260914T034918Z-3294944`.
+No library, forwarding timer, getenv meter, or H1/H7/H8 binary was rebuilt.
+
+### Precondition demonstrated, not inferred
+
+| Tree / probe | Before initialization | Direct `RgaInit(void **)` | After initialization |
+|---|---|---|---|
+| Untouched base | `rgaCtx=null`; isolated debug call gets SIGSEGV (11) | returns **1**, context non-null | debug call completes with exactly **1** getenv lookup |
+| Post-fix | `rgaCtx=null`; debug call completes with **0** lookups | returns **1**, context non-null | debug call completes with exactly **1** lookup |
+
+An im2d warmup also leaves the legacy context null. The C `c_RkRgaInit()` stub
+returns 0 without establishing that context; it is not the required precondition.
+Direct init/deinit and the driver-version ioctl use **negative=failure**, not
+nonzero=failure. These details were checked at runtime, and failed client attempts
+remain recorded rather than attributed to the library. The base's original crash
+was an invalid direct calibration call; the post-fix short-circuit explains why
+its old purported inclusive upper cost was below the property-only cost.
+
+### Matched warmed measurements
+
+Each row has 32 G1 warmups and 2,000 scored synchronous 4K G1 operations, pinned
+to CPU 6 without changing clock/governor settings. Values are median / p95 / p99
+in µs/frame. Every scored operation has two counted debug-property lookups and
+one timed ioctl; userspace is computed per sample, never from separate quantiles.
+
+| Tree / repeat | Samples | Total µs/frame | Summed ioctl µs/frame | Userspace µs/frame |
+|---|---:|---|---|---|
+| Base | 2,000 | 6399.034 / 6474.285 / 6689.541 | 6371.470 / 6444.827 / 6664.165 | **27.418 / 30.334 / 36.168** |
+| Post 1 | 2,000 | 6395.096 / 6483.911 / 6716.376 | 6366.950 / 6453.869 / 6684.292 | **28.001 / 31.209 / 38.209** |
+| Post 2 | 2,000 | 6399.471 / 6486.828 / 6706.750 | 6371.325 / 6456.494 / 6677.874 | **28.000 / 31.209 / 41.126** |
+| Post 3 | 2,000 | 6392.325 / 6486.245 / 6781.127 | 6364.033 / 6454.160 / 6750.793 | **27.709 / 30.626 / 37.044** |
+
+Thirty-one rounds measure both exported R1 logging refresh functions together
+(`rga_log_enable_update` plus `rga_log_level_update`), not a single LOG-key proxy
+for both keys. Each round includes inactive/active forwarding-counter batches of
+100,000 calls; active counts must be exactly 100,000 for property/debug calls and
+200,000 for the refresh pair. All batches pass. Debug calibration uses a real,
+owned legacy context; post property lower costs are 0.057078–0.057183 µs, below
+the corresponding inclusive debug maxima 0.083778–0.083970 µs. No inversion remains.
+
+The point estimate is median net refresh-pair cost divided by median userspace
+remainder. The upper numerator is the largest complete active-counter pair cost,
+including parsing and atomic log-state updates. The lower systematic bound is
+**zero**, because forwarding overhead in the numerator has not independently been
+subtracted; a positive observed minimum is not mislabelled a proven lower bound.
+
+Observer cost is measured with the **actual** forwarding timer and read-only
+driver-version ioctls, not an arbitrary multiple of a readlink microbenchmark.
+The observer receives 32 warmups, then 128 scored scopes; all 160 rows remain in
+`observer.csv` (negative indices identify warmups). No scored outlier is removed.
+For each repeat, with `Umin` the smallest G1 userspace remainder, `Qmax` the largest
+scored observer remainder, `Imax` the largest ioctl count, and `Pmax` the largest
+active refresh-pair cost, the upper percentage is
+`100 * Pmax / (Umin - Imax*Qmax - Pmax)`. A nonpositive denominator means infinity.
+Subtracting the entire pair cost also conservatively allows for its counter
+overhead. These are **empirical warmed envelopes, not hard bounds or statistical
+confidence intervals**; the point estimate is instrumented wall-time attribution,
+not a measured optimization speedup or pure CPU time.
+
+| Tree / repeat | Net pair median µs | Point estimate | Empirical envelope | Decision |
+|---|---:|---:|---|---|
+| Base | 0.121692200 | 0.443840543% | 0–0.968484686% | warmed below gate |
+| Post 1 | 0.131334930 | 0.469036570% | 0–1.893894432% | warmed below gate |
+| Post 2 | 0.131302850 | 0.468938750% | 0–1.569395414% | warmed below gate |
+| Post 3 | 0.130912000 | 0.472452994% | 0–1.157708461% | warmed below gate |
+
+**Item 44 / todo 34 Rock input:** approximately **0.469%**, with the three-repeat
+envelope union **0–1.894%**, for the stated warmed steady-state protocol. This
+does not meet the ≥2% prerequisite and grants **no permission to optimize**.
+Do not generalize the result to cold calls: the preceding cold-inclusive observer
+run (`h4-20260914T034622Z-3244767`) had first-scope costs 18.667/18.084 µs and
+nonpositive corrected minimum denominators, giving **0–infinity: INCONCLUSIVE**.
+That result is retained, not silently relabelled below gate. If todo 34 requires
+an unconditioned/cold-path decision, its input remains INCONCLUSIVE. Any new or
+applicable envelope crossing 2% likewise remains INCONCLUSIVE, not fix permission.
+
+Radxa/R0's prior H4 rows stand. They do not export R1's enable-refresh function;
+an attempted optional Radxa matched-pair rerun stopped before samples, and no
+export was fabricated or library rebuilt to make it run. H1 and H8 were not rerun.
+
+The corrected client is Debian GCC 14.2.0-19, GNU C11, `-O2 -g`, unstripped,
+without LTO/sanitizers; SHA-256
+`df866a0725073d89bcbb949d67b6dcff5a711b528ea224d87ec136fab2449767`.
+Probe SHA-256: `353539e37a91141e1010a4451931a3455ac4b1294cebcedd34e73679e70f6618`.
+Library identities are unchanged from the preceding table and were checked by
+payload SHA-256 before execution. Raw timings, counts, calibration, observer
+warmups, probes, failed attempts and exact build commands are retained.
+
+H4 first acquired fresh ownership, then **inherited only this lane's exact retained
+markers** across failed attempts. A collector token did not propagate out of a
+shell command substitution during one resume; collection failed closed, the
+detached runner finished, and its results were retrieved under the exact-owner
+lease without restarting it. Continuous host-descriptor ownership across that
+interval is **not claimed**. The final measurement held both host locks throughout;
+the inherited markers were released at 03:50:26 UTC. RAUC before/after has both
+slots good, B booted/A inactive, attempt budgets 3/3. No reboot, driver operation,
+serial write, package installation, or slot mutation.
+**Item 43 remains OPEN until the separately authorized OPi legs land.**
+
+## OPi execution — calibrated, but decision INCONCLUSIVE (2026-09-14 UTC)
+
+Run `20260914T130553Z-3452424` completes the OPi measurement matrix. The earlier
+pending/deferred statements above are historical. This lane did not contact the
+Rock. It reused, without rebuilding, the corrected client and probe identified
+above for base/post-fix and the original client for Radxa/R0. Both corrected
+artifact digests and all 28 original payload entries were checked on the board.
+The four library build identities and toolchain/optimization/stripped distinctions
+above remain unchanged; no unlike-build optimization or ABI conclusion is drawn.
+
+The OPi reproduces the calibration precondition trap exactly: initially null
+legacy context, base debug call SIGSEGV 11 in the isolated child, post-fix debug
+call returning with **zero** lookups. Direct `RgaInit(void **)` returns **1** and
+establishes the context; both initialized probes then perform exactly one lookup.
+The measurement client also records null context after im2d warmup and non-null
+after direct init. No invalid null-context calibration is used in the R1 figures.
+
+Each row below uses CPU 6, 32 G1 warmups, then **2,000** scored G1 frames.
+Values are median / p95 / p99 in µs/frame. Each scope has two debug lookups and
+one ioctl. Userspace is the per-operation total minus summed ioctl durations,
+not a subtraction of independently computed quantiles and not pure CPU time.
+
+| Library / repeat | Total µs/frame | Summed ioctl µs/frame | Userspace µs/frame |
+|---|---|---|---|
+| Radxa | 6542.005 / 6620.463 / 6745.586 | 6515.172 / 6593.629 / 6717.294 | 26.834 / 29.458 / 37.332 |
+| R0 rebuild | 6528.297 / 6602.380 / 6790.794 | 6499.714 / 6573.213 / 6760.752 | 28.584 / 30.917 / 36.458 |
+| Untouched base | 6542.297 / 6618.129 / 6789.627 | 6515.464 / 6588.962 / 6756.377 | 26.833 / 30.332 / 39.084 |
+| Post 1 | 6535.880 / 6619.587 / 6860.209 | 6508.755 / 6591.587 / 6823.169 | 27.125 / 30.042 / 38.500 |
+| Post 2 | 6550.172 / 6617.546 / 6826.960 | 6522.463 / 6589.255 / 6796.043 | 27.416 / 29.749 / 37.334 |
+| Post 3 | 6529.463 / 6606.462 / 6801.877 | 6502.630 / 6578.171 / 6765.419 | 26.834 / 30.040 / 38.500 |
+
+Base/post use the same matched-refresh-pair and actual read-only ioctl observer
+protocol as the corrected Rock run: 31 inactive and 31 active 100,000-call
+calibration rounds, 32 observer warmups then 128 scored controls, all retained.
+Every active property/debug count is 100,000 and pair count 200,000. All four
+calibration-valid checks pass; there is no inclusive-upper/property-lower inversion.
+Independent offline arithmetic reproduces the estimates/envelopes below.
+
+| Tree / repeat | Net pair median µs | Point estimate | Warmed empirical envelope | Decision |
+|---|---:|---:|---|---|
+| Base | 0.132560920 | 0.494021987% | 0–1.395794425% | warmed below gate |
+| Post 1 | 0.128731380 | 0.474585732% | 0–1.369317579% | warmed below gate |
+| Post 2 | 0.128804280 | 0.469814269% | 0–2.454084260% | **INCONCLUSIVE** |
+| Post 3 | 0.128661380 | 0.479471490% | 0–3.014690673% | **INCONCLUSIVE** |
+
+Post observer maxima are 2.042 / 2.333 / 8.458 µs. The systematic lower bound
+remains zero; the upper uses **all** scored extrema with the formula above.
+No low-denominator frame or high observer sample was discarded. These empirical
+envelopes are not hard bounds or confidence intervals. Repeating until a narrower
+envelope appears would not erase these already measured rows.
+
+Original-client comparison-only estimates: Radxa **0.372682%**, printed envelope
+0.130869766–4.407397858% (**INCONCLUSIVE**); R0 **0.354518%**, printed envelope
+0.180020750–0.910127368%. These use the old property/debug proxy and empirical
+observer allowance, not the matched R1 pair method; their positive lower values
+are not asserted as systematic lower bounds and neither authorizes an R1 fix.
+
+**Item 44 / todo 34 cross-board input: INCONCLUSIVE, no fix permission.** Rock's
+corrected warmed 0–1.894% result stands, but OPi's warmed union reaches 3.015%.
+Rock cold-inclusive remains INCONCLUSIVE; OPi cold-inclusive was not measured.
+Item 43's requirement to supply measurements and a ≥2% decision input is met;
+that is not a claim that the downstream measurement-gated optimization may run.
+If a conclusive todo-34 decision is required, further justified profiling remains
+owed. The historical Valgrind skip is unchanged.
+
+One fresh **OWNED** dual-contract lease covered the entire OPi run, held by the
+detached host collector 13:05:54–13:20:22 UTC, then released normally. No inherited
+marker, collector timeout, library rebuild, installation, driver reload, reboot,
+serial write, camera-setting or service change. B stayed booted, both RAUC slots
+good, budgets 3/3; CeraUI executable/public assets and configuration hashes match.
 
 ## Appendix — h6.md
 

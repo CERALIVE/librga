@@ -71,6 +71,19 @@ build.
 
 ### Wave-E regression checks (R1)
 
+H4 board characterization [EXISTS] lives in `tests/board/h4-board.c` and
+`run-h4-board.sh`. It requires a held board lock and the forwarding timing and
+getenv-count interposers. The percentage method and undecided ≥2% gate are in
+[`docs/fix-audit.d/h4.md`](docs/fix-audit.d/h4.md). Rock follow-up repaired the
+calibration client and measured the untouched base plus three post-fix repeats:
+approximately 0.469%, with a warmed empirical envelope of 0–1.894%. The
+cold-inclusive result remains INCONCLUSIVE; do not generalize the warmed result.
+The original client needs the documented correction before reuse. OPi reused the
+already-built corrected client: three post-fix estimates of 0.470–0.479%, but a
+warmed envelope union of 0–3.015%. The cross-board todo-34 input is therefore
+INCONCLUSIVE; no optimization is authorized. Both-board measurements are complete,
+which is distinct from satisfying the downstream ≥2% prerequisite.
+
 The scheduler default, failed `imsync` wait cleanup, legacy initialization and
 borrowed-last-reference teardown fixes have green Meson regression cases. Long
 host-only runs use `tests/repro/run-candidate-{a,b,c,d}.sh`; build the ASan and
