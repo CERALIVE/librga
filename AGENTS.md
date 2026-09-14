@@ -150,6 +150,12 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+The R1 `werror` CI leg [EXISTS] runs `bash ci/werror-steps.sh` on trixie/arm64.
+It strictly compiles the fork-modified `im2d_context.cpp` and CeraLive test and
+reproducer TUs without suppressions; inherited library TUs outside this scope
+still emit warnings in normal builds. The exact exclusions and warning canaries
+are documented in [`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md).
+
 Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
 It adds direct exported-init coverage to H1 and H3; build both sanitizer trees
 first. Results and the unproven subclaims are in `docs/fix-audit.d/candidate-a.md`.
@@ -265,8 +271,10 @@ in [`docs/SANITIZERS.md`](docs/SANITIZERS.md#h2-concurrent-teardown-probe).
 
 - That the request bytes this library writes for the CeraLive call set are
   unchanged against the recorded goldens.
-- That every ioctl number and every shared struct layout matches the island
-  driver's UAPI at the pinned island tag, on aarch64.
+- That compared ioctl numbers and layouts match the pinned island UAPI on
+  aarch64, except the four exact OSD flag-offset divergences pinned by the
+  comparator. [The OSD limitation](docs/OSD-LAYOUT-LIMITATION.md) is librga-side,
+  unreachable in the current CeraLive call set, and deferred to a major version.
 - That the exported-symbol set of a release contains R0's, and that `abidiff`
   reports no incompatible change against the previous release.
 - On the board, only what the transcript for that run names: the exact package,
