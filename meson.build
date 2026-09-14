@@ -41,13 +41,21 @@ incdir = include_directories(
     'core/3rdparty/libdrm/include/drm',
     'core/3rdparty/android_hal')
 
+# Upstream silences every warning on the library sources. Keep that by default —
+# this tree is imported and re-linting it is merge friction — but let
+# scripts/run-analyzer.sh turn it off. GCC's `-w` is global and order-independent,
+# so with it on the command line NO -Wanalyzer-* diagnostic is ever emitted, no
+# matter where -fanalyzer appears. Dropping it is the only way to run the analyzer
+# through meson at all.
+librga_quiet_args = get_option('analyzer') ? [] : ['-w']
+
 librga = shared_library(
     'rga',
     librga_srcs,
     dependencies : [libthreads_dep],
     include_directories : incdir,
     version : meson.project_version(),
-    cpp_args : ['-w'],
+    cpp_args : librga_quiet_args,
     install : true,
 )
 
@@ -57,7 +65,7 @@ librga = static_library(
     librga_srcs,
     dependencies : [libthreads_dep],
     include_directories : incdir,
-    cpp_args : ['-w'],
+    cpp_args : librga_quiet_args,
     install : true,
 )
 
@@ -285,6 +293,63 @@ unit_session_env = environment()
 unit_session_env.set('LD_PRELOAD', fake_rga.full_path())
 unit_session_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'unit-session-interposed.log')
 test('unit-session', unit_session, env : unit_session_env, depends : fake_rga, timeout : 30)
+
+# Modified by CeraLive 2026-09-06: gate evidence assembly alongside the host tests.
+test('wire-bootstrap', find_program('bash'),
+    args : [meson.current_source_dir() / 'tests/test-wire-bootstrap.sh'], timeout : 30)
+
+# Modified by CeraLive 2026-09-13: promote the fixed scheduler-default probe.
+candidate_c = executable('candidate-c', 'tests/repro/candidate_c_scheduler.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : golden_dl,
+    cpp_args : unit_warnings,
+    install : false)
+test('candidate-c', candidate_c, env : unit_session_env, depends : fake_rga, timeout : 30)
+
+candidate_d = executable('candidate-d', 'tests/repro/h6_polarity_fence.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings + ['-DLINUX=1'],
+    install : false)
+test('candidate-d', candidate_d, args : ['sync-only'],
+    env : unit_session_env, depends : fake_rga, timeout : 30)
+
+candidate_a = executable('candidate-a', 'tests/repro/h1_init_race.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-fpermissive', '-Wno-pedantic'],
+    install : false)
+test('candidate-a-init', candidate_a, args : ['direct-init'],
+    suite : 'concurrency', env : unit_session_env, depends : fake_rga, timeout : 30)
+candidate_a_fds = executable('candidate-a-fds', 'tests/repro/h3_init_fd_leak.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-fpermissive', '-Wno-pedantic'],
+    install : false)
+candidate_a_env = environment()
+candidate_a_env.set('LD_PRELOAD', fake_rga.full_path())
+candidate_a_env.set('FAKE_RGA_FAIL', 'hwversion')
+candidate_a_env.set('FAKE_RGA_ERRNO', '5')
+foreach api : ['RgaInit', 'improcess']
+    test('candidate-a-fds-' + api, candidate_a_fds,
+        args : [api, meson.current_build_dir() / ('candidate-a-' + api + '.csv')],
+        env : candidate_a_env, depends : fake_rga, timeout : 120)
+endforeach
+
+candidate_b = executable('candidate-b', 'tests/repro/h2_teardown_race.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-Wno-pedantic'],
+    install : false)
+foreach scenario : ['deinit', 'exit', 'refcount']
+    test('candidate-b-' + scenario, candidate_b, args : [scenario],
+        suite : 'concurrency', env : unit_session_env, depends : fake_rga, timeout : 30)
+endforeach
 # >>> fragment: board.build
 add_languages('c')
 board_cc = meson.get_compiler('c')

@@ -13,7 +13,34 @@ No unit-pure/unit-session sources exist on this stacked branch.
 
 `QEMU_LD_PREFIX` defaults to `/usr/aarch64-linux-gnu`. This is a build-host sysroot,
 not a promise of board ABI compatibility: use a target-suite-compatible cross
-toolchain before a board run. No static-ASan/runtime preflight is implemented here.
+toolchain before a board run.
+
+## The static-ASan board variant
+
+`bash scripts/cross-build-harness.sh --asan` is a separate leg from the default
+one above: it does not configure Meson at all. It runs one preflight —
+
+```sh
+aarch64-linux-gnu-gcc -print-file-name=libasan.a
+```
+
+— and records the verdict in `build-aarch64/asan/PREFLIGHT.txt`. A bare
+`libasan.a` back means the cross toolchain has no static ASan runtime, so nothing
+can be built that runs on a board without installing one; the leg is recorded
+**NOT-AVAILABLE**, builds nothing, and exits 77. **That is the verdict on the
+current toolchain** (GCC 16.1.0, checked 2026-09-05 — it carries no aarch64
+`libasan`, `libtsan` or `libubsan` at all).
+
+When the preflight passes, the leg compiles `tests/shim/asan-canary.c` and every
+`tests/repro/*.c` with `-fsanitize=address -static-libasan`, then refuses any
+output that still resolves `libasan` dynamically or lacks `__asan_init`.
+`bash scripts/stage-board.sh --asan` reads the recorded verdict, refuses to stage
+on NOT-AVAILABLE, and otherwise copies `build-aarch64/asan/` to
+`/tmp/librga-bench/asan/`. Run `asan-canary` on the board first: a static ASan
+runtime that fails to start there is indistinguishable from a clean run.
+
+TSan has no board leg and never will — it cannot be statically linked reliably.
+Full detail in [`docs/SANITIZERS.md`](../../docs/SANITIZERS.md).
 
 ## Credentials and ownership
 

@@ -1,13 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Modified by CeraLive 2026-09-05: report the QEMU-only invalid-fd ioctl limit. */
+/* Modified by CeraLive 2026-09-05: check H3 aliases, unknown-core response and fd
+ * capacity, plus fence knobs and poll forwarding. */
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/eventfd.h>
 #include <unistd.h>
 #include "rga_ioctl.h"
 #include "qemu_ioctl_limit.h"
@@ -64,6 +68,59 @@ int main(void)
     CHECK(!setenv("FAKE_RGA_RET_RGA_IOC_GET_DRVIER_VERSION", "0", 1));
     CHECK(ioctl(fd, RGA_IOC_GET_DRVIER_VERSION, &v) == 0 && v.revision == 11);
     CHECK(!unsetenv("FAKE_RGA_RET_RGA_IOC_GET_DRVIER_VERSION"));
+    CHECK(!setenv("FAKE_RGA_FAIL", "hwversion", 1));
+    struct rga_hw_versions_t saved_hw = hw;
+    CHECK(ioctl(fd, RGA_IOC_GET_HW_VERSION, &hw) == -1 && errno == EINVAL);
+    CHECK(!memcmp(&saved_hw, &hw, sizeof(hw)));
+    CHECK(ioctl(fd, RGA_IOC_GET_DRVIER_VERSION, &v) == 1);
+    CHECK(!setenv("FAKE_RGA_FAIL", "driverversion", 1));
+    CHECK(ioctl(fd, RGA_IOC_GET_DRVIER_VERSION, &v) == -1 && errno == EINVAL);
+    CHECK(ioctl(fd, RGA2_GET_VERSION, legacy) == 1);
+    CHECK(ioctl(fd, RGA_IOC_GET_HW_VERSION, &hw) == 1);
+    CHECK(!setenv("FAKE_RGA_FAIL", "getinfo", 1));
+    CHECK(ioctl(fd, RGA_IOC_GET_DRVIER_VERSION, &v) == 1);
+    CHECK(ioctl(fd, RGA_IOC_GET_HW_VERSION, &hw) == 1);
+    CHECK(hw.size == 1 && hw.version[0].major == 99 &&
+          hw.version[0].minor == 0 && hw.version[0].revision == 0 &&
+          !strcmp((char *)hw.version[0].str, "99.0.0"));
+    CHECK(!unsetenv("FAKE_RGA_FAIL"));
+    CHECK(ioctl(fd, RGA_IOC_GET_HW_VERSION, &hw) == 1 && hw.size == 3);
+    int census_fds[1000];
+    for (size_t i = 0; i < sizeof(census_fds) / sizeof(census_fds[0]); ++i)
+        CHECK((census_fds[i] = open("/dev/rga", O_RDWR | O_CLOEXEC)) >= 0);
+    for (size_t i = 0; i < sizeof(census_fds) / sizeof(census_fds[0]); ++i)
+        CHECK(!close(census_fds[i]));
+
+    const char *fences[] = {"-1", "0", "42"};
+    for (size_t i = 0; i < sizeof(fences) / sizeof(fences[0]); ++i) {
+        int wanted_fence = atoi(fences[i]);
+        CHECK(!setenv("FAKE_RGA_OUT_FENCE", fences[i], 1));
+        CHECK(ioctl(fd, RGA_BLIT_SYNC, &task) == 0 && task.out_fence_fd == wanted_fence);
+        CHECK(ioctl(fd, RGA_BLIT_ASYNC, &task) == 0 && task.out_fence_fd == wanted_fence);
+        CHECK(ioctl(fd, RGA_IOC_REQUEST_SUBMIT, &request) == 0 &&
+              request.release_fence_fd == (uint32_t)wanted_fence);
+        CHECK(ioctl(fd, RGA_IOC_REQUEST_CONFIG, &request) == 0 &&
+              request.release_fence_fd == (uint32_t)wanted_fence);
+    }
+    CHECK(!setenv("FAKE_RGA_FAIL", "RGA_BLIT_ASYNC", 1));
+    task.out_fence_fd = 99;
+    CHECK(ioctl(fd, RGA_BLIT_ASYNC, &task) == -1 && errno == EINVAL && task.out_fence_fd == 99);
+    CHECK(!unsetenv("FAKE_RGA_FAIL") && !unsetenv("FAKE_RGA_OUT_FENCE"));
+    CHECK(ioctl(fd, RGA_BLIT_ASYNC, &task) == 0 && task.out_fence_fd == -1);
+    CHECK(ioctl(fd, RGA_IOC_REQUEST_CONFIG, &request) == 0 && request.release_fence_fd == (uint32_t)-1);
+
+    int fence_fd = eventfd(1, EFD_CLOEXEC | EFD_NONBLOCK);
+    CHECK(fence_fd >= 0);
+    struct pollfd wait_fd = {.fd = fence_fd, .events = POLLIN};
+    CHECK(poll(&wait_fd, 1, -1) == 1 && (wait_fd.revents & POLLIN));
+    CHECK(!setenv("FAKE_RGA_SYNC_FAIL", "1", 1));
+    CHECK(poll(&wait_fd, 1, -1) == -1 && errno == EIO);
+    CHECK(fcntl(fence_fd, F_GETFD) >= 0);
+    CHECK(poll(&wait_fd, 1, 0) == 1 && (wait_fd.revents & POLLIN));
+    CHECK(poll(NULL, 0, 0) == 0);
+    CHECK(!setenv("FAKE_RGA_SYNC_FAIL", "0", 1));
+    CHECK(poll(&wait_fd, 1, -1) == 1 && (wait_fd.revents & POLLIN));
+    CHECK(!unsetenv("FAKE_RGA_SYNC_FAIL") && !close(fence_fd));
     char dump_path[] = "shim-bytes-XXXXXX";
     int dump_fd = mkstemp(dump_path);
     CHECK(dump_fd >= 0 && !setenv("FAKE_RGA_DUMP", dump_path, 1));

@@ -10,7 +10,11 @@ rgaImDemo
 build/
 build-aarch64/
 build-aarch64-source/
+build-analyzer/
+build-asan/
+build-h9-repro/
 build-host/
+build-tsan/
 build-cross.log
 build_linux/
 build_android_ndk/
@@ -23,3 +27,6 @@ build-deb-*/
 install-deb-*/
 stage-deb-*/
 dist/
+
+# scripts/run-analyzer.sh and ci/sanitizers-steps.sh captured output
+test-results/

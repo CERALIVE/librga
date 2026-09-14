@@ -24,3 +24,60 @@ unit_session_env = environment()
 unit_session_env.set('LD_PRELOAD', fake_rga.full_path())
 unit_session_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'unit-session-interposed.log')
 test('unit-session', unit_session, env : unit_session_env, depends : fake_rga, timeout : 30)
+
+# Modified by CeraLive 2026-09-06: gate evidence assembly alongside the host tests.
+test('wire-bootstrap', find_program('bash'),
+    args : [meson.current_source_dir() / 'tests/test-wire-bootstrap.sh'], timeout : 30)
+
+# Modified by CeraLive 2026-09-13: promote the fixed scheduler-default probe.
+candidate_c = executable('candidate-c', 'tests/repro/candidate_c_scheduler.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : golden_dl,
+    cpp_args : unit_warnings,
+    install : false)
+test('candidate-c', candidate_c, env : unit_session_env, depends : fake_rga, timeout : 30)
+
+candidate_d = executable('candidate-d', 'tests/repro/h6_polarity_fence.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : unit_warnings + ['-DLINUX=1'],
+    install : false)
+test('candidate-d', candidate_d, args : ['sync-only'],
+    env : unit_session_env, depends : fake_rga, timeout : 30)
+
+candidate_a = executable('candidate-a', 'tests/repro/h1_init_race.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-fpermissive', '-Wno-pedantic'],
+    install : false)
+test('candidate-a-init', candidate_a, args : ['direct-init'],
+    suite : 'concurrency', env : unit_session_env, depends : fake_rga, timeout : 30)
+candidate_a_fds = executable('candidate-a-fds', 'tests/repro/h3_init_fd_leak.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-fpermissive', '-Wno-pedantic'],
+    install : false)
+candidate_a_env = environment()
+candidate_a_env.set('LD_PRELOAD', fake_rga.full_path())
+candidate_a_env.set('FAKE_RGA_FAIL', 'hwversion')
+candidate_a_env.set('FAKE_RGA_ERRNO', '5')
+foreach api : ['RgaInit', 'improcess']
+    test('candidate-a-fds-' + api, candidate_a_fds,
+        args : [api, meson.current_build_dir() / ('candidate-a-' + api + '.csv')],
+        env : candidate_a_env, depends : fake_rga, timeout : 120)
+endforeach
+
+candidate_b = executable('candidate-b', 'tests/repro/h2_teardown_race.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    cpp_args : ['-DLINUX=1', '-Wno-pedantic'],
+    install : false)
+foreach scenario : ['deinit', 'exit', 'refcount']
+    test('candidate-b-' + scenario, candidate_b, args : [scenario],
+        suite : 'concurrency', env : unit_session_env, depends : fake_rga, timeout : 30)
+endforeach

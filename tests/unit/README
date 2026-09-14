@@ -52,11 +52,11 @@ get_bpp_from_format() and get_perPixel_stride_from_format() cannot report
 failure -- an unmapped format returns 0 after a printf, indistinguishable from a
 legitimate zero. That is asserted and marked "KNOWN: validation gap".
 
-The (f) assertion expects IM_STATUS_ILLEGAL_PARAM. IM_SCHEDULER_DEFAULT is 0 and
-imconfig() gates on "value & IM_SCHEDULER_MASK", so the documented "let the
-driver choose" value is the one value the setter refuses. That is the RT-1 bug.
-The assertion flips to a success expectation in the D20 fix todo and NOWHERE
-ELSE; do not soften it in the meantime.
+The (f) assertion now expects IM_STATUS_SUCCESS for IM_SCHEDULER_DEFAULT (0).
+Wave-E candidate C is the authorized RT-1 validation fix: the documented "let
+the driver choose" value must succeed. All explicit-core, unsupported-bit,
+priority and unknown-config controls remain. The separate candidate-c test
+also requires resetting an explicit core back to the default to succeed.
 
 The shim declares a three-core RK3588-shaped device, so the resolution and
 scale limits in (b) are the MERGED multi-core table (8192 input, 8128 output,

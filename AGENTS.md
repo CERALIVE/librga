@@ -43,6 +43,8 @@ Two releases exist, versioned upstream-style rather than CalVer:
 | Import coordinate, licence census, credits | `docs/PROVENANCE.md` |
 | API usability traps every caller trips over | `docs/API-TRAPS.md` |
 | Per-fix evidence ledger | `docs/fix-audit.md` |
+| Sanitizer/analyzer recipes and their proof boundary | `docs/SANITIZERS.md` |
+| Disposition of every `-Wanalyzer-*` finding | `docs/ANALYZER-TRIAGE.md` |
 | Debian package build and contract | `packaging/` |
 | Island-UAPI parity, host shim, goldens, unit tests | `tests/` |
 | Board-gated drills | `tests/board/` |
@@ -72,6 +74,13 @@ a squash collapses the whole PR into one new commit and destroys the per-fix
 history those tiers exist to keep. The same rule covers upstream-sync PRs: a
 squash discards the second parent, the merge-base stops advancing, and every
 later sync replays already-merged commits as phantom conflicts.
+
+`integration/1.10.5-ceralive.1` is integrated by **merge, never rebase**. It carries
+eight two-parent Wave-D investigation merges; rebasing linearizes that history
+and replays conflicts in `tests/shim/contract.c` and `tests/shim/fake_rga.c` that
+were already resolved by union. Do not apply the generic pre-work rebase rule to
+this branch. The fix-audit structural repair is authorized directly on
+`0011d44f074508dd5d8533a77496a593211b9e85`, without any pre-work branch sync.
 
 No commit in this repository may carry a `Co-authored-by:` trailer or any AI or
 tool attribution. Such trailers are **forbidden**. A clean cherry-pick's
@@ -141,11 +150,47 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
+It adds direct exported-init coverage to H1 and H3; build both sanitizer trees
+first. Results and the unproven subclaims are in `docs/fix-audit.d/candidate-a.md`.
+Exit 1 records a finding; Wave E promotes its fixed cases as described below.
+
+Candidate B's host-only R1 probe [EXISTS], `tests/repro/run-candidate-b.sh`,
+runs H2 with an additional owned-reference control after both sanitizer trees
+are built. Its RED findings and ownership limits are recorded in
+`docs/fix-audit.d/candidate-b.md`; Wave-E results are in `docs/fix-audit.d/wave-e-b.md`.
+
+Candidate C's scheduler-default assertion [EXISTS] is
+`bash tests/repro/run-candidate-c.sh`. It uses the existing unit helper but
+expects legitimate zero input to succeed, separately from H5's
+unchanged characterization assertions. Evidence: `docs/fix-audit.d/candidate-c.md`.
+
+Candidate D's isolated H6/C4 mode [EXISTS] is
+`bash tests/repro/run-candidate-d.sh`, after the ASan tree is built. It keeps
+the default H6 cases unchanged and measures only positive-fd `imsync` wait-error
+cleanup under host instrumentation; see `docs/fix-audit.d/candidate-d.md`.
+
+Candidates A–D were expected-RED characterization probes on the pre-fix R1 base.
+Wave E promotes the fixed cases into Meson; the canary-verified repeated-process
+runners remain explicit host-only QA and now expect exit 0. Exit 1 still means a
+finding, never an expected-pass inversion. The historical combined R1 run is in
+[`docs/fix-audit.d/r1-consolidation.md`](docs/fix-audit.d/r1-consolidation.md).
+
 Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
 It preserves the shared-library alias before the static-library reassignment and
 appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
 after editing a fragment; a second invocation changes nothing. It also assembles
-the fix-audit rows from `docs/fix-audit.d/*.md` beneath the existing six-field schema.
+`docs/fix-audit.d/*.md` into one continuous six-field D21 table in
+`docs/fix-audit.md`, with verbatim supporting prose in fragment-labelled appendices.
+Fragments may begin with bare D21 rows or introduce them with the canonical D21
+header. Duplicate ledger headers/separators are omitted from the generated file;
+the source fragments remain unchanged. Subsidiary tables, fenced transcripts and
+comments stay with the prose, not in the ledger. Malformed D21 rows fail assembly
+without overwriting the ledger. Edit evidence in the fragments, then regenerate;
+do not hand-edit the generated table or appendices. The generator migrates the
+historical introduction to distinguish upstream characterization from fix evidence.
+`bash tests/test-wire-bootstrap.sh` checks preservation, structure and idempotency
+in an isolated repo-local fixture; it also runs as the Meson `wire-bootstrap` test.
 
 Two environments, and they prove different things. Keeping them apart is the
 point of this section.
@@ -154,10 +199,67 @@ QEMU user-mode has a measured invalid-fd RGA ioctl limitation, not a shim bug.
 The two narrowly scoped, opt-in emulation skips and native mandatory coverage
 are documented in [`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md).
 
+H6 fence ownership reproduction [EXISTS] runs separately from the green baseline
+suite: `bash tests/repro/run-h6.sh` builds the unchanged shared library and runs
+200 iterations each of C2/C3/C4, with controls and fd census under
+`test-results/h6/`. Exit 1 records RED, not a harness success hidden as a green
+test. H6a is WITHDRAWN because no real positive-success submit path exists on
+the island. The test-only fence/poll knobs are documented in
+[`tests/golden/README`](tests/golden/README); the findings are in
+[`docs/fix-audit.d/h6.md`](docs/fix-audit.d/h6.md). No hardware or sanitizer
+coverage is claimed by this reproducer.
+
 | Environment | What runs there |
 |---|---|
 | **Host shim** | Island-UAPI parity gate (struct sizes, member offsets, ioctl numbers against the island's pinned `rga.h`), request-byte goldens, hardware-independent unit tests, TSan/ASan/UBSan legs, GCC-14 `-fanalyzer`, `nm` containment and `abidiff`. |
 | **Board** | Package install/removal, library-level PSNR and colour oracle, DMA-BUF behaviour, fd census, and the A/B rows against the Radxa package. Both boards: Orange Pi 5+ and Rock 5B+. |
+
+The sanitizer and analyzer recipes, the flags that are load-bearing, the canaries
+that prove a runtime is intercepting rather than merely linked, and the discovery
+contracts a new reproducer registers itself through are in
+[`docs/SANITIZERS.md`](docs/SANITIZERS.md). Every `-Wanalyzer-*` finding carries a
+disposition in [`docs/ANALYZER-TRIAGE.md`](docs/ANALYZER-TRIAGE.md).
+
+Release-export comparisons must use matched shipping compiler/flags. The Wave-E
+GCC 16 debug-vs-GCC 14 release comparison's three extra missing weak `std::`
+symbols were measurement artifacts; the shipping comparison has exactly the 18
+documented upstream removals and no Wave-E removal. See
+[`docs/fix-audit.d/wave-e-abi-reconciliation.md`](docs/fix-audit.d/wave-e-abi-reconciliation.md).
+This does not waive the strict R0 superset contract or expand its recorded delta.
+The main-merge gating contract is `bash tests/test-build-check-gating.sh`, also
+run by `ci/build-check-steps.sh`: real sanitizer coverage must survive docs-only
+gating, and skipped code lanes must fail the terminal summary.
+
+Candidate C's scheduler-default regression [EXISTS] is now the green Meson
+`candidate-c` test, linked against the ordinary shared library. `imconfig` accepts
+the documented zero default as well as every previously accepted scheduler value;
+no default or public signature changes. Historical RED evidence remains in the ledger.
+
+Candidate D's `imsync` wait-error regression [EXISTS] is the green Meson
+`candidate-d` test (`h6_polarity_fence.cpp sync-only`). Positive fences are consumed
+on success and wait failure; the existing `fence_fd <= 0` rejection is unchanged.
+The full H6 characterization remains opt-in because its other rows are not fixed.
+
+Candidate A's direct-init and hardware-version-failure regressions [EXISTS] are
+green Meson tests (`candidate-a-init` in `concurrency`, plus one fd census per
+API). Context creation and publication share the legacy mutex; refcount operations
+are atomic without changing the exported integer's storage or type. Failed legacy
+and im2d initialization closes its device fd. `run-candidate-a.sh 200` runs the
+long host-only race acceptance batch; the default remains 20 fresh processes.
+
+Candidate B's borrowed-last-reference and process-exit regressions [EXISTS] are
+green Meson `concurrency` tests, alongside the unchanged owned-reference control.
+Final legacy close rejects new operations, drains active operations, then closes
+and frees under the context mutex. The already process-lifetime Linux singleton
+now uses a process-lifetime lookup mutex; the old static lock stays exported for
+ABI compatibility but is unused by lookup. No singleton destructor is newly run.
+This fixes the demonstrated borrowed-reference/exit patterns, not a refcounting
+defect in the passing owned-reference path. Full batches: `run-candidate-b.sh`.
+
+The manual H2 teardown probe [EXISTS] is `tests/repro/run-h2.sh`: 200 fresh
+processes per scenario and sanitizer, with its six-field ledger fragment in
+`docs/fix-audit.d/h2.md`. Invocation and diagnostic-output settings are documented
+in [`docs/SANITIZERS.md`](docs/SANITIZERS.md#h2-concurrent-teardown-probe).
 
 ### The suite proves
 
@@ -177,6 +279,14 @@ are documented in [`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md).
   ASan and UBSan. No board drill claims sanitizer coverage, and no ledger row may
   imply one. A host-shim sanitizer report is evidence about the shim's model of
   the driver, not about silicon.
+  TSan is host-only **permanently** — it cannot be statically linked reliably, so
+  no board-side equivalent can exist. ASan *could* reach a board via
+  `-static-libasan`, and `scripts/cross-build-harness.sh --asan` gates that on a
+  preflight. As of 2026-09-05 the verdict is **NOT-AVAILABLE**:
+  `aarch64-linux-gnu-gcc -print-file-name=libasan.a` echoes the bare name, so the
+  cross toolchain carries no static ASan runtime and the board-ASan leg does not
+  exist. Reproducer rows record `host-shim-only` until a toolchain that has it is
+  in use.
 - That the host shim reproduces RGA hardware. It models ioctl return values; it
   does not execute a blit, does not produce pixels, and cannot detect a
   hardware-side correctness fault.

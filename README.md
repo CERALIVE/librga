@@ -69,10 +69,58 @@ The upstream `debian/` directory in this tree is JeffyCN's. It is kept
 byte-for-byte and is **never invoked** — no debhelper is involved in a CeraLive
 build.
 
+### Wave-E regression checks (R1)
+
+The scheduler default, failed `imsync` wait cleanup, legacy initialization and
+borrowed-last-reference teardown fixes have green Meson regression cases. Long
+host-only runs use `tests/repro/run-candidate-{a,b,c,d}.sh`; build the ASan and
+TSan trees first with `scripts/build-sanitized.sh`. The owned-reference teardown
+control remains unchanged. The Linux singleton and its active lookup mutex both
+live until process termination; final context release drains in-flight operations.
+
+These fixes are not release approval. Fresh evidence and the separate R0 ABI
+closure finding are in [`docs/fix-audit.d/wave-e-verification.md`](docs/fix-audit.d/wave-e-verification.md).
+The [matched-build reconciliation](docs/fix-audit.d/wave-e-abi-reconciliation.md)
+corrects the initial unlike-toolchain comparison: 18 inherited removals, no
+shipping-build or Wave-E removals. Strict numeric R0 containment is not waived.
+
 Before reaching for the im2d API, read
 [`docs/API-TRAPS.md`](docs/API-TRAPS.md). It documents the argument-unit and
 status-code surprises that this library's callers hit first, and most of them are
 silent.
+
+The host-only H3 initialization-failure census is [EXISTS]: run
+`bash tests/repro/run-h3.sh` to build the unchanged shared library and measure
+1,000 calls per API/fault pair. Exit 1 means a reproduced leak, not a harness
+failure. Results, caveats and the shim fault mappings are recorded in
+[`docs/fix-audit.d/h3.md`](docs/fix-audit.d/h3.md).
+
+### Job and buffer-handle QA (H10)
+
+The host-only bookkeeping reproducer is available separately from the normal
+passing test suite:
+
+```bash
+bash tests/repro/run-h10.sh asan
+bash tests/repro/run-h10.sh tsan
+```
+
+Each command builds through the existing sanitizer recipe, checks its runtime
+canary, and runs unknown-job cancellation, concurrent config/end versus cancel,
+and repeated buffer release against the unchanged fake device. Serial lifecycle
+controls run first. Exit `1` means an observed finding, `2` means an invalid run,
+and `0` means no finding in that finite run. These are characterization runs, not
+expected-pass CI tests. They do not change the library or access a board.
+
+Fresh logs and request dumps go under `test-results/h10/`; the
+[H10 audit fragment](docs/fix-audit.d/h10.md) records the measured results and their
+limits. Race runs request 2000 iterations twice, but halt on the first sanitizer
+finding; an early report is not a completed 2000-iteration run. Reports keep raw
+module offsets (`symbolize=0`), because online symbolization stalled under the
+preloaded shim on the QA host. Resolve those offsets offline with `addr2line`
+against the matching build before rebuilding it. The shim models ioctl handling,
+not hardware or driver-side ownership, so a forwarded second release is not
+evidence of a kernel double-free.
 
 ## Credits
 
@@ -247,4 +295,3 @@ $ ./meson.sh
   [RGA_FAQ【中文】](docs/Rockchip_FAQ_RGA_CN.md)
 
   [RGA_FAQ【英文】](docs/Rockchip_FAQ_RGA_EN.md)
-

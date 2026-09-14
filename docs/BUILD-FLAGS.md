@@ -194,6 +194,24 @@ mangled name. Each is listed with its reason in
 `packaging/baseline-symbols-upstream-delta.txt`, and none is reachable from an
 installed header — which is what the contract's first, unconditional tier checks.
 
+### Release-export comparison correction (Wave E)
+
+The initial Wave-E comparison reported 21 missing exports because it compared
+published GCC/libstdc++ 14 `-O2` R0 against a GCC/libstdc++ 16 `-O0` R1 debug ELF.
+Rebuilding R1 with the unmodified shipping configuration yields exactly the
+18 documented names above, with no residuals. The extra three were weak `std::`
+emissions: `ctype<char>::do_widen` and `basic_string::_M_replace_cold` vary with
+optimization; the named `_Hashtable::clear` specialization varies with the
+compiler/libstdc++ version. Stripping leaves the dynamic set unchanged, and
+`nm -D` agrees with `readelf --dyn-syms`.
+
+The controlled matrix, exact mangled names, package provenance and unfiltered
+abidiff are in [the reconciliation record](fix-audit.d/wave-e-abi-reconciliation.md).
+No allowance was expanded from 18 to 21, and no shipping flag was changed.
+Strict numeric R0 containment still fails on the 18 inherited names, not on a
+CeraLive-introduced removal. Use matched shipping configurations when comparing
+release exports; debug/sanitizer builds are not release artifacts.
+
 ## Reproducibility
 
 `SOURCE_DATE_EPOCH` is the commit date of the last commit touching a **packaged
