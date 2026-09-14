@@ -135,9 +135,14 @@ printf 'asan-canary: both runtimes reported under the test configuration\n'
 # `board-*` tests belong to the board harness.
 step "meson test under ASan+UBSan (unit, goldens, shim)"
 ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_TEST_OPTIONS}" \
-	meson test -C build-asan --print-errorlogs \
+	meson test -C build-asan --no-rebuild --print-errorlogs \
 	unit-pure unit-session shim-contract goldens
 cp build-asan/meson-logs/testlog.txt test-results/asan-testlog.txt
+
+step "H10 bookkeeping, error paths, handle reuse and races under ASan+UBSan"
+ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_TEST_OPTIONS}" \
+    meson test -C build-asan --no-rebuild --print-errorlogs --suite h10
+cp build-asan/meson-logs/testlog.txt test-results/asan-h10-testlog.txt
 
 # --- ThreadSanitizer -------------------------------------------------------------
 # Host-only, permanently. TSan cannot be statically linked reliably, so there is
@@ -168,7 +173,7 @@ PY
 )"
 if [ "${concurrency_count}" -gt 0 ]; then
 	TSAN_OPTIONS='halt_on_error=1:exitcode=66' \
-		meson test -C build-tsan --print-errorlogs --suite concurrency
+		meson test -C build-tsan --no-rebuild --print-errorlogs --suite concurrency
 	cp build-tsan/meson-logs/testlog.txt test-results/tsan-testlog.txt
 	printf 'TSan: %s concurrency test(s) ran\n' "${concurrency_count}"
 else
