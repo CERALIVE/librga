@@ -15,9 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: route C macro diagnostics to stderr with context.
 #ifndef _im2d_common_h_
 #define _im2d_common_h_
 
+#include <stdio.h>
 #include "im2d_type.h"
 
 /**
@@ -56,7 +58,7 @@ IM_EXPORT_API const char* querystring(int name);
             im2d_api_err = imStrError_t((IM_STATUS)__args[0]); \
         } else { \
             im2d_api_err = ("Fatal error, imStrError() too many parameters\n"); \
-            printf("Fatal error, imStrError() too many parameters\n"); \
+            fprintf(stderr, "librga: Fatal error, imStrError() too many parameters\n"); \
         } \
         im2d_api_err; \
     })
@@ -102,7 +104,7 @@ IM_API IM_STATUS imcheckHeader(im_api_version_t header_version = RGA_CURRENT_API
             __ret = imcheck_t(src, dst, __pat, src_rect, dst_rect, __pat_rect, __args[0]); \
         } else { \
             __ret = IM_STATUS_FAILED; \
-            printf("check failed\n"); \
+            fprintf(stderr, "librga: check failed\n"); \
         } \
         __ret; \
     })
@@ -117,7 +119,7 @@ IM_API IM_STATUS imcheckHeader(im_api_version_t header_version = RGA_CURRENT_API
             __ret = imcheck_t(src, dst, pat, src_rect, dst_rect, pat_rect, __args[0]); \
         } else { \
             __ret = IM_STATUS_FAILED; \
-            printf("check failed\n"); \
+            fprintf(stderr, "librga: check failed\n"); \
         } \
         __ret; \
     })

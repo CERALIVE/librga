@@ -68,6 +68,7 @@ can be checked rather than asserted:
 | H6d · R1 base `57a1067a246c71fa6c9a355d1668884fda155dd5` · no fix SHA | `tests/repro/h6_polarity_fence.cpp` C4 · RED 200/200, `imsync` returns failure without closing fd 10; `test-results/h6/iterations.csv` · GREEN not run, no fix | host-shim-only | Not run: no library change | Not dispatched: reproducer-only task, no fix approval claimed | Not reported; downstream reproduction only |
 | none — no fix landed | `tests/repro/h9_address.cpp` · **NOT-REPRODUCED** on `96c9a53ba94c487f9fae938c73347f5bc00e624d`: a buffer pinned at `0x7f0000012340` arrived in the request bytes as the full 64-bit value, not truncated · no GREEN, because there is no RED | `host-shim-only` | not applicable — no code change, so no export-set or `abidiff` delta | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
 | none — no fix landed | `tests/repro/h9_stdout.cpp` · **REPRODUCED**: with fd 1 redirected to a pipe, the library wrote 87 bytes of error text to stdout when `/dev/rga` was unavailable, and 28 bytes of version banner when it was · no GREEN, because no fix was written | `host-shim-only` | not applicable — no code change | not dispatched: a finding row with no fix has nothing to review | not-applicable — nothing reported upstream |
+| `e5f3fc0` todo 36 fix | **RED:** `tests/repro/run-h9.sh` on R1 base `f04a90e95c5018b693f267a9dcdd445c20ec6e3a` captures 89 bytes of failed-open diagnostics and 28 bytes of version banner on stdout. **GREEN:** the same reproducer captures **0 bytes** on stdout in both paths; `tests/unit/unit_logging.cpp` verifies empty stdout plus original error/banner substrings and `librga:` context on stderr in no-device and fake-device runs; `tests/unit/unit_macro_logging.c` covers the public C macro diagnostics. | host-shim-only | `abidiff` of matched arm64 Trixie R1-base and `e5f3fc0` `librga.so.2.1.0`: clean exit, no removed or changed exported symbol | **APPROVE** — independent `gpt-5.6-luna` review, session `ses_f5fa60204ffeFk8z6ioIjQOQzY` | Not reported upstream; review determines a source contribution path |
 | Wave-E A; first-party initialization fix; commit resolved by `git log --format=%H --grep='fix(init): serialize context publication and unwind failed opens'` | `tests/repro/run-candidate-a.sh`: RED direct-init 20/20 TSan and 1000/1000 leaked fds per API; GREEN same command, then 200 processes per scenario twice; transcripts below; fresh takeover run in `wave-e-verification.md` | host-shim-only | No removal or incompatible change vs pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent full-series review pending; not approved for merge | Downstream-only: initialization ownership repair; not yet submitted upstream |
 | Wave-E B; first-party teardown fix; commit resolved by `git log --format=%H --grep='fix(lifetime): drain active operations before final context release'` | `tests/repro/run-candidate-b.sh`: fresh RED on `1bde9018`, GREEN with active-operation draining and process-lifetime lookup lock; transcripts below | host-shim-only; no board claim | No removal or incompatible change against pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent review pending; no approval or reviewer session id; NOT approved for merge | Downstream-only: borrowed-last-reference and exit-time lock lifetime repair; not submitted upstream |
 | Wave-E C; first-party scheduler-default fix on `1bde9018d28092879978419f8e48f2b88debcbaa`; commit resolved by `git log --format=%H --grep='fix(imconfig): accept the documented default scheduler'` | `tests/repro/run-candidate-c.sh`: RED 2/5 assertions, GREEN 0/5 failures; transcripts below; fresh takeover and unit-session expectation migration in `wave-e-verification.md` | host-shim-only | No removal or incompatible change vs pre-fix R1; strict R0 closure BLOCKED by pre-existing removals, see `wave-e-verification.md` | Independent full-series review pending; not approved for merge | Downstream-only: documented enum acceptance; not yet submitted upstream |
@@ -817,6 +818,22 @@ here. Changing the log sink is a behaviour change for every caller and collides
 directly with the frozen-defaults rule in `AGENTS.md`. It is recorded so the
 consumer side knows that a process which captures librga's stdout will find
 library text mixed into it.
+
+## Todo 36 — stderr with context
+
+The R1-base run above is the RED transcript. It captures 89 bytes of the
+unchanged failed-open message on stdout without the shim and 28 bytes of the
+unchanged version banner with the shim. The fix routes library diagnostics to
+stderr, prefixes them with `librga:`, preserves the existing message text as a
+substring, and leaves `IM_STATUS` values unchanged. The Meson `unit-logging`
+tests run both paths: no device proves the error still prints even when logging
+is otherwise disabled; the fake device proves the initialization banner no
+longer reaches stdout. The GREEN `run-h9.sh` transcript captures zero stdout
+bytes in both paths. A matched arm64 Trixie `abidiff` against the R1 base exits
+cleanly with no removed or changed exported symbol. The C macro regression covers
+the public header paths that previously emitted invalid-argument diagnostics to
+stdout. Android's existing logcat sink did not use stdout and remains unchanged;
+the carried stderr requirement applies to the Linux/RT stdout implementations.
 
 ## Supporting context: the compiler diagnostics from `docs/BUILD-FLAGS.md`
 

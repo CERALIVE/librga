@@ -15,9 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: keep library diagnostics off caller stdout.
 #ifndef _im2d_log_hpp_
 #define _im2d_log_hpp_
 
+#include <stdio.h>
 #include <unistd.h>
 
 #define IM_ERR_MSG_LEN 512
@@ -37,6 +39,9 @@ typedef enum {
 
 #define GET_LOG_LEVEL(level) ((level) & IM_LOG_LEVEL_MASK)
 #define LOG_LEVEL_CHECK(level) ((level) >= rga_log_level_get())
+
+#define RGA_LOG_STDERR(_str, ...) \
+    do { fprintf(stderr, "librga: " _str, ## __VA_ARGS__); } while(0)
 
 const char *rga_get_error_type_str(int type);
 int rga_error_msg_set(const char* format, ...);
@@ -86,9 +91,9 @@ size_t rga_get_start_time_ms(void);
             GET_LOG_LEVEL(level) == IM_LOG_ERROR || \
             (level) & IM_LOG_FORCE) { \
             if ((level) & IM_LOG_DIRECT) { \
-                fprintf(stdout, _str "\n", ## __VA_ARGS__); \
+                RGA_LOG_STDERR(_str "\n", ## __VA_ARGS__); \
             } else { \
-                fprintf(stdout, "%lu %1s %8s: " _str "\n", \
+                RGA_LOG_STDERR("%lu %1s %8s: " _str "\n", \
                     (unsigned long)(rga_get_current_time_ms()-rga_get_start_time_ms()), \
                     rga_get_error_type_str(level), LOG_TAG, \
                     ## __VA_ARGS__); \
@@ -107,9 +112,9 @@ size_t rga_get_start_time_ms(void);
             GET_LOG_LEVEL(level) == IM_LOG_ERROR || \
             (level) & IM_LOG_FORCE) { \
             if ((level) & IM_LOG_DIRECT) {\
-                fprintf(stdout, _str "\n", ## __VA_ARGS__); \
+                RGA_LOG_STDERR(_str "\n", ## __VA_ARGS__); \
             } else { \
-                fprintf(stdout, "%lu %6lu %6d %1s %8s: " _str "\n", \
+                RGA_LOG_STDERR("%lu %6lu %6d %1s %8s: " _str "\n", \
                         (unsigned long)(rga_get_current_time_ms()-rga_get_start_time_ms()), \
                         syscall(SYS_gettid), getpid(), rga_get_error_type_str(level), LOG_TAG, \
                         ## __VA_ARGS__); \

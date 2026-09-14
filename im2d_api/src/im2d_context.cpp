@@ -57,14 +57,14 @@ static IM_STATUS rga_device_init(rga_session_t *session) {
     device = rt_device_find(RGA_DRIVER_NAME);
     if (device == NULL)
     {
-        rt_kprintf("failed to fine %s device\n", RGA_DRIVER_NAME);
+        IM_LOGE("failed to fine %s device\n", RGA_DRIVER_NAME);
         return IM_STATUS_FAILED;
     }
 
     ret = rt_device_open(device, RT_DEVICE_OFLAG_RDWR);
     if (ret < 0)
     {
-        rt_kprintf("failed to fine %s device\n", RGA_DRIVER_NAME);
+        IM_LOGE("failed to fine %s device\n", RGA_DRIVER_NAME);
         return IM_STATUS_FAILED;
     }
 

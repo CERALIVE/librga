@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Modified by CeraLive 2026-09-14: send format and file diagnostics to stderr with context.
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -32,6 +33,7 @@
 #include "utils/utils.h"
 #include "RgaUtils.h"
 #include "rga.h"
+#include "im2d_api/src/im2d_log.h"
 
 struct format_table_entry {
     int format;
@@ -142,7 +144,7 @@ static int get_string_by_format(char *value, int format) {
     if (strcmp(name, "unknown") != 0) {
         memcpy(value, name, strlen(name) + 1);
     } else {
-        printf("Is unsupport format now, please fix");
+        RGA_LOG_STDERR("Is unsupport format now, please fix (format=%d)", format);
         return -EINVAL;
     }
 
@@ -236,7 +238,7 @@ float get_bpp_from_format_impl(int format) {
             bpp = 4;
             break;
         default:
-            printf("Is unsupport format now, please fix \n");
+            RGA_LOG_STDERR("Is unsupport format now, please fix (format=%d)\n", format);
             return 0;
     }
 
@@ -315,7 +317,7 @@ int get_perPixel_stride_from_format_impl(int format) {
         case RK_FORMAT_XBGR_2101010:
             return  (4 * 8);
         default:
-            printf("Is unsupport format now, please fix \n");
+            RGA_LOG_STDERR("Is unsupport format now, please fix (format=%d)\n", format);
             return 0;
     }
 }
@@ -343,7 +345,7 @@ int get_buf_from_file_impl(void *buf, int f, int sw, int sh, int index) {
 
     FILE *file = fopen(filePath, "rb");
     if (!file) {
-        fprintf(stderr, "Could not open %s\n", filePath);
+        RGA_LOG_STDERR("Could not open %s: %s\n", filePath, strerror(errno));
         return -EINVAL;
     }
     fread(buf, get_buf_size_by_w_h_f(sw, sh, f), 1, file);
@@ -369,7 +371,7 @@ int get_buf_from_file_FBC_impl(void *buf, int f, int sw, int sh, int index) {
 
     FILE *file = fopen(filePath, "rb");
     if (!file) {
-        fprintf(stderr, "Could not open %s\n", filePath);
+        RGA_LOG_STDERR("Could not open %s: %s\n", filePath, strerror(errno));
         return -EINVAL;
     }
     fread(buf, get_buf_size_by_w_h_f(sw, sh, f) * 1.5, 1, file);
@@ -393,10 +395,10 @@ int output_buf_data_to_file_impl(void *buf, int f, int sw, int sh, int index) {
 
     FILE *file = fopen(filePath, "wb+");
     if (!file) {
-        fprintf(stderr, "Could not open %s\n", filePath);
+        RGA_LOG_STDERR("Could not open %s: %s\n", filePath, strerror(errno));
         return false;
     } else
-        fprintf(stderr, "open %s and write ok\n", filePath);
+        RGA_LOG_STDERR("open %s and write ok\n", filePath);
     fwrite(buf, get_buf_size_by_w_h_f(sw, sh, f), 1, file);
     fclose(file);
 
@@ -420,10 +422,10 @@ int output_buf_data_to_file_FBC_impl(void *buf, int f, int sw, int sh, int index
 
     FILE *file = fopen(filePath, "wb+");
     if (!file) {
-        fprintf(stderr, "Could not open %s\n", filePath);
+        RGA_LOG_STDERR("Could not open %s: %s\n", filePath, strerror(errno));
         return false;
     } else
-        fprintf(stderr, "open %s and write ok\n", filePath);
+        RGA_LOG_STDERR("open %s and write ok\n", filePath);
     fwrite(buf, get_buf_size_by_w_h_f(sw, sh, f) * 1.5, 1, file);
     fclose(file);
 
