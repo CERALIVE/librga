@@ -1,0 +1,80 @@
+R1 donor audit host gate — 2026-09-13 (local), 2026-09-14 UTC
+Audited base: 5dfe897d206a52f770137e15553c48f84964cf02
+Port under test: 4449f5fa8d901e9d7d08ac078a8479d4619b97b2
+Donor: 571a880951583a3b2a04e7e1fa900861653befde (nyanmisaka)
+
+Native host: x86_64, GCC 16.2.1, Meson 1.12.0, Ninja 1.13.2.
+Native setup: meson setup build-native -Dcpp_args=-fpermissive -Dlibrga_demo=false
+Native test: meson test -C build-native --print-errorlogs
+Result: 25/25 PASS, zero failures or skips, including G1-G8 goldens,
+UAPI parity, unit tests, shim/timing contracts and donor-full-csc.
+
+ASan/UBSan/LSan:
+  bash scripts/build-sanitized.sh asan
+  ASAN_OPTIONS=detect_leaks=1:verify_asan_link_order=0:abort_on_error=1:symbolize=0
+  UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+  meson test -C build-asan --print-errorlogs unit-pure unit-session shim-contract
+    goldens donor-full-csc candidate-c candidate-d candidate-a-init
+    candidate-a-fds-RgaInit candidate-a-fds-improcess
+    candidate-b-deinit candidate-b-exit candidate-b-refcount
+Result: 20/20 PASS. This is the earlier expanded 19-case set plus donor-full-csc,
+not merely the CI script's 11-case selection. Before the run, the existing
+asan-canary under the fake-device preload reported BOTH heap-buffer-overflow
+and signed integer overflow; the canary alone used UBSan halt_on_error=0 to
+permit both deliberate faults. Raw PCs retained (symbolize=0).
+
+TSan:
+  bash scripts/build-sanitized.sh tsan
+  TSAN_OPTIONS=halt_on_error=1:exitcode=66:symbolize=0
+  meson test -C build-tsan --print-errorlogs --suite concurrency
+Result: 4/4 PASS; the existing tsan-canary first reported its deliberate race.
+All sanitizer claims are native host-shim-only, not arm64 or board coverage.
+
+Target-suite gate:
+  bash ci/build-check-steps.sh
+Executed unmodified in cached Debian Trixie arm64 userspace, GCC 14, through
+QEMU binfmt in a bwrap sandbox. The cached Docker image was exported/extracted
+under the checkout's test-results/donors/; no Docker container writable layer
+was created. SKIP_DEPS=1 used the cached image's installed dependencies.
+TMPDIR, HOME, caches, rootfs and outputs were below /mnt/development.
+The scripts' attempted global Git-config write was prevented with an unwritable
+GIT_CONFIG_GLOBAL path; safe.directory was supplied through process environment.
+
+Result: build-check-steps: OK (debian:trixie, target leg).
+  Meson: 23 PASS, 0 FAIL, 2 SKIP (25 registered).
+  The ONLY skips are shim-contract and board-timing, exit 77, with the existing
+  LIBRGA_TEST_QEMU_USER=1 allowance for QEMU invalid-fd ioctl translation.
+  Both complete contracts passed in the native 25/25 run above.
+  UAPI parity: 21 ioctl values, 29 struct sizes, 170 member offsets; no mismatch.
+  Goldens G1-G8 and donor-full-csc passed under arm64 emulation.
+  Workflow summary contract: 7/7 PASS.
+  Static package contract: PASS.
+  Build/package/staged contract: PASS, development version 0.0.0+ceralive.dev.
+  ABI symbol floors: PASS (GLIBC 2.41 / GLIBCXX 3.4.33 / CXXABI 1.3.15 ceilings).
+  The package contract still reports the recorded 18 upstream export removals.
+  This is NOT the separate R1-versus-R0 release abidiff acceptance test.
+
+The UAPI generator labels binfmt execution "native (aarch64)" because no Meson
+exe-wrapper is set inside that userspace. This run is nevertheless QEMU, not
+native arm64. Its generated reporting-only delta was retained in local evidence
+and excluded from the patch; no UAPI definition or recorded parity value changed.
+
+wire-bootstrap.sh was run twice after adding the donor ledger fragment.
+Both invocations produced identical hashes:
+  2ad48521bec96980f7317c40647de1aa8108cbe566b151887799700e43c93d24  docs/fix-audit.md
+  2ef8251f7fc662378c73fd90c11303c1ce52a7fd336cea5739603675b891746c  meson.build
+The native wire-bootstrap test passed, proving one D21 header, all fragment
+rows/prose preserved, and idempotency. No generated ledger was hand-edited.
+
+Tooling limitation: lsp_diagnostics was clean for donor_full_csc.c but retained
+incorrect compile-context diagnostics for NormalRga.cpp (missing include paths
+and host-only pointer casts). The actual native and arm64 compilations passed.
+No source workaround or permanent editor configuration was added for that tool.
+
+An initial background launch was interrupted by the shell-tool timeout, after
+START native. Its EXIT 0 trap is NOT a completed gate. The detached setsid run
+recorded every PASS above followed by ALL HOST GATES PASS and EXIT 0.
+
+No board command, PR creation/merge, rebase, squash, release or fixture update.
+Independent review of 4449f5f is PENDING and blocks integration of this new port.
+Local raw logs, API responses and RED binary: test-results/donors/.

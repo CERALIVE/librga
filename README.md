@@ -138,7 +138,9 @@ This repository descends from Rockchip's `linux-rga` through JeffyCN's
 - **nyanmisaka** for downstream fixes that are candidate donors. Any pick is taken
   with `git cherry-pick -x`, keeps its original author, and is recorded in
   `docs/fix-audit.md` with its reproducer. Picks are credited individually as they
-  land.
+  land. The R1 donor audit and the constrained port of nyanmisaka's
+  `571a880951583a3b2a04e7e1fa900861653befde` combined-CSC fix are recorded in
+  [`docs/DONORS.md`](docs/DONORS.md). No new public feature macro is exposed.
 
 `airockchip/librga` is consulted as a header and CHANGELOG reference only. That
 distribution is binary-only and is never a source donor.
