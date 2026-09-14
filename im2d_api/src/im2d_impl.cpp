@@ -2426,6 +2426,7 @@ error_cancel_job:
     return ret;
 }
 
+// Modified by CeraLive 2026-09-14: account only for jobs actually removed.
 IM_STATUS rga_job_cancel(im_job_handle_t job_handle) {
     im_rga_job_t *job = NULL;
     rga_session_t *session;
@@ -2440,9 +2441,8 @@ IM_STATUS rga_job_cancel(im_job_handle_t job_handle) {
     if (job != NULL) {
         rga_map_delete_job(&g_im2d_job_manager.job_map, job_handle);
         free(job);
+        g_im2d_job_manager.job_count--;
     }
-
-    g_im2d_job_manager.job_count--;
 
     pthread_mutex_unlock(&g_im2d_job_manager.mutex);
 
@@ -4511,4 +4511,3 @@ int generate_color_palette_req(struct rga_req *ioc_req, rga_info_t *src, rga_inf
 
     return 0;
 }
-
