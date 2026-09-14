@@ -8,14 +8,8 @@
 # hit list to test-results/analyzer-hits.txt, then reconciles every hit against
 # the dispositions in docs/ANALYZER-TRIAGE.md.
 #
-# WHY THIS NEEDS -Danalyzer=true
-#
-# meson.build compiles the library with a blanket `-w`. GCC's `-w` sets a global
-# inhibit flag that is checked when a diagnostic is EMITTED, not when the option
-# is parsed, so it silences every -Wanalyzer-* finding no matter where
-# `-fanalyzer` sits on the command line. `-Danalyzer=true` drops that one flag
-# for the library targets and nothing else; the option defaults to false, so no
-# other build in this repository changes.
+# Modified by CeraLive 2026-09-14: -Danalyzer=true remains compatible, but the
+# blanket -w is gone; normal builds expose inherited diagnostics too.
 #
 # WHY C++ ONLY
 #

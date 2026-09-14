@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+// Modified by CeraLive 2026-09-14: preserve a compiler-provided GNU feature macro.
 /*
  * H4 host leg: count getenv() calls made by the library across a fixed number
  * of operations, so the per-operation environment-lookup cost is a measured
@@ -13,7 +14,9 @@
  * The improcess mode replays the golden G1 geometry -- 4K NV16 -> NV12, IM_SYNC
  * -- so the profile leg and this leg exercise the same call.
  */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>

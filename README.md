@@ -89,6 +89,16 @@ Before reaching for the im2d API, read
 status-code surprises that this library's callers hit first, and most of them are
 silent.
 
+The [OSD layout limitation](docs/OSD-LAYOUT-LIMITATION.md) is confirmed
+librga-side but unreachable in the current CeraLive conversion/composition call
+set. The public layout stays unchanged pending a future major version.
+
+`bash ci/werror-steps.sh` [EXISTS] gates `im2d_context.cpp` and CeraLive test and
+reproducer translation units on trixie/arm64 with `-Wall -Wextra -Werror` and no
+warning suppressions. It is not a whole-upstream-tree warning-clean claim.
+Normal library builds now expose inherited warnings; see
+[build flags](docs/BUILD-FLAGS.md#scoped-warnings-as-errors-todo-37).
+
 The host-only H3 initialization-failure census is [EXISTS]: run
 `bash tests/repro/run-h3.sh` to build the unchanged shared library and measure
 1,000 calls per API/fault pair. Exit 1 means a reproduced leak, not a harness
