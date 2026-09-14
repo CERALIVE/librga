@@ -51,6 +51,10 @@ can be checked rather than asserted:
 | Candidate B; no fix. Base `b886777023e0c503134e340be348d6c1b11c8adc`, unchanged R1 library | `tests/repro/run-candidate-b.sh` extends H2; **DEMONSTRATED** last-reference/deinit and exit races under the stated caller pattern. TSan 200/200 each; ASan/UBSan deinit 167/200, exit 0/200. Owned-reference control passes both builds. RED transcript below; no GREEN/fix | host-shim-only | Not run; no library or ABI change | Not dispatched; no reviewer session or fix approval claimed | Not reported; characterization only |
 | Candidate C; no fix. Base `b886777023e0c503134e340be348d6c1b11c8adc`, unchanged R1 library | `tests/repro/candidate_c_scheduler.cpp` via `bash tests/repro/run-candidate-c.sh`; **DEMONSTRATED**, exit 1: five assertions, two failures (fresh/default and explicit-core/reset-to-default). Transcript below; no GREEN/fix | host-shim-only | Not run; test/docs only, no ABI or accepted-input changes | Not dispatched; no reviewer session or fix approval claimed | Not reported; existing validation defect reproduced |
 | Candidate D; no fix. Base `b886777023e0c503134e340be348d6c1b11c8adc`, unchanged R1 library | H6 `sync-only` via `bash tests/repro/run-candidate-d.sh`; **DEMONSTRATED**, 200/200 failure calls retain the positive fence fd, 200/200 success controls consume it. Exit 1, transcript below; no GREEN/fix | host-shim-only | Not run; no library or ABI change, fence polarity unchanged | Not dispatched; no reviewer session or fix approval claimed | Not reported; error-branch cleanup evidence only |
+| `4449f5f` — constrained port of donor `571a880951583a3b2a04e7e1fa900861653befde` | `tests/repro/donor_full_csc.c`: RED on `5dfe897`, legacy mode 0x201 returns -22 before submission; GREEN after port, returns 0 and captures full_csc=1/yuv2rgb=1; 0x200 and separate im2d controls pass on both; `test-results/donors/red.txt` and `csc-green.txt` | host-shim-only; no board or pixel claim | Public headers unchanged; host gates recorded separately; no R1-versus-R0 release ABI closure claimed | PENDING independent review; do not merge this port into integration until an APPROVE receipt is recorded | donor (nyanmisaka); full SHA credited by cherry-pick -x |
+| Donor `338a5fe165267c4bd0704bac4628e9bb61a7806d`; no new fix | PRESENT in audited main; source/pat/destination CSC at `im2d_api/src/im2d_impl.cpp:2173-2203`; inherited at `57a1067`, not Wave E | Static semantic audit; no board command | Not applicable: no change | Not applicable: no pick | Upstream-inherited, Yu Qiaowei |
+| Donor `1d330cc28551943bed3380261a5a9c6fbd58ff53`; no fix | ABSENT at `core/NormalRga.cpp:717-728` in audited main; SKIPPED for specified driver 1.3.11, outside donor's less-than-1.3.9 condition; reproducer NOT RUN, no justification | No hardware or pixel result claimed | Not applicable: no change | Not applicable: no pick | donor (nyanmisaka), not picked |
+| Donor `900f9f0dc702d15536064354f6f1fd77da2719af`; no new fix | PRESENT in audited main; `im2d_api/src/im2d_hardware.h:372-385` and `im2d_api/src/im2d_impl.cpp:585-605`; both relaxed height limits inherited at `57a1067`, not Wave E | Static semantic audit; no board command | Not applicable: no change | Not applicable: no pick | Upstream-inherited, Yu Qiaowei |
 | `GAP: no fix landed` — H1 is characterisation of the unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. Nothing was cherry-picked and nothing was changed under `core/` or `im2d_api/`. | `tests/repro/h1_init_race.cpp` + `tests/repro/run-h1-host.sh`, scenario `c-init`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier`. Every iteration identical: `ok=8 refcount_after_init=0 fds_after_init=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. `c_RkRgaInit()` is `return 0;` at `core/RgaApi.cpp:27` — the C shim was hollowed out and `include/RgaApi.h:41-45` documents it — so this entry point opens no device and increments no counter. Teardown returns `-19` (`-ENODEV`, "Try to exit uninit"), which is the evidence the scenario left no session. GREEN: n/a, no fix. Transcripts: `test-results/h1/c-init.{log,csv}`. | `host-shim-only` (`tests/shim/fake_rga.c`, mock device is a `memfd_create("fake-rga")`; TSan build via `scripts/build-sanitized.sh tsan`). No board contacted. | n/a — no library change, so nothing to close. `librga.so.2.1.0` in `build-tsan/` is the unmodified tree. | `GAP: no review dispatched` — this row is a host-side observation, not a landed fix. | n/a — nothing to report upstream from a NOT-REPRODUCED control. |
 | `GAP: no fix landed` — as above, unchanged tree at `96c9a53ba94c487f9fae938c73347f5bc00e624d`. | Same pair, scenario `singleton-get`. RED: **NOT-REPRODUCED**. 200 fresh processes, run twice (400 total), 8 threads released together on a `std::barrier` into `RockchipRga::get()` → `RkRgaInit()` → `RgaInit()` → `NormalRgaOpen()`. Every iteration identical: `ok=8 ctx_agreed=1 refcount_after_init=1 fds_after_init=1 deinit_calls=1 refcount_after_teardown=0 fds_after_teardown=0`, TSan named none of `rgaCtx`/`refCount`/`mMutex`. The unguarded `if (!rgaCtx)` at `core/NormalRga.cpp:66` is real — only `refCount++` is inside `mMutex` — but on this host it is never reached concurrently, because `Singleton::getInstance()` (`include/RgaSingleton.h:33-40`) holds `sLock` across the whole null-check-and-construct. The eight threads serialise one level above the defect. GREEN: n/a, no fix. Transcripts: `test-results/h1/singleton-get.{log,csv}`. | `host-shim-only`, same build and shim as the row above. No board contacted. | n/a — no library change. | `GAP: no review dispatched` — host-side observation, not a landed fix. | n/a — the latent unguarded check is recorded here, not reported, because no reproducer turned it RED. |
 | H10a observation; **no fix**. Execution base `96c9a53ba94c487f9fae938c73347f5bc00e624d`; library source unchanged from `57a1067a246c71fa6c9a355d1668884fda155dd5`. | `tests/repro/h10_job_handle.cpp count`, via `bash tests/repro/run-h10.sh asan` or `tsan`. **RED: counter drift.** Unknown ID `2147483647`: count/map `0/0 -> -1/0`; 64 subsequent creates yield `63/64`; valid cancellation of all 64 leaves `-1/0`. Both sanitizer builds reproduce it. RED transcripts: `test-results/h10/asan-eS80sZZq/count/transcript.txt`, `test-results/h10/tsan-KHb1J64S/count/transcript.txt` (exit 1 each). `im2d_api/src/im2d_impl.cpp:2445` decrements even when lookup finds no job. No premature creation limit found within this bounded check; all 64 creates succeed and there is no userspace count-limit gate in this source. Re-run 2026-09-06 reproduces the same line in both modes: `test-results/h10/asan-eK4JCCKy/count/`, `test-results/h10/tsan-a3eySo3y/count/`. **GREEN: none; no fix tested.** | `host-shim-only`; native x86_64, GCC 16.2.1, 2026-09-06. No board access. | Not run: QA test/docs only; no library, header, or ABI change. | Not requested; no independent reviewer session or fix approval claimed. | Not reported upstream; characterization only. CeraLive does not call this job API (task scope). |
@@ -301,6 +305,41 @@ reports a heap-buffer-overflow. The candidate emits **no ASan/LSan/UBSan memory
 diagnostic**; the RED is the fd ownership/census assertion. Those sanitizers do
 not track file-descriptor ownership, so their silence is not leak cleanliness.
 No hardware coverage, library fix, GREEN transcript or release approval claimed.
+
+## Appendix — donors.md
+
+Source: [fix-audit.d/donors.md](fix-audit.d/donors.md). D21 rows are in the [ledger above](#rows).
+
+
+### Donor audit scope
+
+All table ranges identify audited main `5dfe897d206a52f770137e15553c48f84964cf02`,
+before the legacy CSC port. See [DONORS.md](../DONORS.md) for the four complete
+semantic verdicts, authors, donor links and adaptations. Only the legacy
+`RgaBlit` defect is repaired; im2d's distinct `rga_blit` already has independent,
+masked full-CSC setup and is an unchanged-path control.
+
+The `0x201` RED is a real compiled and executed rejection, not a missing-text
+search or a compile failure. Initial exploration omitted `-I.` from a direct
+build and incorrectly assumed im2d and legacy mode encodings matched; neither
+attempt is counted as defect proof. Corrected controls follow each builder's
+actual encoding. Raw final reproduction:
+
+```text
+audited main:
+mode=0x200 ret=0 captured=1 full_csc=1 yuv2rgb=0 PASS
+mode=0x201 ret=-22 captured=0 full_csc=0 yuv2rgb=0 FAIL
+improcess src601full+patRGB+dst709full status=1 captured=1 full_csc=1 yuv2rgb=10 PASS
+
+ported legacy path:
+mode=0x200 ret=0 captured=1 full_csc=1 yuv2rgb=0 PASS
+mode=0x201 ret=0 captured=1 full_csc=1 yuv2rgb=1 PASS
+improcess src601full+patRGB+dst709full status=1 captured=1 full_csc=1 yuv2rgb=10 PASS
+```
+
+The port is not independently approved yet. This is a todo-39 branch, not a
+todo-40 integration merge or an R1 release authorization. No existing review
+receipt is reused for this new code.
 
 ## Appendix — h1.md
 
