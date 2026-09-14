@@ -34,13 +34,35 @@ cases = [
     ('history-not-current', header + row.replace(receipt, 'Historical: ' + receipt), False),
     ('history-reject-retained', header + row.replace(receipt, receipt + '; Historical review: REJECT ses_Old123'), True),
     ('escaped-pipe', header + row.replace('RED then GREEN', r'RED a\|b then GREEN'), True),
+    ('trailing-text', header + row.rstrip() + ' unexpected\n', False),
 ]
 (root / 'test-results').mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='ledger-gate-', dir=root / 'test-results') as tmp:
     ledger = Path(tmp) / 'ledger.md'
+    fragments = Path(tmp) / 'fragments'
+    fragments.mkdir()
+    fragment = fragments / 'case.md'
     for name, content, expected in cases:
         ledger.write_text(content)
-        result = subprocess.run(['bash', 'scripts/check-ledger-reviews.sh', str(ledger)], text=True, capture_output=True)
+        fragment.write_text(content)
+        result = subprocess.run(['bash', 'scripts/check-ledger-reviews.sh', str(ledger), str(fragments)], text=True, capture_output=True)
         assert (result.returncode == 0) == expected, (name, result.returncode, result.stdout, result.stderr)
+    for name, rendered in [
+        ('missing-row', header + row),
+        ('duplicate-instead-of-missing', header + row + row),
+        ('changed-evidence', header + row.replace('RED then GREEN', 'different evidence') + observation),
+    ]:
+        fragment.write_text(header + row + observation)
+        ledger.write_text(rendered)
+        result = subprocess.run(['bash', 'scripts/check-ledger-reviews.sh', str(ledger), str(fragments)], text=True, capture_output=True)
+        assert result.returncode != 0, (name, 'incomplete or changed ledger accepted')
+        assert 'source fragment' in result.stderr, (name, result.stderr)
+    fragment.write_text(row + '\n```text\n' + header + row + '```\n\n<!--\n' + row + '-->\n')
+    (fragments / 'second.md').write_text('# Separate evidence\n\n' + header + observation + '\n| A | B | C | D | E | F |\n|---|---|---|---|---|---|\n| 1 | 2 | 3 | 4 | 5 | 6 |\n')
+    ledger.write_text(header + row + observation)
+    result = subprocess.run(['bash', 'scripts/check-ledger-reviews.sh', str(ledger), str(fragments)], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
 print(f'PASS: ledger review gate {len(cases)}/{len(cases)} scenarios')
+print('PASS: missing, substituted and altered rows rejected against source fragments')
+print('PASS: multiple fragments, bare rows, fences, comments and subsidiary tables distinguished')
 PY

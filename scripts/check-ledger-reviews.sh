@@ -3,7 +3,8 @@
 # Modified by CeraLive 2026-09-14: fail closed on missing or non-independent D21 receipts.
 set -euo pipefail
 root=$(realpath "$(dirname "${BASH_SOURCE[0]}")/..")
-python3 - "${1:-$root/docs/fix-audit.md}" <<'PY'
+python3 - "${1:-$root/docs/fix-audit.md}" "${2:-$root/docs/fix-audit.d}" <<'PY'
+from collections import Counter
 from pathlib import Path
 import re
 import sys
@@ -19,13 +20,15 @@ if index == len(lines) or lines[index] != '|---|---|---|---|---|---|':
 errors: list[str] = []
 count = 0
 green = 0
+rendered_rows: list[str] = []
 for number in range(index + 1, len(lines)):
     line = lines[number]
     if not line.startswith('|'):
         break
     count += 1
+    rendered_rows.append(line)
     cells = re.split(r'(?<!\\)\|', line)
-    if len(cells) != 8 or any(not cell.strip() for cell in cells[1:-1]):
+    if len(cells) != 8 or cells[-1].strip() or any(not cell.strip() for cell in cells[1:-1]):
         errors.append(f'line {number + 1}: malformed six-field D21 row')
         continue
     if 'GAP:' in line:
@@ -51,6 +54,48 @@ for number in range(index + 1, len(lines)):
         errors.append(f'line {number + 1}: {status} must carry fix=none (base/donor SHAs are not fixes)')
 if count == 0:
     errors.append('empty D21 ledger')
+
+def fragment_rows(text: str) -> list[str]:
+    result: list[str] = []
+    leading, table, comment = True, False, False
+    fence = ''
+    for line in text.splitlines():
+        if comment:
+            comment = '-->' not in line
+            continue
+        marker = re.match(r'^ *(```+|~~~+)', line)
+        if marker:
+            token = marker.group(1)
+            if not fence:
+                fence = token
+            elif token[0] == fence[0] and len(token) >= len(fence):
+                fence = ''
+            leading, table = False, False
+            continue
+        if fence:
+            continue
+        if '<!--' in line:
+            comment = '-->' not in line.split('<!--', 1)[1]
+            leading, table = False, False
+            continue
+        if line == lines[headers[0]]:
+            leading, table = False, True
+            continue
+        if (leading or table) and line == '|---|---|---|---|---|---|':
+            continue
+        if (leading or table) and line.startswith('|'):
+            result.append(line)
+            leading, table = False, True
+            continue
+        if line.strip():
+            leading = False
+        table = False
+    return result
+
+expected_rows = [row for source in sorted(Path(sys.argv[2]).glob('*.md'))
+                 for row in fragment_rows(source.read_text())]
+if not expected_rows or Counter(expected_rows) != Counter(rendered_rows):
+    errors.append(f'source fragment row mismatch: expected {len(expected_rows)}, rendered {count}; missing, duplicated or altered row')
 if errors:
     sys.exit(f'{path}:\n' + '\n'.join(errors))
 print(f'PASS: {count} D21 rows reviewed; {green} GREEN fix rows independently approved; no GAP')

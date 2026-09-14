@@ -159,6 +159,10 @@ SKIPPED, NOT-REPRODUCED and WITHDRAWN carry `fix=none`. Historical review text
 follows the current receipt and never substitutes for it. Evidence-only review
 does not approve a fix or retroactively claim a hardware run. Receipt history is
 in `docs/fix-audit.d/coordinator-review.md`; edit fragments, then regenerate.
+The checker independently compares the complete rendered row multiset against
+the fragments, so a truncated, duplicated or altered ledger fails even when
+every surviving receipt is syntactically valid. The row count is derived from
+the inputs, never frozen to one release's count.
 
 The R1 `werror` CI leg [EXISTS] runs `bash ci/werror-steps.sh` on trixie/arm64.
 It strictly compiles the fork-modified `im2d_context.cpp` and CeraLive test and

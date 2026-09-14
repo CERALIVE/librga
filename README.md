@@ -77,6 +77,8 @@ requires different author/reviewer agent and model identities for GREEN fixes,
 and retains earlier rejection/approval history. See the
 [coordinator receipt](docs/fix-audit.d/coordinator-review.md). A passing receipt
 gate is not permission to release R1 or waive its outstanding ABI/board gates.
+It also compares every rendered row against the fragment inputs, rejecting row
+loss, duplication or changed evidence rather than trusting a positive count.
 
 H1 board characterization [EXISTS] lives in `tests/board/h1-board.cpp` and
 `run-h1-board.sh`. It requires the board driver's held-lock environment and
