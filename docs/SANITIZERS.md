@@ -14,6 +14,20 @@ may cite a sanitizer result as a hardware claim.
 
 ## Recipes
 
+H10 regression coverage [EXISTS] is registered in `h10`, with both 2000-iteration
+race repeats also in `concurrency`. After `build-sanitized.sh`, run
+`meson test -C build-asan --no-rebuild --suite h10 --print-errorlogs` using the
+ASAN/UBSAN options below, or the equivalent TSan tree/options. The explicit
+build already compiled these targets. `--no-rebuild` avoids Meson's aggregate
+test-dependency rebuild pulling the unrelated static UAPI emitters into a
+sanitizer link (`-static` is incompatible with ASan/TSan). It skips no selected
+test, and the UAPI emitters still run in the unsanitized build gate.
+
+H10c remains driver-owned: its historical characterization script exits 1 for
+forwarding a second release even on a fixed library. The expected-pass H10
+suite instead verifies repeated imports/releases and recycled numeric handles
+against the opt-in single-buffer refcount model. No production tombstone exists.
+
 | Command | Tree | Instrumentation |
 |---|---|---|
 | `bash scripts/build-sanitized.sh asan` | `build-asan/` | `-fsanitize=address,undefined` |
