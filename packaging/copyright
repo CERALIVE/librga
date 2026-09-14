@@ -30,6 +30,17 @@ Copyright: 2016-2025 Rockchip Electronics Co., Ltd.
            2020-2025 Yu Qiaowei <cerf.yu@rock-chips.com>
 License: Apache-2.0
 
+Files: core/NormalRga.cpp
+Copyright: 2016-2025 Rockchip Electronics Co., Ltd.
+           2016 Zhiqin Wei <wzq@rock-chips.com>
+           2025 nyanmisaka <nst799610810@gmail.com>
+           2026 CeraLive contributors
+License: Apache-2.0
+Comment:
+ Combined full-CSC fix from nyanmisaka/rk-mirrors commit
+ 571a880951583a3b2a04e7e1fa900861653befde, with CeraLive's public-header and
+ diagnostic-preservation adaptations. Original source notices are retained.
+
 Files: README.md
 Copyright: 2016-2025 Rockchip Electronics Co., Ltd.
            2026 CeraLive contributors

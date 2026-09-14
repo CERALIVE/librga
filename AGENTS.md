@@ -43,6 +43,7 @@ Two releases exist, versioned upstream-style rather than CalVer:
 | Import coordinate, licence census, credits | `docs/PROVENANCE.md` |
 | API usability traps every caller trips over | `docs/API-TRAPS.md` |
 | Per-fix evidence ledger | `docs/fix-audit.md` |
+| R1 donor semantic verdicts and constrained CSC port | `docs/DONORS.md` |
 | Sanitizer/analyzer recipes and their proof boundary | `docs/SANITIZERS.md` |
 | Disposition of every `-Wanalyzer-*` finding | `docs/ANALYZER-TRIAGE.md` |
 | Debian package build and contract | `packaging/` |

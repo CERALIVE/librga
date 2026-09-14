@@ -306,6 +306,19 @@ unit_macro_logging = executable('unit-macro-logging', 'tests/unit/unit_macro_log
     install : false)
 test('unit-macro-logging', unit_macro_logging, timeout : 30)
 
+donor_full_csc = executable('donor-full-csc', 'tests/repro/donor_full_csc.c',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : golden_dl,
+    c_args : unit_warnings,
+    install : false)
+donor_csc_env = environment()
+donor_csc_env.set('LD_PRELOAD', fake_rga.full_path())
+donor_csc_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'donor-csc-interposed.log')
+donor_csc_env.set('FAKE_RGA_DUMP', meson.current_build_dir() / 'donor-csc-request.bin')
+test('donor-full-csc', donor_full_csc,
+    env : donor_csc_env, depends : fake_rga, timeout : 30)
+
 # Modified by CeraLive 2026-09-06: gate evidence assembly alongside the host tests.
 test('wire-bootstrap', find_program('bash'),
     args : [meson.current_source_dir() / 'tests/test-wire-bootstrap.sh'], timeout : 30)
