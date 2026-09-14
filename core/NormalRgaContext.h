@@ -28,16 +28,12 @@
 
 #ifndef ANDROID
 #define ALOGI(...) do { \
-    if (rga_log_enable_get() > 0 && LOG_LEVEL_CHECK(IM_LOG_INFO)) { \
-        RGA_LOG_STDERR(__VA_ARGS__); \
-        fprintf(stderr, "\n"); \
-    } \
+    RGA_LOG_STDERR(__VA_ARGS__); \
+    fprintf(stderr, "\n"); \
 } while (0)
 #define ALOGD(...) do { \
-    if (rga_log_enable_get() > 0 && LOG_LEVEL_CHECK(IM_LOG_DEBUG)) { \
-        RGA_LOG_STDERR(__VA_ARGS__); \
-        fprintf(stderr, "\n"); \
-    } \
+    RGA_LOG_STDERR(__VA_ARGS__); \
+    fprintf(stderr, "\n"); \
 } while (0)
 #define ALOGE(...) do { RGA_LOG_STDERR(__VA_ARGS__); fprintf(stderr, "\n"); } while (0)
 #endif
