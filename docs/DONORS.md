@@ -84,6 +84,8 @@ does not fabricate it: im2d's equivalent behavior is present elsewhere while
 the legacy call still fails the reproducer. This is exactly why a whole-commit
 hash or an exact-text search cannot substitute for tracing the target call path.
 
-This branch is not release approval. Independent review of this new port remains
-required before integration. Item 47's R1-versus-R0 `abidiff` criterion and board
-gates remain separate; this host-only donor check does not close them.
+This branch is not release approval. The new port received independent APPROVE
+`ses_f5e8c52d4ffeK5JdTbtezo6MGB` before its coordinator merge; details and limits
+are in [the coordinator receipt](fix-audit.d/coordinator-review.md). Item 47's
+R1-versus-R0 `abidiff` criterion and board gates remain separate; this host-only
+donor check does not close them.

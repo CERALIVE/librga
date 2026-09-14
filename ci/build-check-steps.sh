@@ -108,6 +108,9 @@ printf '\nbuild-check-steps: debian:%s (%s leg) · %s · %s\n' \
 step "workflow gating contract"
 bash tests/test-build-check-gating.sh
 
+step "independent D21 review receipts"
+bash scripts/check-ledger-reviews.sh
+
 # First, because it reads the packaging sources and builds nothing: a contract
 # break should cost seconds, not a full compile.
 step "package contract (static)"

@@ -71,6 +71,13 @@ build.
 
 ### Wave-E regression checks (R1)
 
+The R1 evidence ledger is checked by `bash scripts/check-ledger-reviews.sh`
+and the Meson suite. It distinguishes approved fixes from reviewed observations,
+requires different author/reviewer agent and model identities for GREEN fixes,
+and retains earlier rejection/approval history. See the
+[coordinator receipt](docs/fix-audit.d/coordinator-review.md). A passing receipt
+gate is not permission to release R1 or waive its outstanding ABI/board gates.
+
 H1 board characterization [EXISTS] lives in `tests/board/h1-board.cpp` and
 `run-h1-board.sh`. It requires the board driver's held-lock environment and
 measures real-device fd targets on pre/post-fix trees. Both Rock and OPi direct-init

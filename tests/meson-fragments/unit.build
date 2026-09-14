@@ -61,6 +61,11 @@ test('donor-full-csc', donor_full_csc,
 test('wire-bootstrap', find_program('bash'),
     args : [meson.current_source_dir() / 'tests/test-wire-bootstrap.sh'], timeout : 30)
 
+test('ledger-review-contract', find_program('bash'),
+    args : [meson.current_source_dir() / 'tests/test-ledger-reviews.sh'], timeout : 30)
+test('ledger-reviews', find_program('bash'),
+    args : [meson.current_source_dir() / 'scripts/check-ledger-reviews.sh'], timeout : 30)
+
 # Modified by CeraLive 2026-09-13: promote the fixed scheduler-default probe.
 candidate_c = executable('candidate-c', 'tests/repro/candidate_c_scheduler.cpp',
     include_directories : incdir,

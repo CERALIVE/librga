@@ -151,6 +151,15 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+`bash scripts/check-ledger-reviews.sh` [EXISTS] validates the generated D21 table,
+also through Meson and `ci/build-check-steps.sh`. Every row has an explicit
+`status=... fix=...;` disposition and current review receipt. GREEN requires a
+fix commit and different author/reviewer agent names AND model IDs; observations,
+SKIPPED, NOT-REPRODUCED and WITHDRAWN carry `fix=none`. Historical review text
+follows the current receipt and never substitutes for it. Evidence-only review
+does not approve a fix or retroactively claim a hardware run. Receipt history is
+in `docs/fix-audit.d/coordinator-review.md`; edit fragments, then regenerate.
+
 The R1 `werror` CI leg [EXISTS] runs `bash ci/werror-steps.sh` on trixie/arm64.
 It strictly compiles the fork-modified `im2d_context.cpp` and CeraLive test and
 reproducer TUs without suppressions; inherited library TUs outside this scope
