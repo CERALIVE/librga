@@ -138,7 +138,7 @@ Preload it **only into** the retained single-threaded synchronous G-A client wit
 `--improcess-only --iterations 4 --explicit-csc`, under the board lock. The
 archive's `remote.sh` records the exact runner, not authority to access a board.
 
-## Proof boundary and outstanding review
+## Proof boundary and independent review
 
 Local checks passed: 37/37 native non-UAPI tests (no skips), both arm64 UAPI
 checks, the required host-shim sanitizer suites (11 ASan/UBSan baseline, six
@@ -161,6 +161,9 @@ native run, not waived; native arm64 CI remains the complete PR authority.
 - H7 remains platform qualification work. **G-B and todo 43 remain blocked**;
   no R1 tag, release or merge is authorized. No D24 expected-FAIL cell is FIXED,
   and no empty-set waiver is taken.
-- The fix requires a different-agent, different-model review receipt before
-  merge. Pending that receipt, this document is evidence, not an approved D21
-  GREEN row. No approval identity is fabricated and no ledger check is weakened.
+- Different-agent/different-model code/evidence review **APPROVE**:
+  `ses_f59ddb8a5ffeoojhlQh42r9NWq`, reviewer `explore/openai/gpt-5.6-luna`,
+  author `Sisyphus-Junior/openai/gpt-6-astra`, reviewed tree `282d4bc`, fix
+  `9ddd7d8`. The [D21 receipt](fix-audit.d/full709-selector.md) records the
+  bounded approval. The PR remains unmerged by instruction; no ledger check was
+  weakened, and this review does not clear G-B or authorize release.
