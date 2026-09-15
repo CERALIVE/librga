@@ -2,7 +2,8 @@
 
 **Superseded removal disposition:** the later owner decision
 [accepts exactly these 18 inherited removals with documentation](R1-ABI-ACCEPTANCE.md),
-without shims, and enables LTO behind the exact-set ABI gate. The restore-all
+without shims. Later binding review disabled packaged LTO despite the green
+abidiff result; the acceptance record documents the new dynsym gate. The restore-all
 direction and red-gate/LTO-off statements below describe the reserve-only task
 at `ae59c2f`, not current policy. The layout measurements, residual type changes,
 and evidence boundaries remain valid; no historical test result is rewritten.

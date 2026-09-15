@@ -2,7 +2,7 @@
 
 **Historical gate receipt.** The later [reserve repair](R1-ABI-REPAIR.md) restores
 the two Linux LP64 public sizes and adds regression checks. The subsequent
-[accepted-removal decision](R1-ABI-ACCEPTANCE.md) supersedes the red-gate/LTO-off
+[accepted-removal decision](R1-ABI-ACCEPTANCE.md) supersedes the red-gate
 status for current policy. Counts and package hashes below belong to the original
 run, not the repaired or LTO-enabled candidate.
 

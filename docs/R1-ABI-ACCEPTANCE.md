@@ -110,8 +110,9 @@ values. They are not reclassified as libstdc++ noise or newly suppressed here.
 libstdc++, `-g -O2` and LTO off. It then builds R1 with `-Db_lto=true` and compares
 it against that **same** R0 baseline, with the **same** accepted-removal set.
 This isolates LTO rather than changing the baseline to excuse optimizer effects.
-The packaging and normal build/test lanes enable LTO; both ABI comparisons remain
-required, as do analyzer, werror, sanitizers and reproducibility.
+The packaging and normal build/test lanes now disable LTO via `ci/package-lto.env`.
+Both ABI comparisons remain required, as do analyzer, werror, sanitizers and
+reproducibility. The failed LTO experiment remains an unshipped comparison input.
 
 Plain GCC 14 LTO initially removed **16 additional weak C++ exports** from R1
 (including `Mutex` and `im2d_job_manager` destructor variants and libstdc++
@@ -142,7 +143,47 @@ No PR, tag, release, board qualification or SONAME change is authorized by this
 decision. `Provides: librga2 (= 2.2.0)` and `Conflicts`/`Replaces: librga2` remain
 unchanged.
 
-## Verification receipt — 2026-09-15 UTC
+## Binding-drift correction — 2026-09-15 UTC
+
+Independent review of PR #10 found **25 exported R1 bindings changed under LTO**,
+including 20 functions already WEAK in R0. The job-manager destructor and
+`Singleton<RockchipRga>::getInstance()` become GLOBAL; two singleton-related
+GNU_UNIQUE objects also become GLOBAL. Their visibility remains DEFAULT. The
+empty `abidiff-lto-only.txt` report below is genuine, but does not measure this
+metadata and is **not evidence of ELF equivalence**. The prior LTO clearance is
+withdrawn; no reliable binding-preserving retention mechanism is claimed.
+
+`ci/check-dynsym.py` compares sorted exported `(name, type, binding, visibility)`
+tuples from `readelf --dyn-syms --wide`, requiring exact equality with no
+allowlist. It includes version suffixes, ignores undefined imports and local
+symbols, and excludes addresses/sizes/section indices from this metadata-only
+contract. Exit 1 means drift; malformed/empty inputs and tool errors return 2.
+
+The required `abi` job always runs that comparison on non-LTO R1 versus the real
+LTO experiment. `ci/check-lto-policy.sh` records `LTO_DYNSYM=FAIL`, permitting
+only `PACKAGED_LTO=false` on a mismatch; errors fail regardless. A separately
+built R1 using the selected packaging LTO setting must pass the comparator
+unconditionally. Thus a green summary means the **non-LTO selection** is valid,
+not that the LTO experiment passed. The shared readonly setting is consumed by
+packaging, the normal test lane and this policy. The experimental linker roots
+remain measurable but are not used by packaged builds.
+
+The required `dynamic-symbol-evidence` upload retains raw readelf output,
+normalized before/after inventories, both comparison diffs, the LTO verdict and
+positive-control results. `tests/test-dynsym-gate.sh` mutates real ELF .dynsym
+entries: WEAK→GLOBAL, UNIQUE→GLOBAL, function type and visibility each fail.
+Identical inputs pass; invalid ELF fails even with LTO off. The policy is tested
+with LTO both on and off. The workflow-contract test keeps the comparison,
+controls and artifact in the required ABI lane; all nine summary dependencies
+retain failure/cancellation/skip rejection. No existing abidiff control or
+comparison was removed or weakened.
+
+Local reproduction against the retained arm64 artifacts of run 34927479435:
+315 exports on each side, comparator exit **1**, including the named binding
+changes. Local real-ELF mutation controls pass. Host abidiff and Meson are absent;
+the corrected workflow's native hosted result must supply full build/ABI evidence.
+
+## Historical verification receipt — 2026-09-15 UTC (not LTO clearance)
 
 Code commit **`eeb4f74`** on `ci/r1-toolchain-gates`, based on `ae59c2f` and main
 `8490d34`. [Build Check 34927479435](https://github.com/CERALIVE/librga/actions/runs/34927479435)
