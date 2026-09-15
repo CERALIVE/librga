@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+// Modified by CeraLive 2026-09-15: document inert legacy logging setters.
 #ifndef _rockchip_rga_h_
 #define _rockchip_rga_h_
 
@@ -79,9 +80,17 @@ namespace android {
         int         RkRgaFlush();
 
 
+        /**
+         * @deprecated Compatibility no-op for logging; does not enable a dump.
+         * These instance flags are not the same-named rgaContext flags used by
+         * the Android palette path. Both setters retain their inert behavior.
+         * On Linux, use ROCKCHIP_RGA_LOG=1 for operation diagnostics instead;
+         * it is process-wide, not a one-shot control. See docs/API-TRAPS.md.
+         */
         void        RkRgaSetLogOnceFlag(int log) {
             mLogOnce = log;
         }
+        /** @deprecated Compatibility no-op for logging; see RkRgaSetLogOnceFlag. */
         void        RkRgaSetAlwaysLogFlag(bool log) {
             mLogAlways = log;
         }
@@ -107,4 +116,3 @@ namespace android {
 #endif
 
 #endif
-

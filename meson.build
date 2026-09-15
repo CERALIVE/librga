@@ -326,6 +326,15 @@ test('unit-logging-no-device', unit_logging, args : ['no-device'], timeout : 30)
 test('unit-logging-fake-device', unit_logging, args : ['fake-device'],
     env : unit_session_env, depends : fake_rga, timeout : 30)
 
+foreach mode : ['legacy-once', 'legacy-always']
+    setter_env = environment()
+    setter_env.set('LD_PRELOAD', fake_rga.full_path())
+    setter_env.set('FAKE_RGA_LOG', meson.current_build_dir() / (mode + '-shim.log'))
+    setter_env.set('FAKE_RGA_DUMP', meson.current_build_dir() / (mode + '-request.bin'))
+    test('unit-logging-deprecated-' + mode, unit_logging, args : [mode],
+        env : setter_env, depends : fake_rga, timeout : 30)
+endforeach
+
 unit_macro_logging = executable('unit-macro-logging', 'tests/unit/unit_macro_logging.c',
     include_directories : [incdir, unit_incdir],
     link_with : golden_librga,

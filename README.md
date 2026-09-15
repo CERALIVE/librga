@@ -162,6 +162,13 @@ Before reaching for the im2d API, read
 status-code surprises that this library's callers hit first, and most of them are
 silent.
 
+The legacy `RkRgaSetLogOnceFlag` and `RkRgaSetAlwaysLogFlag` methods are
+deprecated compatibility no-ops for logging [EXISTS], not diagnostic controls.
+On Linux, use `ROCKCHIP_RGA_LOG=1` for process-wide operation diagnostics instead.
+Their names must not be confused with Android's separate palette-context flags.
+The [compatibility decision](docs/LEGACY-LOG-SETTERS.md) explains why their bodies
+and both member sets remain unchanged.
+
 The [OSD layout limitation](docs/OSD-LAYOUT-LIMITATION.md) is confirmed
 librga-side but unreachable in the current CeraLive conversion/composition call
 set. The public layout stays unchanged pending a future major version.
