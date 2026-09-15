@@ -41,6 +41,11 @@ abi = workflow.split('  abi:\n', 1)[1].split('  reproducible:\n', 1)[0]
 assert 'run: bash ci/abi-steps.sh' in abi
 assert 'continue-on-error' not in abi
 assert 'fetch-depth: 0' in abi
+assert 'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$root"' in Path('ci/abi-steps.sh').read_text()
+reproducible = workflow.split('  reproducible:\n', 1)[1].split('  mtune-measurement:\n', 1)[0]
+assert 'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$PWD"' in reproducible
+assert 'packaging/package-contract.sh --repro' in reproducible
+assert 'continue-on-error' not in reproducible
 measurement = workflow.split('  mtune-measurement:\n', 1)[1].split('  build-check-summary:\n', 1)[0]
 assert 'continue-on-error: true' in measurement
 assert '      - mtune-measurement\n' not in summary

@@ -82,6 +82,11 @@ unfiltered `abidiff`. Its acceptance rule is no incompatible change, not strict
 numeric R0 export containment. Added symbols are allowed; tool errors and
 incompatible-change bit 8 fail. `tests/test-abi-gate.sh` proves identical and
 additive controls pass and hiding a public symbol in a scratch library fails.
+The ABI and reproducibility jobs trust only their current checkout through
+process-local Git configuration, including child packaging processes. Container
+checkout ownership differs from the build user; checkout's temporary HOME does
+not make that trust available to later shell steps. No persistent Git config is
+changed by these two jobs.
 
 `ci/mtune-measurement.sh` builds generic and `-mtune=cortex-a76` variants only
 under `test-results/mtune`, reports ELF sizes, and never calls the packager.

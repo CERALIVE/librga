@@ -494,6 +494,7 @@ jobs:
           restore-keys: repro-${{ runner.arch }}-
       - name: Build twice with an explicit fixed SOURCE_DATE_EPOCH and compare bytes
         run: |
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$PWD"
           mkdir -p test-results/repro-tmp
           export TMPDIR="$PWD/test-results/repro-tmp"
           SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
