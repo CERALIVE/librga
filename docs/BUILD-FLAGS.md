@@ -67,6 +67,29 @@ saying which diagnostic forced it.
 
 ## The flag set of record
 
+### R1 toolchain candidate (todo 41)
+
+Packaged LTO is explicitly **off** (`-Db_lto=false`) pending the required R0→R1
+ABI gate. It must not be enabled merely because compilation succeeds. The
+matched GCC 14.2 arm64 `-g -O2` probe reports incompatible changes, including
+`rga_info` growing from 696 to 704 bytes and `im_opt` from 304 to 312 bytes.
+These are not weak libstdc++ emission noise. No public header or production
+implementation is changed to repair them in this toolchain-only task.
+
+`ci/abi-steps.sh` builds the published R0 commit and current R1 using one
+target-suite compiler and optimization level, preserves DWARF, and invokes
+unfiltered `abidiff`. Its acceptance rule is no incompatible change, not strict
+numeric R0 export containment. Added symbols are allowed; tool errors and
+incompatible-change bit 8 fail. `tests/test-abi-gate.sh` proves identical and
+additive controls pass and hiding a public symbol in a scratch library fails.
+
+`ci/mtune-measurement.sh` builds generic and `-mtune=cortex-a76` variants only
+under `test-results/mtune`, reports ELF sizes, and never calls the packager.
+Its CI job is measurement-only, non-blocking, and excluded from the required
+summary. H4 microseconds/frame requires a board and belongs to todo 42: it is
+**NOT RUN** here. ELF sizes are not performance evidence or tuning-adoption
+permission. The existing H4 INCONCLUSIVE verdict remains unchanged.
+
 ### Scoped warnings-as-errors (todo 37)
 
 The earlier `-w` measurement above is historical. R1 removes that flag from

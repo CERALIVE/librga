@@ -23,13 +23,28 @@ assert 'run: bash ci/sanitizers-steps.sh' in sanitizers
 assert 'placeholder' not in sanitizers
 summary = workflow.split('  build-check-summary:\n', 1)[1]
 assert 'if: always()' in summary
-for dependency in ('changes', 'resolve-suite', 'build', 'test-results', 'sanitizers', 'werror'):
+dependencies = ('changes', 'resolve-suite', 'build', 'test-results', 'sanitizers', 'werror', 'analyzer', 'abi', 'reproducible')
+for dependency in dependencies:
     assert f'      - {dependency}\n' in summary, dependency
 werror = workflow.split('  werror:\n', 1)[1].split('  sanitizers:\n', 1)[0]
 assert 'needs: [changes, resolve-suite]' in werror
 assert "if: needs.changes.outputs.code == 'true'" in werror
 assert 'run: bash ci/werror-steps.sh' in werror
 assert 'continue-on-error' not in werror
+analyzer = workflow.split('  analyzer:\n', 1)[1].split('  werror:\n', 1)[0]
+assert 'continue-on-error' not in analyzer
+assert "ANALYZER_STRICT: '1'" in analyzer
+assert 'run: bash scripts/run-analyzer.sh' in analyzer
+assert 'needs: [changes, resolve-suite]' in analyzer
+assert "if: needs.changes.outputs.code == 'true'" in analyzer
+abi = workflow.split('  abi:\n', 1)[1].split('  reproducible:\n', 1)[0]
+assert 'run: bash ci/abi-steps.sh' in abi
+assert 'continue-on-error' not in abi
+assert 'fetch-depth: 0' in abi
+measurement = workflow.split('  mtune-measurement:\n', 1)[1].split('  build-check-summary:\n', 1)[0]
+assert 'continue-on-error: true' in measurement
+assert '      - mtune-measurement\n' not in summary
+assert '-mtune' not in Path('packaging/build-deb.sh').read_text()
 assert 'CODE_CHANGED: ${{ needs.changes.outputs.code }}' in summary
 script = textwrap.dedent(summary.split('        run: |\n', 1)[1])
 cases = [
@@ -46,6 +61,27 @@ for code, results, expected in cases:
                          env={**os.environ, 'CODE_CHANGED': code, 'RESULTS': results})
     assert (run.returncode == 0) == expected, (code, results, run.stdout, run.stderr)
 print(f'PASS: real sanitizer lane retained; summary gate {len(cases)}/{len(cases)} cases')
+for dependency in dependencies:
+    for result in ('failure', 'cancelled', 'skipped'):
+        results = ['success'] * len(dependencies)
+        results[dependencies.index(dependency)] = result
+        run = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
+                             env={**os.environ, 'CODE_CHANGED': 'true', 'RESULTS': ' '.join(results)})
+        assert run.returncode != 0, (dependency, result, run.stdout)
+print(f'PASS: all {len(dependencies)} required dependencies reject failure/cancelled/skipped')
+
+count_checker = Path('ci/check-test-count.sh').resolve()
+Path('test-results').mkdir(exist_ok=True)
+with tempfile.TemporaryDirectory(prefix='count-contract-', dir='test-results') as directory:
+    log = Path(directory) / 'testlog.json'
+    for expected in (11, 6):
+        for count, result, passes in ((expected, 'OK', True), (0, 'OK', False),
+                                      (expected - 1, 'OK', False), (expected, 'SKIP', False),
+                                      (expected, 'FAIL', False)):
+            log.write_text('\n'.join(json.dumps({'name': f'test-{i}', 'result': result}) for i in range(count)))
+            run = subprocess.run(['bash', str(count_checker), str(log), str(expected)], capture_output=True)
+            assert (run.returncode == 0) == passes, (expected, count, result)
+print('PASS: executed-count guards reject empty, incomplete, skipped and failed runs')
 
 # Execute the gate's actual discovery block, not a duplicate of its predicate.
 gate = Path('ci/sanitizers-steps.sh').read_text()

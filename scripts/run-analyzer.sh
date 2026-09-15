@@ -20,9 +20,8 @@
 #
 # EXIT STATUS
 #
-# Advisory by default: a compile failure fails, untriaged hits only warn. Set
-# ANALYZER_STRICT=1 to fail on an untriaged hit — that is how this becomes a gate
-# once the backlog it surfaces is at zero.
+# Untriaged hits fail by default. ANALYZER_STRICT=0 is a local advisory mode;
+# the required CI job explicitly selects ANALYZER_STRICT=1.
 set -euo pipefail
 
 root=$(realpath "$(dirname "${BASH_SOURCE[0]}")/..")
@@ -78,6 +77,27 @@ fi
 # of them stops.
 rc=0
 meson compile -C "$build" --ninja-args=-k0 rga:shared_library >>"$out" 2>&1 || rc=$?
+((rc == 0)) || { printf 'run-analyzer: FAIL: analyzer compile exit %s\n' "$rc" >&2; exit "$rc"; }
+python3 - <<'PY'
+import json
+import shlex
+from pathlib import Path
+
+entries = json.loads(Path('build-analyzer/compile_commands.json').read_text())
+checked = 0
+for entry in entries:
+    args = shlex.split(entry['command'])
+    output = args[args.index('-o') + 1]
+    if not output.startswith('librga.so.'):
+        continue
+    obj = Path(entry['directory']) / output
+    if '-fanalyzer' not in args or '-w' in args or not obj.is_file() or obj.stat().st_size == 0:
+        raise SystemExit(f'analyzer did not produce an analyzed object: {output}')
+    checked += 1
+if checked == 0:
+    raise SystemExit('analyzer executed no library translation units')
+print(f'run-analyzer: {checked} analyzed library translation units produced objects')
+PY
 
 grep -oE '^[^ ]+:[0-9]+:[0-9]+: warning: .*\[-Wanalyzer-[a-z-]+\]' "$out" \
 	| sed -E 's#^(\.\./)+##' \
@@ -129,7 +149,7 @@ sys.exit(1 if untriaged else 0)
 PY
 
 if ((status != 0)); then
-	if [[ ${ANALYZER_STRICT:-0} == 1 ]]; then
+	if [[ ${ANALYZER_STRICT:-1} == 1 ]]; then
 		printf 'run-analyzer: FAIL: untriaged analyzer hits (ANALYZER_STRICT=1)\n' >&2
 		exit 1
 	fi

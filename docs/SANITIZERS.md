@@ -211,9 +211,11 @@ script:
 | A Meson test registered in the **`concurrency`** suite | the TSan leg of `ci/sanitizers-steps.sh` |
 | A self-contained C file in **`tests/repro/`** | `scripts/cross-build-harness.sh --asan`, if the preflight passes |
 
-Until a `concurrency` test exists the TSan leg runs the canary and **says** that
-zero concurrency tests ran. A green leg that executed nothing is the failure mode
-this job was rebuilt to remove.
+Zero discovered `concurrency` tests fail the R1 gate. Successful Meson execution
+must additionally report 11 ASan/UBSan baseline results, six H10 results and six
+TSan concurrency results, all `OK`. Canary findings are required separately and
+are not included in those counts. This guards the real result logs rather than
+trusting that successful discovery means tests ran.
 
 ### H2 concurrent teardown probe
 
@@ -278,11 +280,10 @@ observations, not a fix, a two-run GREEN claim, or hardware acceptance.
 [`ANALYZER-TRIAGE.md`](ANALYZER-TRIAGE.md). Both output files are gitignored; the
 triage is the committed record.
 
-`meson.build` compiles the library with a blanket `-w`, and GCC's `-w` sets a
-global inhibit flag checked when a diagnostic is *emitted* — so it silences every
-`-Wanalyzer-*` finding no matter where `-fanalyzer` sits on the command line.
-`-Danalyzer=true` drops that one flag for the library targets and nothing else.
-The option defaults to `false`, so no other build in this repository changes.
+R1 has removed the old blanket `-w`; `-Danalyzer=true` remains compatible.
+GCC's `-w` silences findings even when `-fanalyzer` is present, so the runner
+checks the actual shared-library compile commands for `-fanalyzer` and absence
+of `-w`, and requires a nonzero set of resulting object files after a fresh build.
 
 Only the shipped shared library is analysed. Building everything would feed
 `-fanalyzer` to the C++ test sources, which compile with `-Werror`; a finding in
@@ -290,6 +291,7 @@ non-shipped scaffolding would abort the run instead of being reported.
 
 Reconciliation is keyed on **(source file, warning name)**, deliberately not on
 line number: a line moves with every edit above it, and a triage list that goes
-stale on unrelated churn gets rubber-stamped instead of read. The job is
-advisory; `ANALYZER_STRICT=1` makes an untriaged hit fail, which is how it becomes
-a gate once the backlog reaches zero.
+stale on unrelated churn gets rubber-stamped instead of read. R1 defaults to
+strict reconciliation; the required CI job explicitly sets `ANALYZER_STRICT=1`.
+Untriaged findings fail. `ANALYZER_STRICT=0` is local advisory investigation only,
+not a permitted CI configuration.

@@ -151,6 +151,19 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+R1 toolchain gates: analyzer, scoped werror and host-shim sanitizers are blocking
+dependencies of the required `Build Check summary`. Code changes cannot skip
+them; documentation-only skips remain explicit. Analyzer rejects untriaged
+findings and proves nonzero analyzed objects. Sanitizer result guards require
+11 baseline ASan/UBSan tests, six H10 tests and six TSan concurrency tests, all
+executed successfully. `tests/test-build-check-gating.sh` exercises failure,
+cancellation, skip and empty-result controls without adding Meson registrations.
+`Build Check` may be manually dispatched on a branch; it never publishes.
+The summary also requires matched-debug R0→R1 `abi` and two-build `reproducible`
+jobs. Packaged LTO remains disabled until the ABI blocker is resolved; see
+[`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md). `mtune-measurement` is explicitly
+non-blocking and unpackaged, and cannot establish board H4 timings.
+
 Legacy `ALOGI`/`ALOGD` diagnostics [EXISTS] remain unconditional at the macro
 boundary: only their existing call sites select emission. Do not add im2d's
 global enable or severity gate there. Constructor notices must survive disabled

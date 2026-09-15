@@ -139,11 +139,13 @@ ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_TEST_OPTIONS}" \
 	meson test -C build-asan --no-rebuild --print-errorlogs \
 	unit-pure unit-session shim-contract goldens
 cp build-asan/meson-logs/testlog.txt test-results/asan-testlog.txt
+bash ci/check-test-count.sh build-asan/meson-logs/testlog.json 11
 
 step "H10 bookkeeping, error paths, handle reuse and races under ASan+UBSan"
 ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_TEST_OPTIONS}" \
     meson test -C build-asan --no-rebuild --print-errorlogs --suite h10
 cp build-asan/meson-logs/testlog.txt test-results/asan-h10-testlog.txt
+bash ci/check-test-count.sh build-asan/meson-logs/testlog.json 6
 
 # --- ThreadSanitizer -------------------------------------------------------------
 # Host-only, permanently. TSan cannot be statically linked reliably, so there is
@@ -163,8 +165,7 @@ printf 'tsan-canary: the runtime reported the deliberate race\n'
 
 # THE DISCOVERY CONTRACT for the concurrency reproducers (todos 21-30):
 # register the test in the Meson `concurrency` suite and this leg picks it up
-# with no edit here. Until one exists the count is 0 and this script SAYS SO
-# rather than printing a green line that stands for nothing.
+# with no edit here. Zero discovered tests must fail, not retire this required leg.
 step "meson test under TSan (concurrency suite)"
 concurrency_count="$(python3 - <<'PY'
 import json, pathlib
@@ -178,13 +179,9 @@ if [ "${concurrency_count}" -gt 0 ]; then
 	cp build-tsan/meson-logs/testlog.txt test-results/tsan-testlog.txt
 	printf 'TSan: %s concurrency test(s) ran\n' "${concurrency_count}"
 else
-	cat <<'EOF'
-NO CONCURRENCY REPRODUCER REGISTERED YET.
-The TSan runtime is proven active by the canary above, and zero concurrency
-tests ran. This leg claims nothing about librga's thread safety. Add a test to
-the Meson `concurrency` suite and it runs here automatically.
-EOF
+	fail 'no concurrency tests discovered'
 fi
+bash ci/check-test-count.sh build-tsan/meson-logs/testlog.json 6
 
 {
 	printf '# sanitizers-steps summary\n'
