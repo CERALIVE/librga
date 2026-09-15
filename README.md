@@ -77,8 +77,11 @@ rejects empty or skipped suites as well as failures. Run the workflow-contract
 regressions locally with `bash tests/test-build-check-gating.sh`. Manual
 `Build Check` runs build and test branch candidates only, without publishing.
 The matched-debug ABI and reproducibility jobs also feed the summary. R1 is
-not ABI-cleared: the debug comparison reports incompatible type changes, so
-packaged LTO stays disabled. See [build flags](docs/BUILD-FLAGS.md) for the
+not ABI-cleared: the [reserve repair](docs/R1-ABI-REPAIR.md) restores the Linux
+LP64 public sizes and adds C/C++ assertions plus an R0-sized guarded-copy test,
+but inherited symbol removals and other type changes keep the unfiltered gate
+red. Gaussian configuration remains available. Packaged LTO stays disabled.
+See [build flags](docs/BUILD-FLAGS.md) for the
 measurement boundary and the unpackaged, non-gating Cortex-A76 variant.
 The [todo-41 gate receipt](docs/R1-BUILD-GATES.md) records the passing counts,
 reproducible package hashes and the blocking matched-debug ABI report.

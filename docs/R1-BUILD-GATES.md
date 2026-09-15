@@ -1,5 +1,10 @@
 # R1 build and toolchain gates [PARTIAL]
 
+**Historical gate receipt.** The later [reserve repair](R1-ABI-REPAIR.md) restores
+the two Linux LP64 public sizes and adds regression checks. The cumulative ABI
+gate still fails on the separately classified inherited changes. Counts and
+package hashes below belong to the original run, not the repaired candidate.
+
 Scope: librga-fork todo 41 only. **Not ABI-cleared, not board-qualified, not
 released.** Todos 42 and 43 were not attempted. No production source, installed
 header, default, status/message contract, SONAME or symbol visibility changed.
