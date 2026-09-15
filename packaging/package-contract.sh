@@ -328,6 +328,10 @@ if [ "$1" = "--repro" ]; then
 	if ! diff -u "${tmp}/sums-1" "${tmp}/sums-2"; then
 		fail "two builds with the same SOURCE_DATE_EPOCH produced different archives"
 	fi
+	for first in "${tmp}/dist-1/"*.deb; do
+		cmp "${first}" "${tmp}/dist-2/${first##*/}" \
+			|| fail "repeated build differs byte-for-byte: ${first##*/}"
+	done
 	note "OK reproducible — two builds, identical sha256:"
 	sed 's/^/  /' "${tmp}/sums-1"
 	exit 0

@@ -29,8 +29,8 @@ Two Debian packages, both release assets of one tag and both served from
 | `librga-ceralive-dev` | Headers under `include/rga/`, the static library, and `librga.pc`. |
 
 The SONAME, the pkg-config name, and the header install path are unchanged from
-upstream. The exported-symbol set is a superset contract: it may grow, never
-shrink.
+upstream. R1 accepts exactly [18 inherited internal-symbol removals](docs/R1-ABI-ACCEPTANCE.md)
+with documentation; any extra removal or stale accepted entry fails the ABI gate.
 
 ## Versioning: R0 and R1
 
@@ -70,6 +70,28 @@ byte-for-byte and is **never invoked** — no debhelper is involved in a CeraLiv
 build.
 
 ### Wave-E regression checks (R1)
+
+The `Build Check summary` requires the analyzer, scoped werror and host-shim
+sanitizer jobs. The analyzer fails on untriaged findings; the sanitizer runner
+rejects empty or skipped suites as well as failures. Run the workflow-contract
+regressions locally with `bash tests/test-build-check-gating.sh`. Manual
+`Build Check` runs build and test branch candidates only, without publishing.
+The matched-debug ABI and reproducibility jobs also feed the summary. The
+[reserve repair](docs/R1-ABI-REPAIR.md) restores the Linux LP64 public sizes with
+C/C++ assertions and an R0-sized guarded-copy test. The later
+[accepted-removal decision](docs/R1-ABI-ACCEPTANCE.md) enumerates the 18 inherited
+removals, rejects unexpected or stale entries, and leaves all other ABI changes
+visible. Gaussian configuration remains available. Packaged LTO and the matching
+normal test lane use `ci/package-lto.env`, currently **disabled**: the LTO
+experiment preserves names but changes WEAK/GNU_UNIQUE bindings. A separate,
+required dynamic-symbol check compares exact name/type/binding/visibility tuples,
+retains the failed LTO qualification, and demands equality for the selected
+packaging configuration. Run its real-ELF mutation controls with
+`bash tests/test-dynsym-gate.sh`. An empty abidiff report is not LTO clearance.
+See [build flags](docs/BUILD-FLAGS.md) for the
+measurement boundary and the unpackaged, non-gating Cortex-A76 variant.
+The [todo-41 gate receipt](docs/R1-BUILD-GATES.md) records the passing counts,
+reproducible package hashes and the blocking matched-debug ABI report.
 
 The R1 evidence ledger is checked by `bash scripts/check-ledger-reviews.sh`
 and the Meson suite. It distinguishes approved fixes from reviewed observations,
@@ -132,7 +154,8 @@ These fixes are not release approval. Fresh evidence and the separate R0 ABI
 closure finding are in [`docs/fix-audit.d/wave-e-verification.md`](docs/fix-audit.d/wave-e-verification.md).
 The [matched-build reconciliation](docs/fix-audit.d/wave-e-abi-reconciliation.md)
 corrects the initial unlike-toolchain comparison: 18 inherited removals, no
-shipping-build or Wave-E removals. Strict numeric R0 containment is not waived.
+shipping-build or Wave-E removals. The later owner decision accepts those 18 only;
+it does not erase the historical findings or authorize another removal.
 
 Before reaching for the im2d API, read
 [`docs/API-TRAPS.md`](docs/API-TRAPS.md). It documents the argument-unit and

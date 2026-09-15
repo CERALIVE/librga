@@ -162,6 +162,7 @@ case " ${LDFLAGS} " in
 esac
 
 # --- Build ---------------------------------------------------------------------
+source "${root}/ci/package-lto.env"
 # Every option is stated explicitly rather than left at its default. -Dlibdrm=true
 # mirrors upstream debian/rules; -Dlibrga_demo=false keeps the sample binary and
 # its bundled prebuilt libdrm.so out of the packages entirely.
@@ -169,6 +170,7 @@ meson setup "${build_dir}" "${root}" \
 	--prefix=/usr \
 	--libdir="lib/${triplet}" \
 	--buildtype=release \
+	-Db_lto="${PACKAGED_LTO}" \
 	-Dlibdrm=true \
 	-Dlibrga_demo=false
 meson compile -C "${build_dir}"
