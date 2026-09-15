@@ -121,10 +121,13 @@ These are compatibility contracts with live consumers, not cleanup opportunities
   `Conflicts`/`Replaces: librga2`) and `librga-ceralive-dev` (development).
 - **pkg-config:** the file is `librga.pc` and keeps its name and its variables.
 - **Header install path:** public headers install under `include/rga/`.
-- **Exported symbols are a SUPERSET contract.** The set may grow; it may **never
-  shrink**. No symbol removal, no public-struct layout change, no visibility or
-  version-script change. `nm -D` containment against R0 plus `abidiff` between
-  releases are the executable authorities.
+- **No unexpected symbol removals.** R1 accepts exactly the 18 inherited upstream
+  removals in `packaging/baseline-symbols-upstream-delta.txt`, without shims. Both
+  extra removals and absent expected removals fail the ABI gate. This explicit
+  owner decision supersedes strict R0-superset wording for those entries only;
+  see [R1 ABI acceptance](docs/R1-ABI-ACCEPTANCE.md) for each disposition and the
+  private-binary/writable-data risks. No new public-layout, visibility or
+  version-script change is authorized. R0 neutrality is unchanged.
 - **Defaults are frozen.** The default colour matrix, the default interpolation
   mode, and the default log level stay exactly as upstream ships them. Changing
   any of them silently changes behaviour for every caller, including callers
@@ -138,9 +141,9 @@ locked by C/C++ header assertions. Gaussian configuration consumes existing
 reserve space including its alignment gap; no preceding field moves. Non-LP64
 and Android layouts are not changed by this repair. `unit-pure` guards an exact
 304-byte R0 option allocation with an inaccessible page and checks Gaussian
-setter/copy round-trips. This repair is **not cumulative ABI clearance**: the
-unfiltered gate still rejects inherited R0 symbol removals and other type changes.
-See [R1 ABI repair](docs/R1-ABI-REPAIR.md) for the measurements and dispositions.
+setter/copy round-trips. The [reserve repair](docs/R1-ABI-REPAIR.md) records the
+measurements; the later [accepted-removal decision](docs/R1-ABI-ACCEPTANCE.md)
+changes only the enumerated removal policy, never these assertions.
 
 ## The additive-only principle
 
@@ -151,6 +154,10 @@ to be broken by well-meant tidying:
 > trees, legacy `RockchipRga`/`c_RkRga*` API, every exported symbol, all stay;
 > `LIBRGA_STRICT_DRIVER=1` stays as a default-off opt-in; validation changes only
 > accept MORE valid input.
+
+The 2026-09-14 owner decision makes one narrow exception to the quoted export
+rule: the 18 inherited R1 removals above are accepted with documentation. It is
+not authorization to remove any other symbol or source/platform tree.
 
 In practice: the Android and RT-Thread build files stay even though CeraLive
 builds with Meson, the CMake tree stays even though we do not use it, chips we
@@ -169,12 +176,13 @@ executed successfully. `tests/test-build-check-gating.sh` exercises failure,
 cancellation, skip and empty-result controls without adding Meson registrations.
 `Build Check` may be manually dispatched on a branch; it never publishes.
 The summary also requires matched-debug R0→R1 `abi` and two-build `reproducible`
-jobs. Packaged LTO remains disabled until the ABI blocker is resolved; see
+jobs. Packaged LTO is enabled behind both non-LTO and LTO ABI comparisons; see
 [`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md). `mtune-measurement` is explicitly
 non-blocking and unpackaged, and cannot establish board H4 timings.
-The exact todo-41 result is [`docs/R1-BUILD-GATES.md`](docs/R1-BUILD-GATES.md):
-required toolchain jobs and reproducibility pass, but ABI and the terminal
-summary fail. Do not close todo 41 or enable LTO on that evidence.
+The historical todo-41 result is [`docs/R1-BUILD-GATES.md`](docs/R1-BUILD-GATES.md).
+Current removal policy and verification are in
+[`docs/R1-ABI-ACCEPTANCE.md`](docs/R1-ABI-ACCEPTANCE.md). Green under the accepted
+list does not mean an empty diff or board/release approval.
 
 Legacy `ALOGI`/`ALOGD` diagnostics [EXISTS] remain unconditional at the macro
 boundary: only their existing call sites select emission. Do not add im2d's
@@ -294,7 +302,8 @@ GCC 16 debug-vs-GCC 14 release comparison's three extra missing weak `std::`
 symbols were measurement artifacts; the shipping comparison has exactly the 18
 documented upstream removals and no Wave-E removal. See
 [`docs/fix-audit.d/wave-e-abi-reconciliation.md`](docs/fix-audit.d/wave-e-abi-reconciliation.md).
-This does not waive the strict R0 superset contract or expand its recorded delta.
+That historical receipt did not waive R0 containment. The later owner decision
+accepts only the enumerated delta; see `docs/R1-ABI-ACCEPTANCE.md`.
 The main-merge gating contract is `bash tests/test-build-check-gating.sh`, also
 run by `ci/build-check-steps.sh`: real sanitizer coverage must survive docs-only
 gating, and skipped code lanes must fail the terminal summary.
@@ -338,8 +347,8 @@ in [`docs/SANITIZERS.md`](docs/SANITIZERS.md#h2-concurrent-teardown-probe).
   aarch64, except the four exact OSD flag-offset divergences pinned by the
   comparator. [The OSD limitation](docs/OSD-LAYOUT-LIMITATION.md) is librga-side,
   unreachable in the current CeraLive call set, and deferred to a major version.
-- That the exported-symbol set of a release contains R0's, and that `abidiff`
-  reports no incompatible change against the previous release.
+- That removals equal the explicitly accepted R1 set and `abidiff` reports no
+  remaining incompatible change against R0, including with LTO enabled.
 - On the board, only what the transcript for that run names: the exact package,
   the exact kernel, the exact island tag, and the finite observations that run
   scored.

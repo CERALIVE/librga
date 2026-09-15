@@ -69,19 +69,22 @@ saying which diagnostic forced it.
 
 ### R1 toolchain candidate (todo 41)
 
-Packaged LTO is explicitly **off** (`-Db_lto=false`) pending the required R0→R1
-ABI gate. It must not be enabled merely because compilation succeeds. The
-matched GCC 14.2 arm64 `-g -O2` probe reports incompatible changes, including
-`rga_info` growing from 696 to 704 bytes and `im_opt` from 304 to 312 bytes.
-These are not weak libstdc++ emission noise. No public header or production
-implementation is changed to repair them in this toolchain-only task.
+Packaged LTO is **on** (`-Db_lto=true`) after the
+[reserve-size repair](R1-ABI-REPAIR.md) and the owner's
+[acceptance of exactly 18 inherited removals](R1-ABI-ACCEPTANCE.md). The C/C++
+size assertions remain locked at 696/304. The normal build/test lane uses LTO too.
+This supersedes the initial LTO-off candidate; compilation alone was not clearance.
 
 `ci/abi-steps.sh` builds the published R0 commit and current R1 using one
-target-suite compiler and optimization level, preserves DWARF, and invokes
-unfiltered `abidiff`. Its acceptance rule is no incompatible change, not strict
-numeric R0 export containment. Added symbols are allowed; tool errors and
-incompatible-change bit 8 fail. `tests/test-abi-gate.sh` proves identical and
-additive controls pass and hiding a public symbol in a scratch library fails.
+target-suite compiler and optimization level, preserves DWARF, and first runs a
+non-LTO control. It then compares R1 with LTO against the same non-LTO R0. Each
+comparison retains the unfiltered report, demands exact equality with the
+committed removal set (including stale-entry rejection), and suppresses only those
+literal deletions before applying the original exit-bit rule. Added symbols are
+allowed; tool errors and remaining incompatible-change bit 8 fail. All other type
+changes stay visible. `tests/test-abi-gate.sh` proves exact acceptance, unexpected
+function/data removal and stale-entry rejection, plus independent incompatible
+vtable rejection. It retains the original identical/additive/hidden-symbol cases.
 The ABI and reproducibility jobs trust only their current checkout through
 process-local Git configuration, including child packaging processes. Container
 checkout ownership differs from the build user; checkout's temporary HOME does

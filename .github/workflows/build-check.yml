@@ -464,7 +464,7 @@ jobs:
         with:
           name: abi-evidence
           path: |
-            test-results/abi/abidiff.txt
+            test-results/abi/abidiff*.txt*
             test-results/abi/build-*/compile_commands.json
             test-results/abi/build-*/librga.so.2.1.0
           if-no-files-found: error

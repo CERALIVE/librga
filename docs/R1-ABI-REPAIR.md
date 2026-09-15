@@ -1,4 +1,11 @@
-# R1 reserve repair and remaining ABI blockers [PARTIAL]
+# R1 reserve repair and remaining ABI blockers — historical receipt [PARTIAL]
+
+**Superseded removal disposition:** the later owner decision
+[accepts exactly these 18 inherited removals with documentation](R1-ABI-ACCEPTANCE.md),
+without shims, and enables LTO behind the exact-set ABI gate. The restore-all
+direction and red-gate/LTO-off statements below describe the reserve-only task
+at `ae59c2f`, not current policy. The layout measurements, residual type changes,
+and evidence boundaries remain valid; no historical test result is rewritten.
 
 **The two Linux LP64 public sizes are repaired; R1 is still not ABI-cleared.**
 This is a reserve-budget correction on `ci/r1-toolchain-gates`, based on

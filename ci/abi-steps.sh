@@ -11,7 +11,7 @@ out="$root/test-results/abi"
 mkdir -p "$out"
 readonly r0=f4c3ee62ab354c2cbe22718f543fc0ba6e58365c
 [[ $(git rev-parse '1.10.1+ceralive.1^{commit}') == "$r0" ]]
-[[ ! -e "$out/r0" && ! -e "$out/build-r1" ]] || {
+[[ ! -e "$out/r0" && ! -e "$out/build-r1" && ! -e "$out/build-r1-lto" ]] || {
     printf 'ABI: use a fresh test-results/abi directory\n' >&2; exit 1;
 }
 mkdir -p "$out/r0"
@@ -28,4 +28,12 @@ for revision in r0 r1; do
     meson compile -C "$out/build-$revision" rga:shared_library
 done
 bash tests/test-abi-gate.sh
-bash ci/check-abi.sh "$out/build-r0/librga.so" "$out/build-r1/librga.so" "$out/abidiff.txt"
+bash ci/check-abi.sh "$out/build-r0/librga.so" "$out/build-r1/librga.so" "$out/abidiff.txt" \
+    packaging/baseline-symbols-upstream-delta.txt
+
+# Keep the non-LTO control above; only the candidate changes optimization here.
+meson setup "$out/build-r1-lto" "$root" \
+    --buildtype=debugoptimized -Db_lto=true -Dlibrga_demo=false
+meson compile -C "$out/build-r1-lto" rga:shared_library
+bash ci/check-abi.sh "$out/build-r0/librga.so" "$out/build-r1-lto/librga.so" "$out/abidiff-lto.txt" \
+    packaging/baseline-symbols-upstream-delta.txt

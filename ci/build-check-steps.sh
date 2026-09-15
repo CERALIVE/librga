@@ -131,6 +131,7 @@ if command -v ccache >/dev/null; then
 fi
 rm -rf build
 meson setup build \
+	-Db_lto=true \
 	-Dlibdrm=true \
 	-Dlibrga_demo=false
 
