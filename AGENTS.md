@@ -133,6 +133,15 @@ These are compatibility contracts with live consumers, not cleanup opportunities
   Accepting `IM_SCHEDULER_DEFAULT` inside the existing `imconfig` signature is an
   argument-validation fix, not new API.
 
+Linux LP64 `rga_info_t` and `im_opt_t` retain the R0 sizes (696 and 304 bytes),
+locked by C/C++ header assertions. Gaussian configuration consumes existing
+reserve space including its alignment gap; no preceding field moves. Non-LP64
+and Android layouts are not changed by this repair. `unit-pure` guards an exact
+304-byte R0 option allocation with an inaccessible page and checks Gaussian
+setter/copy round-trips. This repair is **not cumulative ABI clearance**: the
+unfiltered gate still rejects inherited R0 symbol removals and other type changes.
+See [R1 ABI repair](docs/R1-ABI-REPAIR.md) for the measurements and dispositions.
+
 ## The additive-only principle
 
 Quoted verbatim from the effort's plan (D29), because it is the rule most likely

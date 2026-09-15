@@ -13,9 +13,13 @@
  * what librga does TODAY. Where today's behaviour is a defect it is asserted
  * anyway and marked, so a later fix has to change the test deliberately.
  */
+// Modified by CeraLive 2026-09-14: guard R0 option copies and Gaussian storage.
 #include <cerrno>
+#include <cstddef>
 #include <cstring>
 #include <dlfcn.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "RgaUtils.h"
 #include "rga.h"
@@ -213,6 +217,61 @@ static void check_rga_set_rect(void)
 
 /* -------------------------------------------------------------------------- */
 
+static void check_public_abi(void)
+{
+#if defined(__linux__) && defined(__LP64__) && !defined(ANDROID)
+    static_assert(offsetof(rga_info_t, rgba5551_alpha1) == 291, "R0 prefix moved");
+    static_assert(offsetof(im_opt_t, interp) == 176, "R0 prefix moved");
+    static_assert(offsetof(rga_info_t, gauss_config) == 296, "Gaussian storage moved");
+    static_assert(offsetof(im_opt_t, gauss_config) == 184, "Gaussian storage moved");
+    static_assert(offsetof(rga_info_t, reserve) + sizeof(rga_info_t::reserve) == 690,
+                  "R0 reserve end moved");
+    static_assert(offsetof(im_opt_t, reserve) + sizeof(im_opt_t::reserve) == 304,
+                  "R0 reserve end moved");
+
+    unit_begin("R0 option boundary and Gaussian round-trip");
+    const long page_size = sysconf(_SC_PAGESIZE);
+    if (page_size < 304) {
+        unit_fail("page size", "cannot construct the R0 guard-page fixture");
+        return;
+    }
+    void *mapping = mmap(NULL, 2 * page_size, PROT_READ | PROT_WRITE,
+                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mapping == MAP_FAILED) {
+        unit_fail("mmap", "cannot construct the R0 guard-page fixture");
+        return;
+    }
+    char *boundary = static_cast<char *>(mapping) + page_size;
+    if (mprotect(boundary, page_size, PROT_NONE) != 0) {
+        unit_fail("mprotect", "cannot protect the page following the R0 object");
+        munmap(mapping, 2 * page_size);
+        return;
+    }
+    /* A real R0-sized allocation, not sizeof(the header being tested). */
+    char *old_opt = boundary - 304;
+    memset(old_opt, 0, 304);
+    const im_api_version_t r0_version = 0x010a0104;
+    memcpy(old_opt, &r0_version, sizeof(r0_version));
+    im_opt_t copied = {};
+    unit_eq_int("copy R0 without reading the guard page", IM_STATUS_SUCCESS,
+                rga_get_opt(&copied, old_opt));
+    unit_eq_hex("R0 version retained", r0_version, copied.version);
+    unit_eq_int("munmap", 0, munmap(mapping, 2 * page_size));
+
+    im_opt_t opt = {};
+    imsetOptGaussianBlur(&opt, 3, 3, 1, 2);
+    unit_eq_int("copy Gaussian options", IM_STATUS_SUCCESS, rga_get_opt(&copied, &opt));
+    unit_eq_int("Gaussian width", 3, copied.gauss_config.ksize.width);
+    unit_eq_int("Gaussian height", 3, copied.gauss_config.ksize.height);
+    unit_eq_bpp("Gaussian sigma x", 1, copied.gauss_config.sigma_x);
+    unit_eq_bpp("Gaussian sigma y", 2, copied.gauss_config.sigma_y);
+    double matrix[9] = {};
+    imsetOptGaussianBlurMatrix(&opt, 3, 3, matrix);
+    unit_eq_int("copy Gaussian matrix", IM_STATUS_SUCCESS, rga_get_opt(&copied, &opt));
+    unit_eq_int("Gaussian matrix pointer retained", 1, copied.gauss_config.matrix == matrix);
+#endif
+}
+
 int main(void)
 {
     /*
@@ -228,6 +287,7 @@ int main(void)
     check_format_tables();
     check_version_predicates();
     check_rga_set_rect();
+    check_public_abi();
 
     return unit_report("unit-pure");
 }

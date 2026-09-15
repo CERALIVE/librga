@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+// Modified by CeraLive 2026-09-14: preserve the R0 public structure size.
 #ifndef _rk_drm_rga_
 #define _rk_drm_rga_
 
@@ -321,8 +322,20 @@ typedef struct rga_info {
 
     struct rga_gauss_config gauss_config;
 
+#if defined(__linux__) && defined(__LP64__) && !defined(ANDROID)
+    char reserve[378]; /* R0: 398 minus 4-byte alignment gap and 16-byte config. */
+#else
     char reserve[386];
+#endif
 } rga_info_t;
+
+#if defined(__linux__) && defined(__LP64__) && !defined(ANDROID)
+#ifdef __cplusplus
+static_assert(sizeof(rga_info_t) == 696, "rga_info_t must retain the R0 ABI size");
+#else
+_Static_assert(sizeof(rga_info_t) == 696, "rga_info_t must retain the R0 ABI size");
+#endif
+#endif
 
 
 typedef struct drm_rga {
