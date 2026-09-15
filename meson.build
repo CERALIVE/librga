@@ -44,8 +44,9 @@ incdir = include_directories(
 # Modified by CeraLive 2026-09-14: expose inherited warnings without a cleanup sweep.
 # ci/werror-steps.sh separately gates the explicitly documented fork-owned scope.
 
-# Modified by CeraLive 2026-09-14: retain existing weak exports during GCC LTO.
-# These are linker roots for existing definitions, not new shims or ABI exclusions.
+# Modified by CeraLive 2026-09-15: keep the rejected LTO experiment measurable.
+# These roots retain names, NOT bindings. Packaging disables LTO; the required
+# dynsym gate records this experiment's failure. Do not treat abidiff as clearance.
 lto_link_args = []
 if get_option('b_lto')
     foreach symbol : [

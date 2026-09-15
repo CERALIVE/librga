@@ -69,18 +69,30 @@ saying which diagnostic forced it.
 
 ### R1 toolchain candidate (todo 41)
 
-Packaged LTO is **on** (`-Db_lto=true`) after the
-[reserve-size repair](R1-ABI-REPAIR.md) and the owner's
-[acceptance of exactly 18 inherited removals](R1-ABI-ACCEPTANCE.md). The C/C++
-size assertions remain locked at 696/304. The normal build/test lane uses LTO too.
-This supersedes the initial LTO-off candidate; compilation alone was not clearance.
+Packaged LTO is **off**, selected by `ci/package-lto.env` in both packaging and
+the normal build/test lane. Independent review found binding drift that abidiff
+does not report. The [reserve-size repair](R1-ABI-REPAIR.md), owner's
+[acceptance of exactly 18 inherited removals](R1-ABI-ACCEPTANCE.md), and C/C++
+size assertions at 696/304 remain unchanged. ABI correctness takes precedence
+over the optimization; no reliable binding-preserving LTO mechanism is claimed.
 
 GCC LTO prunes some existing weak C++ definitions unless they are linker roots.
-The shared-library target in `meson.build` retains those exact definitions using
-`-Wl,--undefined=<symbol>` under LTO only; no source shim or visibility change.
-The initial plain-LTO build failed the exact removal gate, so these are retention
-flags, **not additions to the 18-removal allowance**. The separate non-LTO-R1 to
-LTO-R1 comparison accepts no removals. See the acceptance record for the RED run.
+The experimental shared-library target in `meson.build` retains those names using
+`-Wl,--undefined=<symbol>` under LTO only, but **not their bindings**. Those roots
+remain solely to keep the rejected experiment and existing comparisons measurable;
+they are not used by packaging. There are no additions to the removal allowance.
+The separate non-LTO-R1 to LTO-R1 abidiff comparison still accepts no removals.
+
+The required ABI job also compares exported `(name, type, binding, visibility)`
+tuples with `ci/check-dynsym.py`: exact equality only, no exclusions. It always
+retains the failed experimental LTO comparison, even while LTO is off. The policy
+permits that failed qualification **only with packaged LTO disabled**; a separate
+build with the selected packaging setting must pass unconditional tuple equality
+against non-LTO R1. Missing/invalid inputs and tool errors fail either way.
+`dynamic-symbol-evidence` retains both comparisons, normalized inventories, raw
+readelf output, the explicit LTO verdict and mutation-control results. The controls
+change actual .dynsym WEAK/UNIQUE bindings, type and visibility independently;
+each must fail. This metadata gate complements, not replaces, abidiff.
 
 `ci/abi-steps.sh` builds the published R0 commit and current R1 using one
 target-suite compiler and optimization level, preserves DWARF, and first runs a

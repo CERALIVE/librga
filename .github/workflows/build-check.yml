@@ -459,6 +459,13 @@ jobs:
           restore-keys: abi-${{ runner.arch }}-
       - name: Compare matched -g -O2 R0 and R1, rejecting incompatibilities
         run: bash ci/abi-steps.sh
+      - name: Retain exact dynamic-symbol comparison and LTO qualification
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: dynamic-symbol-evidence
+          path: test-results/abi/dynsym-*
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -121,6 +121,7 @@ bash packaging/package-contract.sh
 # wipes and owns. The feature options mirror that script so the tests exercise
 # the configuration the package ships.
 step "meson setup"
+source ci/package-lto.env
 if command -v ccache >/dev/null; then
 	# meson has no compiler-launcher option; it reads the compiler out of the
 	# environment at setup time. Only the TEST build is launched through ccache
@@ -131,7 +132,7 @@ if command -v ccache >/dev/null; then
 fi
 rm -rf build
 meson setup build \
-	-Db_lto=true \
+	-Db_lto="${PACKAGED_LTO}" \
 	-Dlibdrm=true \
 	-Dlibrga_demo=false
 

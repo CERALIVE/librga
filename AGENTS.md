@@ -176,12 +176,18 @@ executed successfully. `tests/test-build-check-gating.sh` exercises failure,
 cancellation, skip and empty-result controls without adding Meson registrations.
 `Build Check` may be manually dispatched on a branch; it never publishes.
 The summary also requires matched-debug R0→R1 `abi` and two-build `reproducible`
-jobs. Packaged LTO is enabled behind both non-LTO and LTO ABI comparisons; see
+jobs. Packaged LTO is disabled by `ci/package-lto.env`; see
 [`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md). `mtune-measurement` is explicitly
 non-blocking and unpackaged, and cannot establish board H4 timings.
-The shared target retains existing weak C++ definitions with exact linker roots
-under LTO; these are not removal waivers or shims. Non-LTO R1→LTO R1 additionally
-accepts no removals. Do not widen the upstream removal list to hide LTO pruning.
+The experimental LTO target retains names with linker roots but changes WEAK and
+GNU_UNIQUE bindings. `ci/check-dynsym.py` requires exact exported name/type/binding/
+visibility equality, independently of abidiff. The required ABI job always records
+the LTO comparison and its explicit FAIL qualification, forbids packaging LTO on
+that result, and requires exact equality for a separate build using the selected
+packaging LTO setting. Tool errors are fatal regardless of that setting. The
+`dynamic-symbol-evidence` artifact retains inventories, raw readelf output, diffs,
+policy and real-ELF mutation controls. All three abidiff comparisons remain required;
+non-LTO R1→LTO R1 accepts no removals. Do not widen the upstream removal list.
 The historical todo-41 result is [`docs/R1-BUILD-GATES.md`](docs/R1-BUILD-GATES.md).
 Current removal policy and verification are in
 [`docs/R1-ABI-ACCEPTANCE.md`](docs/R1-ABI-ACCEPTANCE.md). Green under the accepted
@@ -351,7 +357,9 @@ in [`docs/SANITIZERS.md`](docs/SANITIZERS.md#h2-concurrent-teardown-probe).
   comparator. [The OSD limitation](docs/OSD-LAYOUT-LIMITATION.md) is librga-side,
   unreachable in the current CeraLive call set, and deferred to a major version.
 - That removals equal the explicitly accepted R1 set and `abidiff` reports no
-  remaining incompatible change against R0, including with LTO enabled.
+  remaining incompatible change against R0. This does not prove ELF binding
+  equivalence: the separate dynsym check rejects the experimental LTO build,
+  and the selected non-LTO configuration must preserve every exported tuple.
 - On the board, only what the transcript for that run names: the exact package,
   the exact kernel, the exact island tag, and the finite observations that run
   scored.

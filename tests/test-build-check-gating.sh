@@ -47,8 +47,26 @@ assert '-Db_lto=false' in abi_steps and '-Db_lto=true' in abi_steps
 assert '"$out/abidiff-lto.txt"' in abi_steps
 assert '"$out/abidiff-lto-only.txt"' in abi_steps
 assert abi_steps.count('packaging/baseline-symbols-upstream-delta.txt') == 2
+assert 'source ci/package-lto.env' in abi_steps
+assert 'export PACKAGED_LTO' in abi_steps
+assert 'bash tests/test-dynsym-gate.sh | tee "$out/dynsym-controls.txt"' in abi_steps
+assert 'bash ci/check-lto-policy.sh "$out/build-r1/librga.so" "$out/build-r1-lto/librga.so"' in abi_steps
+assert '"$out/dynsym-lto.diff" | tee "$out/dynsym-policy.txt"' in abi_steps
+assert '-Db_lto="$PACKAGED_LTO"' in abi_steps
+assert 'python3 ci/check-dynsym.py "$out/build-r1/librga.so" "$out/build-r1-selected/librga.so"' in abi_steps
+assert '"$out/dynsym-selected.diff"' in abi_steps
+assert 'set -euo pipefail' in abi_steps
+assert 'readonly PACKAGED_LTO=false' in Path('ci/package-lto.env').read_text()
+assert 'name: dynamic-symbol-evidence' in abi
+dynsym_upload = abi.split('name: Retain exact dynamic-symbol comparison and LTO qualification', 1)[1].split('      - uses:', 1)[0]
+assert 'if: always()' in dynsym_upload
+assert 'path: test-results/abi/dynsym-*' in dynsym_upload
+assert 'if-no-files-found: error' in dynsym_upload
 for build_script in ('packaging/build-deb.sh', 'ci/build-check-steps.sh'):
-    assert '-Db_lto=true' in Path(build_script).read_text(), build_script
+    build_text = Path(build_script).read_text()
+    assert 'source ' in build_text and 'ci/package-lto.env' in build_text, build_script
+    assert '-Db_lto="${PACKAGED_LTO}"' in build_text, build_script
+    assert '-Db_lto=true' not in build_text, build_script
 reproducible = workflow.split('  reproducible:\n', 1)[1].split('  mtune-measurement:\n', 1)[0]
 assert 'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$PWD"' in reproducible
 assert 'packaging/package-contract.sh --repro' in reproducible

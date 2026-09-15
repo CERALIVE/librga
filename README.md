@@ -81,8 +81,13 @@ The matched-debug ABI and reproducibility jobs also feed the summary. The
 C/C++ assertions and an R0-sized guarded-copy test. The later
 [accepted-removal decision](docs/R1-ABI-ACCEPTANCE.md) enumerates the 18 inherited
 removals, rejects unexpected or stale entries, and leaves all other ABI changes
-visible. Gaussian configuration remains available. Packaged LTO is enabled behind
-both non-LTO and LTO ABI comparisons; the normal test lane also uses LTO.
+visible. Gaussian configuration remains available. Packaged LTO and the matching
+normal test lane use `ci/package-lto.env`, currently **disabled**: the LTO
+experiment preserves names but changes WEAK/GNU_UNIQUE bindings. A separate,
+required dynamic-symbol check compares exact name/type/binding/visibility tuples,
+retains the failed LTO qualification, and demands equality for the selected
+packaging configuration. Run its real-ELF mutation controls with
+`bash tests/test-dynsym-gate.sh`. An empty abidiff report is not LTO clearance.
 See [build flags](docs/BUILD-FLAGS.md) for the
 measurement boundary and the unpackaged, non-gating Cortex-A76 variant.
 The [todo-41 gate receipt](docs/R1-BUILD-GATES.md) records the passing counts,
