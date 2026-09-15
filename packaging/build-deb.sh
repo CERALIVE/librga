@@ -169,6 +169,7 @@ meson setup "${build_dir}" "${root}" \
 	--prefix=/usr \
 	--libdir="lib/${triplet}" \
 	--buildtype=release \
+	-Db_lto=false \
 	-Dlibdrm=true \
 	-Dlibrga_demo=false
 meson compile -C "${build_dir}"
