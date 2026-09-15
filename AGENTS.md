@@ -167,6 +167,15 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+Explicit RGB/BGR full709 selector repair [EXISTS] is guarded by
+`donor-full-csc`, including unchanged 601/limited709 controls and retained source
+Y2R in combined CSC. It repairs upstream `2aa0ab4d` without coefficient changes.
+The [isolated OPi receipt](docs/FULL709-SELECTOR.md) proves the 8↔0 pixel effect;
+it does not pass G-B or authorize R1 release. For this sysext-backed qualification,
+**never APT-manage librga or remount `/usr`**: use extracted artifacts through
+per-process `LD_LIBRARY_PATH`. The historical package-swap instructions below
+do not authorize an install on a read-only merged `/usr`.
+
 R1 toolchain gates: analyzer, scoped werror and host-shim sanitizers are blocking
 dependencies of the required `Build Check summary`. Code changes cannot skip
 them; documentation-only skips remain explicit. Analyzer rejects untriaged
