@@ -141,3 +141,47 @@ an empty symbol diff. The extra three weak libstdc++ names were measurement nois
 No PR, tag, release, board qualification or SONAME change is authorized by this
 decision. `Provides: librga2 (= 2.2.0)` and `Conflicts`/`Replaces: librga2` remain
 unchanged.
+
+## Verification receipt — 2026-09-15 UTC
+
+Code commit **`eeb4f74`** on `ci/r1-toolchain-gates`, based on `ae59c2f` and main
+`8490d34`. [Build Check 34927479435](https://github.com/CERALIVE/librga/actions/runs/34927479435)
+is **fully green**, including its required summary. This is a branch candidate,
+not a released package or a hardware qualification.
+
+| Gate | Measured result |
+|---|---|
+| R0 → R1, matched GCC 14.2 `-g -O2`, LTO off | Raw abidiff 12; exact 18-removal set; deletion-only rules leave exit **4**; wrapper passes |
+| Same R0 → R1 with LTO on | Raw abidiff 12; same exact 18-removal set; deletion-only rules leave exit **4**; wrapper passes |
+| Non-LTO R1 → LTO R1 | No accepted removals; abidiff **0**, empty report |
+| ABI regression controls | Original 3/3; exact-18 acceptance; extra function/data rejection; all 18 stale-entry rejections; restored candidate passes; independent vtable incompatibility still returns 12 after filtering; truncated report and duplicate list rejected |
+| Bookworm arm64, LTO on | **37/37**, zero failures or skips |
+| Trixie arm64, LTO on | **37/37**, zero failures or skips; package contracts and ABI floors pass |
+| Analyzer | 17 analyzed library TUs; three documented finding pairs; zero untriaged |
+| Scoped werror | 32 TUs, `-Wall -Wextra -Werror`, no suppression flags; canaries pass |
+| Host-shim sanitizers | ASan/UBSan baseline **11/11**, H10 **6/6**, TSan concurrency **6/6** |
+| Reproducibility, LTO packages | Two complete builds, byte-identical runtime and development packages at `SOURCE_DATE_EPOCH=1789445141` |
+| Required summary | All nine dependency results `success` |
+
+The reproducibility artifact records SHA-256:
+
+```text
+3e4c1c062d5fe0251ffe4700d39761972693cecf883cbcbe1956f3fb59dbf1fb  librga2-ceralive_1.10.5+ceralive.1_arm64.deb
+d274a6f53f797aa731f521b18fb2772cb0c856c3a819553caae7afc8fbef363f  librga-ceralive-dev_1.10.5+ceralive.1_arm64.deb
+```
+
+The `abi-evidence` artifact retains all three raw reports, both generated
+deletion-only rule files, both remaining reports, compile commands and the three
+DWARF libraries. The six function/two variable changes remain visible in the
+cumulative reports, not hidden by an empty-diff claim. Local ABI controls and
+matched arm64 probes are retained under `test-results/acceptance/`; a local image
+initially lacked abidiff, and that setup failure is not counted as a gate run.
+Local full build/repro steps did not run after the plain-LTO ABI failure; the
+complete native hosted run above supplies those results, not an emulation claim.
+
+Changed Python and shell files have clean error-level LSP diagnostics. Bash
+syntax, workflow-contract tests and `actionlint` pass. YAML LSP was previously
+declined, and no Meson/Markdown server is configured; real Meson configuration,
+compilation and CI are the build-file evidence. No tooling configuration was
+installed. Validation stopped at the first complete green run; this receipt is a
+documentation-only follow-up, not a second build claim.
