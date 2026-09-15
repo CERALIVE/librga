@@ -49,6 +49,12 @@ cares about is the im2d API release it corresponds to:
 
 ## Build
 
+R1's explicit BT.709-full RGB→YUV path now clears the ordinary destination
+selector instead of retaining BT.601-limited alongside full CSC. This repairs
+upstream `2aa0ab4d`, not the donor port; coefficients and other colour modes are
+unchanged. The [failing-first regression and isolated pixel evidence](docs/FULL709-SELECTOR.md)
+recover the recorded 50.689414 dB result. G-B and R1 release remain blocked.
+
 CeraLive builds with **Meson**, targeting Debian **Trixie** on arm64. The CMake,
 Android, and RT-Thread build files upstream ships are preserved but unused.
 
