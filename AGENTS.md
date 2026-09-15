@@ -197,10 +197,16 @@ Legacy `ALOGI`/`ALOGD` diagnostics [EXISTS] remain unconditional at the macro
 boundary: only their existing call sites select emission. Do not add im2d's
 global enable or severity gate there. Constructor notices must survive disabled
 logging. Gaussian framing and values share `IM_LOG_ENABLED`, including force and
-error bypasses. Tests capture output, not just return codes. The separate public
-setter probes remain RED because their private flags were already disconnected
-before todo 36; see `docs/fix-audit.d/logging-round-five.md`. Do not claim those
-setters were repaired by removing the macro gate.
+error bypasses. Tests capture output, not just return codes. The public
+`RkRgaSetLogOnceFlag` / `RkRgaSetAlwaysLogFlag` setters are deliberately deprecated
+compatibility no-ops for logging [EXISTS]. Their instance members are not Android's
+separate `rgaContext` palette members; preserve both sets and their layouts.
+The owner-directed [D29 decision](docs/LEGACY-LOG-SETTERS.md) retains runtime
+behavior and adds no compiler/runtime warning. The historical RED probes in
+`docs/fix-audit.d/logging-round-five.md` become mandatory deprecation-contract
+assertions with positive diagnostic controls, not deferred wiring failures.
+Do not claim these setters were repaired by removing the macro gate or by this
+documentation change. Linux callers use `ROCKCHIP_RGA_LOG=1` instead.
 
 `bash scripts/check-ledger-reviews.sh` [EXISTS] validates the generated D21 table,
 also through Meson and `ci/build-check-steps.sh`. Every row has an explicit
