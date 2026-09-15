@@ -113,6 +113,18 @@ This isolates LTO rather than changing the baseline to excuse optimizer effects.
 The packaging and normal build/test lanes enable LTO; both ABI comparisons remain
 required, as do analyzer, werror, sanitizers and reproducibility.
 
+Plain GCC 14 LTO initially removed **16 additional weak C++ exports** from R1
+(including `Mutex` and `im2d_job_manager` destructor variants and libstdc++
+instantiations). The exact-set gate rejected that candidate in
+[run 34927102093](https://github.com/CERALIVE/librga/actions/runs/34927102093).
+Those names were **not added to the removal allowlist**. Instead, `meson.build`
+passes one `--undefined=<symbol>` linker root per existing definition when LTO is
+enabled. This retains compiled definitions through LTO; it adds no compatibility
+shim, source implementation, visibility override or version script. A generic
+`--export-dynamic` probe did not retain them and was discarded. The ABI job also
+compares non-LTO R1 to LTO R1 with **no accepted removals**: LTO itself must not
+lose an export. This is separate from the accepted upstream R0→R1 transition.
+
 `bash tests/test-abi-gate.sh` uses real GCC-built ELF fixtures and real abidiff:
 identical/additive controls pass; an unlisted hidden public symbol fails; exactly
 the committed 18 removals pass; a nineteenth function or variable fails; restoring

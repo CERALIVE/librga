@@ -179,6 +179,9 @@ The summary also requires matched-debug R0→R1 `abi` and two-build `reproducibl
 jobs. Packaged LTO is enabled behind both non-LTO and LTO ABI comparisons; see
 [`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md). `mtune-measurement` is explicitly
 non-blocking and unpackaged, and cannot establish board H4 timings.
+The shared target retains existing weak C++ definitions with exact linker roots
+under LTO; these are not removal waivers or shims. Non-LTO R1→LTO R1 additionally
+accepts no removals. Do not widen the upstream removal list to hide LTO pruning.
 The historical todo-41 result is [`docs/R1-BUILD-GATES.md`](docs/R1-BUILD-GATES.md).
 Current removal policy and verification are in
 [`docs/R1-ABI-ACCEPTANCE.md`](docs/R1-ABI-ACCEPTANCE.md). Green under the accepted

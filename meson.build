@@ -44,11 +44,38 @@ incdir = include_directories(
 # Modified by CeraLive 2026-09-14: expose inherited warnings without a cleanup sweep.
 # ci/werror-steps.sh separately gates the explicitly documented fork-owned scope.
 
+# Modified by CeraLive 2026-09-14: retain existing weak exports during GCC LTO.
+# These are linker roots for existing definitions, not new shims or ABI exclusions.
+lto_link_args = []
+if get_option('b_lto')
+    foreach symbol : [
+        '_ZN16im2d_job_managerD1Ev',
+        '_ZN16im2d_job_managerD2Ev',
+        '_ZN5MutexD1Ev',
+        '_ZN5MutexD2Ev',
+        '_ZNKSt5ctypeIcE8do_widenEc',
+        '_ZNSt10_HashtableIjSt4pairIKjjESaIS2_ENSt8__detail10_Select1stESt8equal_toIjESt4hashIjENS4_18_Mod_range_hashingENS4_20_Default_ranged_hashENS4_20_Prime_rehash_policyENS4_17_Hashtable_traitsILb0ELb0ELb1EEEE21_M_deallocate_bucketsEv',
+        '_ZNSt10_HashtableIjSt4pairIKjjESaIS2_ENSt8__detail10_Select1stESt8equal_toIjESt4hashIjENS4_18_Mod_range_hashingENS4_20_Default_ranged_hashENS4_20_Prime_rehash_policyENS4_17_Hashtable_traitsILb0ELb0ELb1EEEE5clearEv',
+        '_ZNSt10_HashtableIjSt4pairIKjjESaIS2_ENSt8__detail10_Select1stESt8equal_toIjESt4hashIjENS4_18_Mod_range_hashingENS4_20_Default_ranged_hashENS4_20_Prime_rehash_policyENS4_17_Hashtable_traitsILb0ELb0ELb1EEEEC1IPKS2_EET_SJ_mRKS9_RKS7_RKS3_St17integral_constantIbLb1EE',
+        '_ZNSt10_HashtableIjSt4pairIKjjESaIS2_ENSt8__detail10_Select1stESt8equal_toIjESt4hashIjENS4_18_Mod_range_hashingENS4_20_Default_ranged_hashENS4_20_Prime_rehash_policyENS4_17_Hashtable_traitsILb0ELb0ELb1EEEEC2IPKS2_EET_SJ_mRKS9_RKS7_RKS3_St17integral_constantIbLb1EE',
+        '_ZNSt13unordered_mapIjjSt4hashIjESt8equal_toIjESaISt4pairIKjjEEED1Ev',
+        '_ZNSt13unordered_mapIjjSt4hashIjESt8equal_toIjESaISt4pairIKjjEEED2Ev',
+        '_ZNSt3setIiSt4lessIiESaIiEED1Ev',
+        '_ZNSt3setIiSt4lessIiESaIiEED2Ev',
+        '_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE15_M_replace_coldEPcmPKcmm',
+        '_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED1Ev',
+        '_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED2Ev',
+    ]
+        lto_link_args += '-Wl,--undefined=' + symbol
+    endforeach
+endif
+
 librga = shared_library(
     'rga',
     librga_srcs,
     dependencies : [libthreads_dep],
     include_directories : incdir,
+    link_args : lto_link_args,
     version : meson.project_version(),
     install : true,
 )

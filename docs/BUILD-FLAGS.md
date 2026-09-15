@@ -75,6 +75,13 @@ Packaged LTO is **on** (`-Db_lto=true`) after the
 size assertions remain locked at 696/304. The normal build/test lane uses LTO too.
 This supersedes the initial LTO-off candidate; compilation alone was not clearance.
 
+GCC LTO prunes some existing weak C++ definitions unless they are linker roots.
+The shared-library target in `meson.build` retains those exact definitions using
+`-Wl,--undefined=<symbol>` under LTO only; no source shim or visibility change.
+The initial plain-LTO build failed the exact removal gate, so these are retention
+flags, **not additions to the 18-removal allowance**. The separate non-LTO-R1 to
+LTO-R1 comparison accepts no removals. See the acceptance record for the RED run.
+
 `ci/abi-steps.sh` builds the published R0 commit and current R1 using one
 target-suite compiler and optimization level, preserves DWARF, and first runs a
 non-LTO control. It then compares R1 with LTO against the same non-LTO R0. Each

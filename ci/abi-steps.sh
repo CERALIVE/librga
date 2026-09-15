@@ -37,3 +37,4 @@ meson setup "$out/build-r1-lto" "$root" \
 meson compile -C "$out/build-r1-lto" rga:shared_library
 bash ci/check-abi.sh "$out/build-r0/librga.so" "$out/build-r1-lto/librga.so" "$out/abidiff-lto.txt" \
     packaging/baseline-symbols-upstream-delta.txt
+bash ci/check-abi.sh "$out/build-r1/librga.so" "$out/build-r1-lto/librga.so" "$out/abidiff-lto-only.txt"

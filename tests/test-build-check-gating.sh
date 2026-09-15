@@ -45,6 +45,7 @@ assert 'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VAL
 abi_steps = Path('ci/abi-steps.sh').read_text()
 assert '-Db_lto=false' in abi_steps and '-Db_lto=true' in abi_steps
 assert '"$out/abidiff-lto.txt"' in abi_steps
+assert '"$out/abidiff-lto-only.txt"' in abi_steps
 assert abi_steps.count('packaging/baseline-symbols-upstream-delta.txt') == 2
 for build_script in ('packaging/build-deb.sh', 'ci/build-check-steps.sh'):
     assert '-Db_lto=true' in Path(build_script).read_text(), build_script
