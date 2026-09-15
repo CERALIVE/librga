@@ -163,6 +163,9 @@ The summary also requires matched-debug R0→R1 `abi` and two-build `reproducibl
 jobs. Packaged LTO remains disabled until the ABI blocker is resolved; see
 [`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md). `mtune-measurement` is explicitly
 non-blocking and unpackaged, and cannot establish board H4 timings.
+The exact todo-41 result is [`docs/R1-BUILD-GATES.md`](docs/R1-BUILD-GATES.md):
+required toolchain jobs and reproducibility pass, but ABI and the terminal
+summary fail. Do not close todo 41 or enable LTO on that evidence.
 
 Legacy `ALOGI`/`ALOGD` diagnostics [EXISTS] remain unconditional at the macro
 boundary: only their existing call sites select emission. Do not add im2d's

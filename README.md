@@ -80,6 +80,8 @@ The matched-debug ABI and reproducibility jobs also feed the summary. R1 is
 not ABI-cleared: the debug comparison reports incompatible type changes, so
 packaged LTO stays disabled. See [build flags](docs/BUILD-FLAGS.md) for the
 measurement boundary and the unpackaged, non-gating Cortex-A76 variant.
+The [todo-41 gate receipt](docs/R1-BUILD-GATES.md) records the passing counts,
+reproducible package hashes and the blocking matched-debug ABI report.
 
 The R1 evidence ledger is checked by `bash scripts/check-ledger-reviews.sh`
 and the Meson suite. It distinguishes approved fixes from reviewed observations,
