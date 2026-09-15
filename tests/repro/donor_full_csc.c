@@ -1,13 +1,28 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Modified by CeraLive 2026-09-14: exercise combined source/destination CSC. */
+/* Modified by CeraLive 2026-09-15: pin full709's selector and unchanged CSC controls. */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include "RgaApi.h"
-#include "im2d.h"
+#include "im2d_buffer.h"
+#include "im2d_single.h"
 #include "rga_ioctl.h"
+
+static int full709_coefficients(const struct rga_req *r)
+{
+    return r->full_csc.flag == 1 && r->feature.full_csc_clip_en == 1 &&
+           r->full_csc.coe_y.r_v == 218 && r->full_csc.coe_y.g_y == 731 &&
+           r->full_csc.coe_y.b_u == 74 && r->full_csc.coe_y.off == 0 &&
+           r->full_csc.coe_u.r_v == -117 && r->full_csc.coe_u.g_y == -393 &&
+           r->full_csc.coe_u.b_u == 512 && r->full_csc.coe_u.off == 130944 &&
+           r->full_csc.coe_v.r_v == 512 && r->full_csc.coe_v.g_y == -463 &&
+           r->full_csc.coe_v.b_u == -46 && r->full_csc.coe_v.off == 130944;
+}
 
 /* The driver shim captures requests; it does not execute colour conversion. */
 int main(void)
@@ -59,11 +74,46 @@ int main(void)
     FILE *file = fopen(dump, "rb");
     int captured = file && fread(&request, sizeof(request), 1, file) == 1;
     if (file) fclose(file);
-    int pass = status == IM_STATUS_SUCCESS && captured && request.full_csc.flag == 1 &&
-               request.yuv2rgb_mode == (IM_YUV_TO_RGB_BT601_FULL | IM_RGB_TO_YUV_BT601_LIMIT);
+    /* Full709 must clear only R2Y, preserving the source's independent Y2R. */
+    int pass = status == IM_STATUS_SUCCESS && captured && full709_coefficients(&request) &&
+               request.yuv2rgb_mode == IM_YUV_TO_RGB_BT601_FULL;
     printf("improcess src601full+patRGB+dst709full status=%d captured=%d "
            "full_csc=%u yuv2rgb=%u %s\n", status, captured,
            request.full_csc.flag, request.yuv2rgb_mode, pass ? "PASS" : "FAIL");
     failures += !pass;
+
+    const struct { const char *name; IM_COLOR_SPACE_MODE space; unsigned selector, full; } cases[] = {
+        {"default", IM_COLOR_SPACE_DEFAULT, 8, 0},
+        {"601-limited", IM_YUV_BT601_LIMIT_RANGE, 8, 0},
+        {"601-full", IM_YUV_BT601_FULL_RANGE, 4, 0},
+        {"709-limited", IM_YUV_BT709_LIMIT_RANGE, 12, 1},
+        {"709-full", IM_YUV_BT709_FULL_RANGE, 0, 1},
+    };
+    const int formats[] = {RK_FORMAT_BGR_888, RK_FORMAT_RGB_888};
+    for (unsigned f = 0; f < sizeof(formats) / sizeof(formats[0]); ++f) {
+        for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+            rga_buffer_t s = wrapbuffer_fd(100, 1280, 720, formats[f], 1280, 720);
+            rga_buffer_t d = wrapbuffer_fd(101, 1280, 720, RK_FORMAT_YCbCr_420_SP, 1280, 720);
+            rga_buffer_t no_overlay = {0};
+            if (cases[i].space) {
+                imsetColorSpace(&s, IM_RGB_FULL);
+                imsetColorSpace(&d, cases[i].space);
+            }
+            unlink(dump);
+            status = improcess(s, d, no_overlay, empty, empty, empty, IM_SYNC);
+            struct rga_req r = {0};
+            file = fopen(dump, "rb");
+            captured = file && fread(&r, sizeof(r), 1, file) == 1 && fgetc(file) == EOF;
+            if (file) fclose(file);
+            pass = status == IM_STATUS_SUCCESS && captured &&
+                   r.yuv2rgb_mode == cases[i].selector && r.full_csc.flag == cases[i].full &&
+                   (cases[i].space != IM_YUV_BT709_FULL_RANGE || full709_coefficients(&r));
+            printf("improcess format=%x %s status=%d captured=%d full_csc=%u "
+                   "selector=%u expected=%u %s\n", formats[f], cases[i].name, status,
+                   captured, r.full_csc.flag, r.yuv2rgb_mode, cases[i].selector,
+                   pass ? "PASS" : "FAIL");
+            failures += !pass;
+        }
+    }
     return failures ? 1 : 0;
 }
