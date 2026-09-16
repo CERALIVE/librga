@@ -84,6 +84,12 @@ build.
 
 ### Wave-E regression checks (R1)
 
+The [toolchain mutation receipt](docs/TOOLCHAIN-GATE-PROOFS.md) distinguishes
+real compiler/runtime faults from process-boundary fixtures. Required CI proves
+analyzer extraction failures propagate, public-size assertions reject growth,
+and actual sanitizer test blocks fail on instrumented faults before restoring
+their original executables. Empty or unknown summary results fail closed.
+
 The `Build Check summary` requires the analyzer, scoped werror and host-shim
 sanitizer jobs. The analyzer fails on untriaged findings; the sanitizer runner
 rejects empty or skipped suites as well as failures. Run the workflow-contract

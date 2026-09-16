@@ -318,6 +318,9 @@ jobs:
       # debian:trixie-slim bash scripts/run-analyzer.sh` reproduces it exactly.
       #
       # Normal builds now expose warnings too; analyzer adds -fanalyzer.
+      - name: Prove analyzer failure propagation
+        run: bash tests/test-analyzer-gate.sh
+
       - name: Run the analyzer and reconcile against docs/ANALYZER-TRIAGE.md
         run: bash scripts/run-analyzer.sh
 
@@ -401,6 +404,9 @@ jobs:
       # reproduces this leg exactly, without a pull request and without this file.
       - name: Sanitizers (build · canaries · meson test)
         run: bash ci/sanitizers-steps.sh
+
+      - name: Prove sanitizer findings fail the job test blocks, then restore
+        run: bash tests/test-sanitizer-failures.sh
 
       - name: Upload sanitizer logs
         if: always()
@@ -575,17 +581,25 @@ jobs:
         run: |
           set -euo pipefail
           echo "dependency results: ${RESULTS}"
+          case "${CODE_CHANGED}" in
+            true|false) ;;
+            *) echo '::error::missing or invalid change verdict'; exit 1 ;;
+          esac
+          [[ -n ${RESULTS//[[:space:]]/} ]] || {
+            echo '::error::no dependency results'; exit 1;
+          }
           for result in ${RESULTS}; do
             case "${result}" in
-                failure|cancelled)
-                  echo "::error::a required job reported '${result}'"
-                  exit 1
-                  ;;
+                success) ;;
                 skipped)
                   if [ "${CODE_CHANGED}" != 'false' ]; then
                     echo "::error::a required job skipped without a docs-only verdict"
                     exit 1
                   fi
+                  ;;
+                *)
+                  echo "::error::a required job reported '${result}'"
+                  exit 1
                   ;;
             esac
           done
