@@ -9,7 +9,8 @@ must preserve `librga_so = librga` before upstream reassigns `librga` to its sta
 archive. The board probe and bench link the shared library so `LD_LIBRARY_PATH`
 can select either release. The inherited golden executable deliberately retains
 todo 12's instrumented static library; it is not a shared-library comparison tool.
-No unit-pure/unit-session sources exist on this stacked branch.
+Both unit-pure and unit-session are present. `golden-cases-dynamic` is the
+separate uninstrumented shared-library client for provider comparisons.
 
 `QEMU_LD_PREFIX` defaults to `/usr/aarch64-linux-gnu`. This is a build-host sysroot,
 not a promise of board ABI compatibility: use a target-suite-compatible cross
@@ -99,7 +100,11 @@ fail below 30 dB; copy selftest requires exact bytes. Box is the default referen
 resampler; `--bilinear` selects pixel-centred bilinear. This selection changes the
 reference only, not driver interpolation. FD census spans allocation/release after
 library initialization and before deinitialization so the persistent RGA session
-is not mistaken for a leak. No hardware result may be inferred from host tests.
+is not mistaken for a leak. The bench acquires `c_RkRgaGetContext()` and runs
+an im2d validation-only `imcheck` before the census: R1 has a separate lazy im2d
+session that the legacy context does not warm. `--session-selftest` requires the
+host fake-device shim and checks both sessions again inside the measured interval.
+Strict equality is unchanged. No hardware result may be inferred from host tests.
 
 `fake_rga.c -DFORWARD_TIMING` builds a separate forwarding-only implementation:
 no fake device opens, fake version data, or failure injection. All ioctls reach
@@ -122,3 +127,49 @@ result, errno preservation, CSV fields, and a userspace delay in the total scope
 
 See [COUNTERS.md](COUNTERS.md) for actual access status and the outstanding hardware
 checks; see [the oracle](../oracle/README.md) for the independent numerical model.
+
+## Recovered isolated R1 drill [EXISTS]
+
+`r1-isolated-drill.sh` adapts the reusable measurements from the R0 package drill.
+It **does not install/remove packages**: current sysext qualification forbids APT
+management or remounting `/usr`. Supply an already-authorized, idle board and an
+SSH identity allowed to access its RGA, DMA heap and read-only debugfs counters.
+The script holds the existing descriptor lock/remote marker throughout staging,
+measurement and LIFO cleanup. Every transport call is bounded.
+
+Supply `CERALIVE_BOARD_TEST=1`, the credential environment above, `PR_RUN_ID`,
+`BASELINE_LIB` and `CANDIDATE_LIB` (locally extracted real `librga.so.2.1.0`
+files), their expected `BASELINE_SHA256`/`CANDIDATE_SHA256`, `HARNESS_DIR` holding
+target-suite `probe-version` and `rga-convert-bench`, and a **fresh repo-local**
+`RESULT_DIR`. Run `bash tests/board/r1-isolated-drill.sh` only after obtaining
+board ownership from the coordinator. It stages unique `/tmp` directories,
+verifies both provider hashes remotely, and sets `LD_LIBRARY_PATH` for each
+individual process. It never exports a system-wide override or restarts services.
+
+Measurements retained from R0:
+
+- `--routing --core 1|2|4`: 1000 exact NV12 copies at 128×64; selected debugfs
+  core must increase by exactly 1000 and the other two by zero.
+- `--improcess-only --iterations 1 --explicit-csc`: all nine named cells,
+  including rotation, must exist exactly once on each provider, score at least
+  30 dB, and agree within 0.01 dB (infinity must agree exactly). This is a strict
+  comparison, **not** a new R1 neutrality policy; intended behavior changes may
+  make it RED and require review, never a silent threshold relaxation.
+- RGB16 encoder smoke: `mpp:5,mppenc:5`; either `converted with RGA` or
+  `using RGA converted buffer` is required. Enable-only/empty/failure logs fail.
+- `--soak`: one process, 3840×2160 NV16→NV12, a 3600-second monotonic deadline,
+  3605-second process timeout and 3700-second SSH bound. Every iteration retains
+  DMA synchronization, poisoned output, submission/oracle checks and PSNR output.
+  Zero iterations or reaching the iteration cap before the deadline is failure.
+  The wrapper independently checks elapsed time, completed-row count and fd equality.
+- A fresh baseline copy runs afterward. EXIT removes only the uniquely staged
+  directory before ownership release; cleanup failure propagates. This is not R0's
+  package-restoration proof. Interrupted transport/power loss still requires owner
+  inspection of the retained marker and temporary state.
+
+Offline coverage is registered in Meson: `board-session-baseline`,
+`board-soak-control`, `board-recovery-mutations`, `board-conversion-evidence` and
+`board-isolated-drill`. The loop fixture substitutes in-memory I/O and a clock;
+the drill fixture substitutes **all transport**, retaining real orchestration,
+scorers and cleanup. Neither executes hardware. Both-board R1 soaks and package
+installation/removal/rollback remain **NOT RUN by this recovery**.

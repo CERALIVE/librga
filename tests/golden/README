@@ -184,3 +184,21 @@ per-iteration fd census. Exit 1 means a defect was reproduced, not a build
 failure; exit 2 means a harness/precondition failure. H6a positive-success
 polarity is WITHDRAWN, not a test: no real positive-success submit path exists
 on the island. See docs/fix-audit.d/h6.md for the observations and limits.
+# Recovered shared-provider diagnostics
+
+`golden-cases-dynamic` [EXISTS] builds the same cases.c against librga_so, not
+the static zero-initialized archive. LD_LIBRARY_PATH therefore selects the actual
+provider. The `golden-dynamic` Meson test captures all eight requests, verifies
+G2, then rejects mutated/truncated bytes, absent shim and a failed submit.
+G8 raw padding remains unmasked: capturing it is not a claim of deterministic
+production request bytes. The original static golden suite remains unchanged.
+
+`csc-padding-probe` [EXISTS] is the recovered aarch64-only raw stack-poison
+diagnostic. It prints the compiled layout and all differing request bytes; exit
+0 means equality in that run, 1 means a finding, 2 invalid execution, 77 wrong
+architecture. It has no hardware calls. Select a provider with LD_LIBRARY_PATH.
+No R0 nine-byte waiver applies to R1. It is not registered as an expected-green
+test of the real library. On native aarch64 `csc-padding-controls` exercises the
+same probe against clean and deliberately padding-dependent fixture writers.
+The latter must exit 1. This control can also run under user-mode QEMU on a host;
+it proves the diagnostic, not silicon or production padding cleanliness.
