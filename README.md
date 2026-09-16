@@ -47,6 +47,11 @@ cares about is the im2d API release it corresponds to:
   reproducers actually turned RED, each fix carrying its own red/green transcripts
   and independent-review receipt in [`docs/fix-audit.md`](docs/fix-audit.md).
 
+`LIBRGA_STRICT_DRIVER` is **not implemented**: setting it, including to `1`, has
+no effect. Earlier policy text incorrectly described an existing default-off
+opt-in. R1 retains the upstream `rga_check_driver()` version-table policy; this
+documentation correction introduces no strict mode or runtime behaviour change.
+
 ## Build
 
 Recovered validation infrastructure [EXISTS] includes a shared-library golden
