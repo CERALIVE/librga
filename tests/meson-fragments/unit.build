@@ -25,6 +25,16 @@ unit_session_env.set('LD_PRELOAD', fake_rga.full_path())
 unit_session_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'unit-session-interposed.log')
 test('unit-session', unit_session, env : unit_session_env, depends : fake_rga, timeout : 30)
 
+# Modified by CeraLive 2026-09-16: execute the real shared-library blend validator.
+unit_blend = executable('blend-validation', 'tests/unit/unit_blend.cpp',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : golden_dl,
+    cpp_args : unit_warnings,
+    install : false)
+test('blend-validation', unit_blend,
+    env : unit_session_env, depends : fake_rga, timeout : 30)
+
 # Modified by CeraLive 2026-09-14: keep the H9 stdout-sink regression in Meson.
 unit_logging = executable('unit-logging', 'tests/unit/unit_logging.cpp',
     include_directories : [incdir, unit_incdir],

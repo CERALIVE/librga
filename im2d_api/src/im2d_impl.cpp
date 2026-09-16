@@ -17,6 +17,7 @@
  */
 // Modified by CeraLive 2026-09-14: send im2d diagnostics to stderr with context.
 // Modified by CeraLive 2026-09-15: restore BT.709-full's ordinary R2Y selector.
+// Modified by CeraLive 2026-09-16: distinguish RGB backgrounds from RGA format codes.
 
 #ifdef LOG_TAG
 #undef LOG_TAG
@@ -1165,8 +1166,8 @@ IM_STATUS rga_check_blend(rga_buffer_t src, rga_buffer_t pat, rga_buffer_t dst, 
     dst_fmt = dst.format;
 
     src_isRGB = is_rga_format(src_fmt);
-    pat_isRGB = is_rga_format(pat_fmt);
-    dst_isRGB = is_rga_format(dst_fmt);
+    pat_isRGB = is_rgb_format(pat_fmt);
+    dst_isRGB = is_rgb_format(dst_fmt);
 
     /* bg format check */
     if (rga_is_buffer_valid(pat)) {
