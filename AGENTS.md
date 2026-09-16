@@ -167,6 +167,15 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+NV12 blend validation [EXISTS] runs as `blend-validation` against the real shared
+library. R1 already inherits upstream fc3f742's pattern-first ordering; the new
+two-predicate correction uses `is_rgb_format`, not the RGA-format namespace
+macro, to retain the documented background rejection controls. The regression
+is RED on R0 and uncorrected R1 for different reasons, and ordering-mutation
+proven. [Finite OPi PiP evidence](docs/NV12-BLEND.md) includes a decoded visible
+inset using the PR36 plugin via process-local overrides. The bounded run still
+errors on primary EOS: neither endurance/teardown nor release is approved.
+
 Explicit RGB/BGR full709 selector repair [EXISTS] is guarded by
 `donor-full-csc`, including unchanged 601/limited709 controls and retained source
 Y2R in combined CSC. It repairs upstream `2aa0ab4d` without coefficient changes.

@@ -49,6 +49,13 @@ cares about is the im2d API release it corresponds to:
 
 ## Build
 
+R1's three-channel NV12-output validation now has a real-library regression and
+[decoded OPi PiP evidence](docs/NV12-BLEND.md). The R0 ordering fix was already
+inherited upstream; the new change corrects two RGB classifiers so unsupported
+backgrounds remain rejected. The decoded frame shows a visible inset with PR36's
+geometry fix. This is finite composition only: the bounded run still reports a
+primary-EOS error, and soak, teardown, package-swap and release gates remain open.
+
 R1's explicit BT.709-full RGB→YUV path now clears the ordinary destination
 selector instead of retaining BT.601-limited alongside full CSC. This repairs
 upstream `2aa0ab4d`, not the donor port; coefficients and other colour modes are
