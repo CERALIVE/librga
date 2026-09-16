@@ -122,7 +122,14 @@ removed. The installed library hash was unchanged before/after. Evidence hashes:
 | `composed.mkv` | `843d64ee923a871d6b54ef350d44d991beb600f783769a6617e61aebff8ac375` |
 | Decoded frame50 | `78f8b902318ee1b0500bf88d01a9d6a281e5a04607141360ccafb9859d4dad0c` |
 
-Independent fix review is pending; this is not a merge receipt.
+Independent review of `8fcf447..00974ff`: **APPROVE first-party diff; REJECT merge
+readiness**. Reviewer `codebase-search-specialist`, model reported as
+`openai/gpt-5.6-luna`, actual tool session `ses_f57498fe2ffeb1017KoSF1qtKy`.
+The requested integration base remains `5214fff`, before the already-merged
+ABI/full709 prerequisites in `8fcf447`. PR13 stays draft until an independently
+authorized base synchronization or owner-selected current target; no base was
+updated and nothing was merged. This code/evidence approval is not permission
+to merge the stale-base PR or release R1.
 
 ## Local gate receipt
 
