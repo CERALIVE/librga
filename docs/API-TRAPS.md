@@ -58,3 +58,19 @@ Read this before adding an im2d call to a consumer.
   prints a deprecation notice at init since 1.10.5.** It still works and it is
   never removed — the additive-only rule keeps every legacy symbol exported — but
   it receives no new capability, and new consumer code uses the im2d API instead.
+
+## Blend and composition
+
+- **On R0 (`1.10.1+ceralive.1`), a three-channel composite onto a YUV
+  destination is rejected even with an RGB background.** `imcomposite`,
+  `imcheck_composite` and `improcess`-with-pattern return
+  `IM_STATUS_NOT_SUPPORTED` before any ioctl when the destination is NV12 or
+  another YUV format, because the validator tests the destination as if it were
+  the background layer. Nothing is written, so a pipeline that ignores the
+  status ships an untouched, solid-green frame. Composite into an RGB buffer and
+  convert to NV12 in a second pass. Full write-up, scope, and fix status:
+  [`R0-BLEND-LIMITATION.md`](R0-BLEND-LIMITATION.md).
+- **A YUV background is never accepted, in any version.** Two-channel
+  `imblend` onto a YUV destination, and a three-channel composite whose pattern
+  buffer is YUV, are rejected by the documented im2d contract, not by the R0
+  defect above. Do not read the fix for R0 as permission for either.
