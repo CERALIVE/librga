@@ -7,6 +7,7 @@ scratch=$(mktemp -d "$root/test-results/analyzer-gate.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch"/{scripts,docs,bin}
 cp "$root/scripts/run-analyzer.sh" "$scratch/scripts/"
+cp "$root/scripts/analyzer-summary.sh" "$scratch/scripts/"
 printf '| `core/probe.cpp` | `-Wanalyzer-null-dereference` | 1 | fixture | fixture |\n' >"$scratch/docs/ANALYZER-TRIAGE.md"
 
 # Fake only the expensive compiler boundary. Extraction, reconciliation, object
@@ -18,7 +19,7 @@ case "$1" in
     setup)
         mkdir -p build-analyzer
         printf 'object\n' >build-analyzer/librga.so.probe.o
-        printf '[{"directory":"build-analyzer","command":"g++ -fanalyzer -o librga.so.probe.o"}]\n' >build-analyzer/compile_commands.json
+        printf '[{"directory":"build-analyzer","file":"probe.cpp","command":"g++ -fanalyzer -c probe.cpp -o librga.so.probe.o"}]\n' >build-analyzer/compile_commands.json
         ;;
     compile)
         if [[ ${COMPILE_RC:-0} != 0 ]]; then exit "$COMPILE_RC"; fi
@@ -31,6 +32,13 @@ case "$1" in
         ;;
     *) exit 97 ;;
 esac
+SH
+real_cxx=$(command -v g++)
+cat >"$scratch/bin/g++" <<SH
+#!/usr/bin/env bash
+if [[ \$1 == --version ]]; then exec "$real_cxx" "\$@"; fi
+[[ \${INERT_ANALYZER:-0} == 1 ]] || printf 'warning: fixture [-Wanalyzer-null-dereference]\n' >&2
+exit 0
 SH
 for tool in grep sed sort; do
     real_tool=$(command -v "$tool")
@@ -49,6 +57,13 @@ run_case() {
         printf 'FAIL: %s: job exit=%s, expected=%s\n' "$name" "$rc" "$expected" >&2
         exit 1
     fi
+    local summary_rc=0
+    bash "$scratch/scripts/analyzer-summary.sh" >"$scratch/$name-summary.log" 2>&1 || summary_rc=$?
+    if [[ $expected == 0 ]]; then
+        [[ $summary_rc == 0 ]] || { cat "$scratch/$name-summary.log" >&2; exit 1; }
+    else
+        [[ $summary_rc != 0 ]] || { printf 'FAIL: failed run has clean summary\n' >&2; exit 1; }
+    fi
     printf 'PASS: %s: job exit=%s\n' "$name" "$rc"
 }
 
@@ -56,6 +71,7 @@ run_case triaged 0
 NO_HITS=1 run_case no-findings 0
 COMPILE_RC=23 run_case compile-error 23
 ZERO_OBJECTS=1 run_case zero-objects 1
+INERT_ANALYZER=1 run_case inert-analyzer 1
 mv "$scratch/docs/ANALYZER-TRIAGE.md" "$scratch/docs/triage.saved"
 touch "$scratch/docs/ANALYZER-TRIAGE.md"
 run_case untriaged 1
@@ -64,3 +80,6 @@ for tool in grep sed sort; do
     FAULT_TOOL=$tool run_case "$tool-error" 42
 done
 run_case restored 0
+rm "$scratch/test-results/analyzer-complete.count"
+if bash "$scratch/scripts/analyzer-summary.sh"; then exit 1; fi
+printf 'PASS: missing completion receipt rejects stale zero-findings summary\n'

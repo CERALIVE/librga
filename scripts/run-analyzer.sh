@@ -26,6 +26,9 @@ set -euo pipefail
 
 root=$(realpath "$(dirname "${BASH_SOURCE[0]}")/..")
 cd "$root"
+mkdir -p test-results
+rm -f test-results/analyzer-complete.count test-results/analyzer-object.count \
+    test-results/analyzer-hits.txt test-results/analyzer-probe.log
 
 for tool in meson ninja g++ python3; do
 	command -v "$tool" >/dev/null || { printf 'missing tool: %s\n' "$tool" >&2; exit 77; }
@@ -81,6 +84,7 @@ meson compile -C "$build" --ninja-args=-k0 rga:shared_library >>"$out" 2>&1 || r
 python3 - <<'PY'
 import json
 import shlex
+import subprocess
 from pathlib import Path
 
 entries = json.loads(Path('build-analyzer/compile_commands.json').read_text())
@@ -93,10 +97,26 @@ for entry in entries:
     obj = Path(entry['directory']) / output
     if '-fanalyzer' not in args or '-w' in args or not obj.is_file() or obj.stat().st_size == 0:
         raise SystemExit(f'analyzer did not produce an analyzed object: {output}')
+    if checked == 0:
+        probe = Path('test-results/analyzer-probe.cpp').resolve()
+        probe.write_text('int main() { int *p = nullptr; *p = 1; return 0; }\n')
+        probe_output = probe.with_suffix('.o')
+        if entry['file'] not in args:
+            raise SystemExit('analyzer probe cannot identify the source argument')
+        probe_args = [str(probe) if arg == entry['file'] else arg for arg in args]
+        for option in ('-o', '-MF', '-MQ'):
+            if option in probe_args:
+                probe_args[probe_args.index(option) + 1] = str(probe_output) + ('.d' if option == '-MF' else '')
+        result = subprocess.run(probe_args, cwd=entry['directory'], capture_output=True,
+                                text=True, check=False)
+        Path('test-results/analyzer-probe.log').write_text(result.stdout + result.stderr)
+        if result.returncode != 0 or '-Wanalyzer-null-dereference' not in result.stderr:
+            raise SystemExit('analyzer capability probe failed: planted null dereference not diagnosed')
     checked += 1
 if checked == 0:
     raise SystemExit('analyzer executed no library translation units')
 print(f'run-analyzer: {checked} analyzed library translation units produced objects')
+Path('test-results/analyzer-object.count').write_text(f'{checked}\n')
 PY
 
 extract_rc=0
@@ -162,4 +182,5 @@ if ((status != 0)); then
 fi
 
 ((rc == 0)) || { printf 'run-analyzer: FAIL: the analyzer build did not compile (exit %s)\n' "$rc" >&2; exit "$rc"; }
+((status == 0)) && cp test-results/analyzer-object.count test-results/analyzer-complete.count
 printf 'run-analyzer: OK\n'
