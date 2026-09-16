@@ -18,7 +18,32 @@ golden_cases = executable('golden-cases', 'tests/golden/cases.c',
     c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
     install : false)
 fake_rga_env = environment()
+golden_dynamic = executable('golden-cases-dynamic', 'tests/golden/cases.c',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
+    install : false)
+test('golden-dynamic', find_program('bash'),
+    args : [files('tests/golden/test-dynamic.sh'), golden_dynamic.full_path(),
+        fake_rga.full_path(), meson.current_source_dir() / 'tests/golden'],
+    depends : [golden_dynamic, fake_rga])
 fake_rga_env.set('LD_PRELOAD', fake_rga.full_path())
+executable('csc-padding-probe', 'tests/golden/csc-padding-probe.c',
+    include_directories : incdir, link_with : librga_so,
+    dependencies : golden_dl, link_args : ['-Wl,--no-as-needed'], install : false)
+if host_machine.cpu_family() == 'aarch64'
+  padding_probe = executable('csc-padding-control-probe', 'tests/golden/csc-padding-probe.c',
+      include_directories : incdir, dependencies : golden_dl, install : false)
+  padding_clean = shared_library('csc-padding-clean', 'tests/golden/csc-padding-control.c',
+      include_directories : incdir, install : false)
+  padding_mutant = shared_library('csc-padding-mutant', 'tests/golden/csc-padding-control.c',
+      include_directories : incdir, c_args : ['-DPADDING_MUTANT'], install : false)
+  test('csc-padding-controls', find_program('bash'),
+      args : [files('tests/golden/test-csc-padding.sh'), padding_probe.full_path(),
+          padding_clean.full_path(), padding_mutant.full_path()],
+      depends : [padding_probe, padding_clean, padding_mutant])
+endif
 golden_shell = find_program('sh')
 shim_contract = executable('shim-contract', 'tests/shim/contract.c',
     include_directories : incdir,
