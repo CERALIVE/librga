@@ -20,6 +20,7 @@ mkdir -p "$out/r0"
 git archive "$r0" | tar -x -C "$out/r0"
 g++ --version
 abidiff --version
+bash tests/test-abi-layout.sh
 export CC='ccache gcc' CXX='ccache g++' CFLAGS='-g -O2' CXXFLAGS='-g -O2'
 unset CPPFLAGS LDFLAGS
 for revision in r0 r1; do

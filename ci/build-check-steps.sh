@@ -107,6 +107,7 @@ printf '\nbuild-check-steps: debian:%s (%s leg) · %s · %s\n' \
 # --- Static package contract ------------------------------------------------------
 step "workflow gating contract"
 bash tests/test-build-check-gating.sh
+bash tests/test-abi-layout.sh
 
 step "independent D21 review receipts"
 bash scripts/check-ledger-reviews.sh

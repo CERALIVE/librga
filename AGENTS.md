@@ -167,6 +167,14 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+Toolchain failure proofs [EXISTS] are recorded in
+[`docs/TOOLCHAIN-GATE-PROOFS.md`](docs/TOOLCHAIN-GATE-PROOFS.md). Analyzer extraction
+must propagate tool failures rather than treating them as zero findings. Required
+CI runs its process-boundary controls, copied-header 696/304 mutations and real
+ASan/UBSan/TSan test-executable mutations with restoration. The terminal summary
+rejects empty/unknown results and invalid change verdicts. These are host-only
+gates; the frozen dynsym mismatch still disqualifies packaged LTO.
+
 Explicit RGB/BGR full709 selector repair [EXISTS] is guarded by
 `donor-full-csc`, including unchanged 601/limited709 controls and retained source
 Y2R in combined CSC. It repairs upstream `2aa0ab4d` without coefficient changes.
