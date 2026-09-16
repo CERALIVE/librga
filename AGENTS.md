@@ -31,6 +31,17 @@ Two releases exist, versioned upstream-style rather than CalVer:
 | **R0** `1.10.1+ceralive.1` | `5a97e650a30b7c7036eb5aa26e39f2d09f18fcc9` | A rebuild of the same API release the bench boards run today, with packaging and CI commits only. Under the owner-approved 2026-09-12 amendment, neutrality is **bounded** to global export containment (254/254), semantic request equality on the CeraLive call set excluding only nine proved `full_csc` padding bytes, and both-board gate rows. Weak COMDAT template internals are outside the floor. Never "byte-identical source". |
 | **R1** `1.10.5+ceralive.1` | `57a1067a246c71fa6c9a355d1668884fda155dd5` | The pinned fork point plus the fix series that Wave 0 actually turned RED. |
 
+R0 is **released** (2026-09-13, tag target `f4c3ee6`) and served by `apt.ceralive.tv`;
+R1 is not. R0 carries one publicly documented limitation, inherited from its
+`1.10.1_[4]` base: `rga_check_blend` in `im2d_api/src/im2d_impl.cpp` tests the
+destination as the background whenever a valid RGB pattern is present, so a
+three-channel composite onto NV12 (or any YUV destination) returns
+`IM_STATUS_NOT_SUPPORTED` before any ioctl. Rockchip's own upstream fix is
+`fc3f742a` (`1.10.1_[6]`), whose parent is exactly R0's base; R1 inherits it.
+The user-facing write-up is [`docs/R0-BLEND-LIMITATION.md`](docs/R0-BLEND-LIMITATION.md),
+and the same fact is stated in the GitHub release notes and `README.md`. Do not
+patch R0 for it: the release artifact is immutable, and the fix lives in R1.
+
 ## Repository map
 
 | Area | Location |
@@ -42,6 +53,7 @@ Two releases exist, versioned upstream-style rather than CalVer:
 | Upstream Rockchip developer guides and FAQ | `docs/Rockchip_*` |
 | Import coordinate, licence census, credits | `docs/PROVENANCE.md` |
 | API usability traps every caller trips over | `docs/API-TRAPS.md` |
+| Released-R0 limitation: three-channel blend onto a YUV destination | `docs/R0-BLEND-LIMITATION.md` |
 | Per-fix evidence ledger | `docs/fix-audit.md` |
 | Debian package build and contract | `packaging/` |
 | Island-UAPI parity, host shim, goldens, unit tests | `tests/` |
