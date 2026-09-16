@@ -49,15 +49,36 @@ cares about is the im2d API release it corresponds to:
   `rga_req.full_csc`—never its named coefficients. The amendment preserves the
   literal G8 and weak-symbol FAIL records and requires executable negative
   controls. It is never a claim of byte-identical source or whole-request bytes.
+  **Released 2026-09-13** and served by `apt.ceralive.tv`. It carries one known
+  limitation, described in the next section.
 - **R1 — `1.10.5+ceralive.1`.** The pinned fork point plus the fix series that
   reproducers actually turned RED, each fix carrying its own red/green transcripts
   and independent-review receipt in [`docs/fix-audit.md`](docs/fix-audit.md).
+  **Not released.** No date is committed.
+
+## Known limitation in R0: blending onto a YUV destination
+
+R0 rejects a three-channel alpha blend (`imcomposite`, `imcheck_composite`, or
+`improcess` with a pattern buffer) whose destination is NV12 or another YUV
+format, even when the background supplied is RGB. The call returns
+`IM_STATUS_NOT_SUPPORTED` before any hardware work, so a pipeline that does not
+check the status ships an untouched, solid-green frame. Picture-in-picture or
+side-by-side composition written straight into an encoder's NV12 buffer does not
+work on R0; composite into an RGB buffer and convert in a second pass instead.
+
+Everything else, scaling, cropping, format conversion, rotation, colour-space
+conversion and blends onto RGB destinations, behaves as it did in the Radxa
+package R0 replaces. The cause is a misplaced `else if` in the blend validator
+that Rockchip fixed upstream in `1.10.1_[6]`; R0 rebuilds `1.10.1_[4]`, the last
+point release before that fix. R1 inherits the corrected check. The full
+write-up, with the exact code, the symptom, the scope table and the fix status,
+is [`docs/R0-BLEND-LIMITATION.md`](docs/R0-BLEND-LIMITATION.md).
 
 ## Build
 
-R0 is currently an unreleased integration candidate. See
-[`docs/R0-NEUTRALITY.md`](docs/R0-NEUTRALITY.md) for the measured export and real-board
-request-byte results; build success alone is not release approval.
+R0 is released. See [`docs/R0-NEUTRALITY.md`](docs/R0-NEUTRALITY.md) for the
+measured export and real-board request-byte results that bounded its neutrality
+claim; a green build alone was never the release criterion.
 
 CeraLive builds with **Meson**, targeting Debian **Trixie** on arm64. The CMake,
 Android, and RT-Thread build files upstream ships are preserved but unused.
