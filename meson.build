@@ -272,7 +272,32 @@ golden_cases = executable('golden-cases', 'tests/golden/cases.c',
     c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
     install : false)
 fake_rga_env = environment()
+golden_dynamic = executable('golden-cases-dynamic', 'tests/golden/cases.c',
+    include_directories : incdir,
+    link_with : librga_so,
+    dependencies : [libthreads_dep, golden_dl],
+    c_args : ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-Wno-pedantic'],
+    install : false)
+test('golden-dynamic', find_program('bash'),
+    args : [files('tests/golden/test-dynamic.sh'), golden_dynamic.full_path(),
+        fake_rga.full_path(), meson.current_source_dir() / 'tests/golden'],
+    depends : [golden_dynamic, fake_rga])
 fake_rga_env.set('LD_PRELOAD', fake_rga.full_path())
+executable('csc-padding-probe', 'tests/golden/csc-padding-probe.c',
+    include_directories : incdir, link_with : librga_so,
+    dependencies : golden_dl, link_args : ['-Wl,--no-as-needed'], install : false)
+if host_machine.cpu_family() == 'aarch64'
+  padding_probe = executable('csc-padding-control-probe', 'tests/golden/csc-padding-probe.c',
+      include_directories : incdir, dependencies : golden_dl, install : false)
+  padding_clean = shared_library('csc-padding-clean', 'tests/golden/csc-padding-control.c',
+      include_directories : incdir, install : false)
+  padding_mutant = shared_library('csc-padding-mutant', 'tests/golden/csc-padding-control.c',
+      include_directories : incdir, c_args : ['-DPADDING_MUTANT'], install : false)
+  test('csc-padding-controls', find_program('bash'),
+      args : [files('tests/golden/test-csc-padding.sh'), padding_probe.full_path(),
+          padding_clean.full_path(), padding_mutant.full_path()],
+      depends : [padding_probe, padding_clean, padding_mutant])
+endif
 golden_shell = find_program('sh')
 shim_contract = executable('shim-contract', 'tests/shim/contract.c',
     include_directories : incdir,
@@ -472,9 +497,24 @@ test('board-oracle', oracle_test)
 executable('probe-version', 'tests/board/probe-version.c',
     include_directories : incdir, link_with : librga_so,
     c_args : board_cargs, install : false)
-executable('rga-convert-bench', 'tests/board/rga-convert-bench.c',
+board_bench = executable('rga-convert-bench', 'tests/board/rga-convert-bench.c',
     include_directories : incdir, link_with : [librga_so, board_oracle],
     dependencies : [board_math, board_dl], c_args : board_cargs, install : false)
+test('board-session-baseline', board_bench, args : ['--session-selftest'],
+    env : fake_rga_env, depends : fake_rga)
+bench_control = executable('bench-control', 'tests/board/bench-control.c',
+    include_directories : incdir, link_with : [librga_so, board_oracle],
+    dependencies : [board_math, board_dl], c_args : board_cargs, install : false)
+test('board-soak-control', find_program('bash'),
+    args : [files('tests/board/test-bench-control.sh'), bench_control.full_path()],
+    depends : bench_control)
+test('board-conversion-evidence', find_program('bash'),
+    args : [files('tests/board/conversion-evidence.sh'), '--selftest'])
+test('board-isolated-drill', find_program('bash'),
+    args : [files('tests/board/test-isolated-drill.sh')])
+test('board-recovery-mutations', find_program('bash'),
+    args : [files('tests/board/test-bench-mutations.sh'), meson.current_build_dir()],
+    depends : [board_bench, board_oracle, fake_rga], timeout : 90)
 board_timing = shared_library('rga_timing', 'tests/shim/fake_rga.c',
     include_directories : incdir, dependencies : [board_dl, libthreads_dep],
     c_args : board_cargs + ['-DFORWARD_TIMING'], install : false)

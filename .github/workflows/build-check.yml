@@ -328,20 +328,7 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          count=0
-          if [ -f test-results/analyzer-hits.txt ]; then
-            count="$(wc -l < test-results/analyzer-hits.txt)"
-          fi
-          {
-            echo "## GCC -fanalyzer — REQUIRED"
-            echo
-            echo "This job gates a merge. It reports what the GCC static"
-            echo "analyzer sees in the library sources. Every finding"
-            echo "is dispositioned in \`docs/ANALYZER-TRIAGE.md\`; an untriaged one"
-            echo "is printed above."
-            echo
-            echo "- unique \`-Wanalyzer-*\` hits: \`${count}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          bash scripts/analyzer-summary.sh | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the analyzer log
         if: always()

@@ -172,6 +172,20 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+R0 infrastructure recovery [EXISTS] is inventoried commit-by-commit in
+[`docs/R0-INFRASTRUCTURE-RECOVERY.md`](docs/R0-INFRASTRUCTURE-RECOVERY.md).
+`golden-cases-dynamic` uses the real shared provider without the static golden
+instrumentation. The recovered aarch64 padding probe is diagnostic (exit 1 is a
+finding), never a padding-waiver gate. The bench warms BOTH legacy and im2d
+sessions before its strict fd census. R6 retains 3600/3605/3700-second bench,
+process and transport bounds and rejects empty/short execution. Host mutation
+tests do not qualify hardware. `r1-isolated-drill.sh` selects extracted providers
+per process; it never APT-manages or remounts sysext `/usr`. Package-swap/rollback
+qualification remains a separate, unported hardware gate under current policy.
+Analyzer completion requires a real planted-diagnostic probe using the configured
+library compile command, nonzero objects and successful triage. The always-run
+summary refuses missing completion evidence rather than reporting a clean zero.
+
 NV12 blend validation [EXISTS] runs as `blend-validation` against the real shared
 library. R1 already inherits upstream fc3f742's pattern-first ordering; the new
 two-predicate correction uses `is_rgb_format`, not the RGA-format namespace

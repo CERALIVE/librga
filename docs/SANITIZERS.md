@@ -295,3 +295,16 @@ stale on unrelated churn gets rubber-stamped instead of read. R1 defaults to
 strict reconciliation; the required CI job explicitly sets `ANALYZER_STRICT=1`.
 Untriaged findings fail. `ANALYZER_STRICT=0` is local advisory investigation only,
 not a permitted CI configuration.
+# Recovered analyzer capability boundary
+
+The R0 recovery retains the R1 Meson-derived source/object inventory rather than
+restoring R0's inline workflow parser. Before accepting findings it compiles a
+planted null dereference with the first shipped translation unit's **actual
+compile command**, substituting only source/output/dependency paths. A successful
+compile without `-Wanalyzer-null-dereference` is failure: accepting the compiler
+flag and producing objects alone do not prove analysis occurred.
+
+`scripts/analyzer-summary.sh` consumes a completion count written only after
+capability, object, extraction and triage checks. Missing/stale evidence is not
+zero findings. `tests/test-analyzer-gate.sh` preserves #14's controls and adds
+inert-compiler and missing-completion cases, also checking summary failure.

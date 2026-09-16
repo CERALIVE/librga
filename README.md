@@ -26,7 +26,7 @@ Two Debian packages, both release assets of one tag and both served from
 | Package | Contents |
 |---|---|
 | `librga2-ceralive` | The runtime library, SONAME `librga.so.2`. `Provides: librga2`, `Conflicts`/`Replaces: librga2`, so it substitutes for the distribution package on a CeraLive device. |
-| `librga-ceralive-dev` | Headers under `include/rga/`, the static library, and `librga.pc`. |
+| `librga-ceralive-dev` | Headers under `include/rga/` and `librga.pc`. No static archive: `packaging/build-deb.sh` deletes `librga.a` and `packaging/package-contract.sh` rejects a staged archive. |
 
 The SONAME, the pkg-config name, and the header install path are unchanged from
 upstream. R1 accepts exactly [18 inherited internal-symbol removals](docs/R1-ABI-ACCEPTANCE.md)
@@ -53,6 +53,13 @@ opt-in. R1 retains the upstream `rga_check_driver()` version-table policy; this
 documentation correction introduces no strict mode or runtime behaviour change.
 
 ## Build
+
+Recovered validation infrastructure [EXISTS] includes a shared-library golden
+client, the aarch64 CSC padding diagnostic, warmed fd census, one-hour soak and
+cross-release conversion evidence. The [43-commit recovery audit](docs/R0-INFRASTRUCTURE-RECOVERY.md)
+records every port and exclusion. The [board runbook](tests/board/README.md)
+describes the process-local drill: it does not install packages or qualify R1
+hardware by inheriting R0's receipts. Both-board qualification remains pending.
 
 R1's three-channel NV12-output validation now has a real-library regression and
 [decoded OPi PiP evidence](docs/NV12-BLEND.md). The R0 ordering fix was already
