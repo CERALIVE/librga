@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+// Modified by CeraLive 2026-09-14: preserve the R0 public option size.
 #ifndef _RGA_IM2D_TYPE_H_
 #define _RGA_IM2D_TYPE_H_
 
@@ -486,8 +487,20 @@ typedef struct im_opt {
 
     im_gauss_t gauss_config;
 
+#if defined(__linux__) && defined(__LP64__) && !defined(ANDROID)
+    char reserve[88]; /* R0: 124 minus 4-byte alignment gap and 32-byte config. */
+#else
     char reserve[92];
+#endif
 } im_opt_t;
+
+#if defined(__linux__) && defined(__LP64__) && !defined(ANDROID)
+#ifdef __cplusplus
+static_assert(sizeof(im_opt_t) == 304, "im_opt_t must retain the R0 ABI size");
+#else
+_Static_assert(sizeof(im_opt_t) == 304, "im_opt_t must retain the R0 ABI size");
+#endif
+#endif
 
 typedef struct im_handle_param {
     uint32_t width;

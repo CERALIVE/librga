@@ -24,7 +24,17 @@ is `test-results/logging-green-tests.log`. These are host-shim observations,
 not hardware validation. No H10 launcher, signature, layout, visibility, SONAME
 or `IM_STATUS` definition changed.
 
-## Public-setter acceptance remains blocked
+## Historical public-setter acceptance gap
+
+**2026-09-15 disposition:** the owner-directed separate scope selected honest
+deprecation, not reconnection. The header now explicitly documents both methods
+as compatibility no-ops for logging. `legacy-once` and `legacy-always` are mandatory
+Meson tests of that deliberate contract, with repeated operations, zero/nonzero
+values, distinct context-state sentinels and positive environment/direct-dump
+controls. The original positive-output assertion is replaced under this explicit
+contract decision, not waived as an expected failure. The historical RED evidence
+below remains unchanged; it is not a current unexplained failing probe. See
+[`LEGACY-LOG-SETTERS.md`](../LEGACY-LOG-SETTERS.md) for the D29 rationale.
 
 The review's setter explanation conflated two different fields. The inline
 `RkRgaSetLogOnceFlag` and `RkRgaSetAlwaysLogFlag` write private members of

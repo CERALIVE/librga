@@ -48,6 +48,23 @@ Read this before adding an im2d call to a consumer.
 
 ## Environment, logging, and the legacy API
 
+- **`RkRgaSetLogOnceFlag(int)` and `RkRgaSetAlwaysLogFlag(bool)` are deprecated
+  compatibility no-ops for logging [EXISTS].** Neither enables, disables or
+  consumes a diagnostic dump. Their inline assignments remain for compatibility;
+  they write private `RockchipRga` instance members that logging never reads.
+  They do **not** write the separate `rgaContext::mLogOnce` / `mLogAlways` members
+  declared in `core/NormalRgaContext.h` and read/reset by Android's palette path.
+  Identical names do not make these the same state. Neither set is renamed or
+  removed. This is documentation deprecation, without a compiler attribute or
+  new runtime warning. See [the compatibility decision](LEGACY-LOG-SETTERS.md).
+- **For Linux operation diagnostics, start your process with
+  `ROCKCHIP_RGA_LOG=1` [EXISTS].** The core refreshes `rgaContext::Is_debug` from
+  that environment variable at blit/fill/palette entry; the deprecated setters
+  neither override nor suppress it. It is process-wide, not instance-local or
+  one-shot. R1 sends these diagnostics to stderr. For a deliberate parameter
+  dump, the existing `RkRgaLogOutUserPara()` method also emits immediately.
+  Constructor notices and error diagnostics are separate from successful-operation
+  logging; their presence does not prove a setter works.
 - **`ROCKCHIP_RGA_LOG` is the only environment knob the library reads.** There is
   no other supported environment variable for log level or behaviour; anything
   else found in samples or downstream trees does nothing here.

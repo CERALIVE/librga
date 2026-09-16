@@ -67,6 +67,56 @@ saying which diagnostic forced it.
 
 ## The flag set of record
 
+### R1 toolchain candidate (todo 41)
+
+Packaged LTO is **off**, selected by `ci/package-lto.env` in both packaging and
+the normal build/test lane. Independent review found binding drift that abidiff
+does not report. The [reserve-size repair](R1-ABI-REPAIR.md), owner's
+[acceptance of exactly 18 inherited removals](R1-ABI-ACCEPTANCE.md), and C/C++
+size assertions at 696/304 remain unchanged. ABI correctness takes precedence
+over the optimization; no reliable binding-preserving LTO mechanism is claimed.
+
+GCC LTO prunes some existing weak C++ definitions unless they are linker roots.
+The experimental shared-library target in `meson.build` retains those names using
+`-Wl,--undefined=<symbol>` under LTO only, but **not their bindings**. Those roots
+remain solely to keep the rejected experiment and existing comparisons measurable;
+they are not used by packaging. There are no additions to the removal allowance.
+The separate non-LTO-R1 to LTO-R1 abidiff comparison still accepts no removals.
+
+The required ABI job also compares exported `(name, type, binding, visibility)`
+tuples with `ci/check-dynsym.py`: exact equality only, no exclusions. It always
+retains the failed experimental LTO comparison, even while LTO is off. The policy
+permits that failed qualification **only with packaged LTO disabled**; a separate
+build with the selected packaging setting must pass unconditional tuple equality
+against non-LTO R1. Missing/invalid inputs and tool errors fail either way.
+`dynamic-symbol-evidence` retains both comparisons, normalized inventories, raw
+readelf output, the explicit LTO verdict and mutation-control results. The controls
+change actual .dynsym WEAK/UNIQUE bindings, type and visibility independently;
+each must fail. This metadata gate complements, not replaces, abidiff.
+
+`ci/abi-steps.sh` builds the published R0 commit and current R1 using one
+target-suite compiler and optimization level, preserves DWARF, and first runs a
+non-LTO control. It then compares R1 with LTO against the same non-LTO R0. Each
+comparison retains the unfiltered report, demands exact equality with the
+committed removal set (including stale-entry rejection), and suppresses only those
+literal deletions before applying the original exit-bit rule. Added symbols are
+allowed; tool errors and remaining incompatible-change bit 8 fail. All other type
+changes stay visible. `tests/test-abi-gate.sh` proves exact acceptance, unexpected
+function/data removal and stale-entry rejection, plus independent incompatible
+vtable rejection. It retains the original identical/additive/hidden-symbol cases.
+The ABI and reproducibility jobs trust only their current checkout through
+process-local Git configuration, including child packaging processes. Container
+checkout ownership differs from the build user; checkout's temporary HOME does
+not make that trust available to later shell steps. No persistent Git config is
+changed by these two jobs.
+
+`ci/mtune-measurement.sh` builds generic and `-mtune=cortex-a76` variants only
+under `test-results/mtune`, reports ELF sizes, and never calls the packager.
+Its CI job is measurement-only, non-blocking, and excluded from the required
+summary. H4 microseconds/frame requires a board and belongs to todo 42: it is
+**NOT RUN** here. ELF sizes are not performance evidence or tuning-adoption
+permission. The existing H4 INCONCLUSIVE verdict remains unchanged.
+
 ### Scoped warnings-as-errors (todo 37)
 
 The earlier `-w` measurement above is historical. R1 removes that flag from

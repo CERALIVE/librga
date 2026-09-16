@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 // Modified by CeraLive 2026-09-14: assert library diagnostics use stderr with context.
+// Modified by CeraLive 2026-09-15: gate deprecated setters and working diagnostic controls.
 #include <cstdio>
 #include <cstring>
 #include <dlfcn.h>
@@ -117,6 +118,23 @@ static void check_legacy_logging(void)
 }
 
 static RockchipRga *setter_rga;
+static bool setter_once;
+static int setter_value;
+
+static IM_STATUS legacy_set_flag(void)
+{
+    if (setter_once)
+        setter_rga->RkRgaSetLogOnceFlag(setter_value);
+    else
+        setter_rga->RkRgaSetAlwaysLogFlag(setter_value != 0);
+    return IM_STATUS_SUCCESS;
+}
+
+static IM_STATUS legacy_parameter_dump(void)
+{
+    rga_info_t info = {};
+    return setter_rga->RkRgaLogOutUserPara(&info) == 0 ? IM_STATUS_SUCCESS : IM_STATUS_FAILED;
+}
 
 static IM_STATUS legacy_fill(void)
 {
@@ -130,24 +148,79 @@ static IM_STATUS legacy_fill(void)
 
 static void check_legacy_setter(bool once)
 {
-    unit_begin(once ? "public legacy once setter" : "public legacy always setter");
+    unit_begin(once ? "deprecated legacy once setter" : "deprecated legacy always setter");
     unit_eq_int("unset ROCKCHIP_RGA_LOG", 0, unsetenv("ROCKCHIP_RGA_LOG"));
     unit_eq_int("global logging is disabled", 0, rga_log_enable_update());
     RockchipRga rga;
     setter_rga = &rga;
+    setter_once = once;
     unit_eq_int("fake device is ready", 1, rga.RkRgaIsReady());
-    if (once)
-        rga.RkRgaSetLogOnceFlag(1);
-    else
-        rga.RkRgaSetAlwaysLogFlag(true);
+    void *context = NULL;
+    rga.RkRgaGetContext(&context);
+    unit_eq_int("legacy context exists", 1, context != NULL);
+    if (!context) {
+        setter_rga = NULL;
+        return;
+    }
+    rgaContext *ctx = static_cast<rgaContext *>(context);
+    ctx->mLogOnce = 23;
+    ctx->mLogAlways = 47;
+    const int values[] = {1, 0, -1, 2};
+    for (int value : values) {
+        setter_value = value;
+        captured_imcheck setter = {};
+        unit_eq_int("capture deprecated setter", 1, capture_call(&setter, legacy_set_flag));
+        unit_eq_int("setter stdout empty", 0, strlen(setter.stdout_text));
+        unit_eq_int("setter emits no runtime warning", 0, strlen(setter.stderr_text));
+        for (int operation = 0; operation < 2; ++operation) {
+            captured_imcheck capture = {};
+            unit_eq_int("capture successful legacy operation", 1, capture_call(&capture, legacy_fill));
+            unit_eq_int("legacy fill succeeded", IM_STATUS_SUCCESS, capture.status);
+            unit_eq_int("setter does not enable process-wide logging", 0, rga_log_enable_get());
+            unit_eq_int("setter leaves global env unset", 1, getenv("ROCKCHIP_RGA_LOG") == NULL);
+            unit_eq_int("legacy fill stdout empty", 0, strlen(capture.stdout_text));
+            unit_eq_int("deprecated setter leaves operation diagnostics disabled", 0,
+                        strlen(capture.stderr_text));
+            unit_eq_int("context once flag is separate and unconsumed", 23, ctx->mLogOnce);
+            unit_eq_int("context always flag is separate", 47, ctx->mLogAlways);
+        }
+    }
+
+    unit_eq_int("enable documented Linux operation diagnostics", 0,
+                setenv("ROCKCHIP_RGA_LOG", "1", 1));
+    setter_value = 0;
+    legacy_set_flag();
+    for (int operation = 0; operation < 2; ++operation) {
+        captured_imcheck enabled = {};
+        unit_eq_int("capture environment-enabled fill", 1, capture_call(&enabled, legacy_fill));
+        unit_eq_int("environment-enabled fill succeeded", IM_STATUS_SUCCESS, enabled.status);
+        unit_eq_int("environment-enabled fill stdout empty", 0, strlen(enabled.stdout_text));
+        unit_eq_int("zero setter cannot suppress environment-selected diagnostics", 1,
+                    strstr(enabled.stderr_text, "librga: <<<<-------- print rgaLog -------->>>>") != NULL);
+        unit_eq_int("environment remains enabled", 0, strcmp(getenv("ROCKCHIP_RGA_LOG"), "1"));
+        unit_eq_int("context once flag still unconsumed", 23, ctx->mLogOnce);
+        unit_eq_int("context always flag still separate", 47, ctx->mLogAlways);
+    }
+
+    unit_eq_int("disable documented Linux operation diagnostics", 0,
+                setenv("ROCKCHIP_RGA_LOG", "0", 1));
+    setter_value = 1;
+    legacy_set_flag();
     captured_imcheck capture = {};
-    unit_eq_int("capture successful legacy operation", 1, capture_call(&capture, legacy_fill));
-    unit_eq_int("legacy fill succeeded", IM_STATUS_SUCCESS, capture.status);
-    unit_eq_int("setter does not enable process-wide logging", 0, rga_log_enable_get());
-    unit_eq_int("setter leaves global env unset", 1, getenv("ROCKCHIP_RGA_LOG") == NULL);
-    unit_eq_int("legacy fill stdout empty", 0, strlen(capture.stdout_text));
-    unit_eq_int("requested operation diagnostic emitted", 1,
-                strstr(capture.stderr_text, "librga: <<<<-------- print rgaLog -------->>>>") != NULL);
+    unit_eq_int("capture explicitly disabled fill", 1, capture_call(&capture, legacy_fill));
+    unit_eq_int("explicitly disabled fill succeeded", IM_STATUS_SUCCESS, capture.status);
+    unit_eq_int("explicitly disabled fill stdout empty", 0, strlen(capture.stdout_text));
+    unit_eq_int("nonzero setter cannot override environment zero", 0, strlen(capture.stderr_text));
+    unit_eq_int("setter leaves global logging disabled throughout", 0, rga_log_enable_get());
+    unit_eq_int("environment remains zero", 0, strcmp(getenv("ROCKCHIP_RGA_LOG"), "0"));
+
+    captured_imcheck dump = {};
+    unit_eq_int("capture explicit parameter dump", 1, capture_call(&dump, legacy_parameter_dump));
+    unit_eq_int("explicit dump succeeded", IM_STATUS_SUCCESS, dump.status);
+    unit_eq_int("explicit dump stdout empty", 0, strlen(dump.stdout_text));
+    unit_eq_int("explicit dump still emits with logging disabled", 1,
+                strstr(dump.stderr_text, "librga: handl-fd-vir-phy-hnd-format[") != NULL);
+    unit_eq_int("restore absent environment", 0, unsetenv("ROCKCHIP_RGA_LOG"));
     setter_rga = NULL;
 }
 

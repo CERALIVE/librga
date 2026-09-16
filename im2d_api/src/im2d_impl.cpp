@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 // Modified by CeraLive 2026-09-14: send im2d diagnostics to stderr with context.
+// Modified by CeraLive 2026-09-15: restore BT.709-full's ordinary R2Y selector.
 
 #ifdef LOG_TAG
 #undef LOG_TAG
@@ -3571,6 +3572,8 @@ int generate_blit_req(struct rga_req *ioc_req, rga_info_t *src, rga_info_t *dst,
 
         if ((dst->color_space_mode & full_csc_mask) == rgb2yuv_709_limit)
             r2y_mode = IM_RGB_TO_YUV_BT709_LIMIT;
+        else if ((dst->color_space_mode & full_csc_mask) == rgb2yuv_709_full)
+            r2y_mode = 0;
     }
 
     yuvToRgbMode = r2y_mode | y2r_mode;

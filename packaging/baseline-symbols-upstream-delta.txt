@@ -1,4 +1,8 @@
-# Baseline symbols that a NON-baseline API release legitimately no longer exports.
+# Accepted R1 removals inherited from upstream 1.10.5, decision 2026-09-14.
+# Shared by the package contract and the matched R0-to-R1 ABI gate.
+# Each entry is accepted without a shim: no installed public declaration or known
+# external caller. Per-symbol dispositions, usage-search controls and residual
+# private-binary/writable-data risks: docs/R1-ABI-ACCEPTANCE.md.
 #
 # The baseline (packaging/baseline-symbols-radxa-2.2.0-1.txt) was taken from a
 # board binary reporting rga_api version 1.10.1_[4]. When the tree being built
@@ -32,7 +36,7 @@ _Z14rga_check_infoPKc12rga_buffer_t7im_recti	signature changed; the tree exports
 _Z15rga_task_submitj12rga_buffer_tS_S_7im_rectS0_S0_P6im_opti	signature changed; the tree exports _Z15rga_task_submitj12rga_buffer_tS_S_7im_rectS0_S0_iPiP6im_opti
 _Z16rga_check_driverR13rga_version_t	signature changed from reference to value; the tree exports _Z16rga_check_driver13rga_version_t
 _Z16rga_check_rotateiR20rga_info_table_entry	signature changed from reference to pointer; the tree exports _Z16rga_check_rotateiP20rga_info_table_entry
-_Z17rga_import_buffermiP15im_handle_param	signature changed; the tree exports _Z17rga_import_buffermij
+_Z17rga_import_buffermiP15im_handle_param	renamed to rga_import_buffer_param (not lost capability); _Z23rga_import_buffer_parammiP15im_handle_param retains the parameter-taking functionality
 _Z22NormalRgaSetBitbltModeP7rga_req10rga_interphjjjj	signature changed; the tree exports _Z22NormalRgaSetBitbltModeP7rga_reqP10rga_interphjjjj
 _Z35rga_version_table_get_current_indexR13rga_version_tPK30rga_version_bind_table_entry_ti	signature changed from reference to value; the tree exports the same name taking 13rga_version_t
 _Z35rga_version_table_get_minimum_indexR13rga_version_tPK30rga_version_bind_table_entry_ti	same reference-to-value change

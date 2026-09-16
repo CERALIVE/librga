@@ -11,10 +11,11 @@ on:
     tags: ["*"]
   pull_request:
     branches: [main, "release/**", "integration/**"]
+  workflow_dispatch:
 
 concurrency:
   group: build-check-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' && github.ref_type != 'tag' }}
 
 permissions:
   contents: read
@@ -293,16 +294,14 @@ jobs:
           PY
 
   analyzer:
-    name: GCC -fanalyzer (advisory)
+    name: GCC -fanalyzer (required)
     needs: [changes, resolve-suite]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04-arm
     container:
       image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
-    # ADVISORY for the R0 release line. The findings are read, triaged and
-    # recorded; they do not block a merge yet. Promoting this job to a gate is a
-    # separate, deliberate step once the backlog it surfaces is at zero.
-    continue-on-error: true
+    env:
+      ANALYZER_STRICT: '1'
     steps:
       - name: Install base tooling
         run: |
@@ -331,9 +330,9 @@ jobs:
             count="$(wc -l < test-results/analyzer-hits.txt)"
           fi
           {
-            echo "## GCC -fanalyzer — ADVISORY"
+            echo "## GCC -fanalyzer — REQUIRED"
             echo
-            echo "This job does not gate a merge. It reports what the GCC static"
+            echo "This job gates a merge. It reports what the GCC static"
             echo "analyzer sees in the library sources. Every finding"
             echo "is dispositioned in \`docs/ANALYZER-TRIAGE.md\`; an untriaged one"
             echo "is printed above."
@@ -435,14 +434,125 @@ jobs:
             echo "board-side equivalent."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  abi:
+    name: ABI · R1 vs R0 · matched debug builds
+    needs: [changes, resolve-suite]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
+    steps:
+      - name: Install ABI tooling before full-history checkout
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git g++ ccache meson ninja-build pkg-config python3 abigail-tools binutils
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: abi-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: abi-${{ runner.arch }}-
+      - name: Compare matched -g -O2 R0 and R1, rejecting incompatibilities
+        run: bash ci/abi-steps.sh
+      - name: Retain exact dynamic-symbol comparison and LTO qualification
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: dynamic-symbol-evidence
+          path: test-results/abi/dynsym-*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: abi-evidence
+          path: |
+            test-results/abi/abidiff*.txt*
+            test-results/abi/build-*/compile_commands.json
+            test-results/abi/build-*/librga.so.2.1.0
+          if-no-files-found: error
+
+  reproducible:
+    name: Reproducible · two complete arm64 package builds
+    needs: [changes, resolve-suite]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
+    steps:
+      - name: Install packaging tooling before full-history checkout
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git g++ ccache meson ninja-build pkg-config python3 dpkg-dev binutils
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: repro-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: repro-${{ runner.arch }}-
+      - name: Build twice with an explicit fixed SOURCE_DATE_EPOCH and compare bytes
+        run: |
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$PWD"
+          mkdir -p test-results/repro-tmp
+          export TMPDIR="$PWD/test-results/repro-tmp"
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          printf 'SOURCE_DATE_EPOCH=%s\n' "$SOURCE_DATE_EPOCH" | tee test-results/reproducible.txt
+          bash packaging/package-contract.sh --repro 2>&1 | tee -a test-results/reproducible.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: reproducibility-evidence
+          path: test-results/reproducible.txt
+          if-no-files-found: error
+
+  mtune-measurement:
+    name: Cortex-A76 · measurement only, not an acceptance gate
+    needs: [changes, resolve-suite]
+    if: needs.changes.outputs.code == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:${{ needs.resolve-suite.outputs.suite }}-slim
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install measurement tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends g++ ccache meson ninja-build pkg-config python3 binutils
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: mtune-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: mtune-${{ runner.arch }}-
+      - name: Prepare unpackaged H4 variants and record size, never performance pass/fail
+        run: bash ci/mtune-measurement.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mtune-measurement-only
+          path: |
+            test-results/mtune/measurement.txt
+            test-results/mtune/*/librga.so.2.1.0
+          if-no-files-found: warn
+
   # The one check a branch-protection rule can require. It runs on every event,
   # including a docs-only pull request where every gate above skipped, and goes
   # red whenever a dependency failed or was cancelled. Skips are allowed only
   # when change detection explicitly classified the diff as documentation-only.
   #
-  # `analyzer` is deliberately absent: it is `continue-on-error: true` ADVISORY,
-  # and folding an advisory lane into the blocking summary would promote it to a
-  # gate by the back door.
   build-check-summary:
     name: Build Check summary
     if: always()
@@ -453,6 +563,9 @@ jobs:
       - test-results
       - sanitizers
       - werror
+      - analyzer
+      - abi
+      - reproducible
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any dependency failed or was cancelled

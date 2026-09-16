@@ -8,12 +8,18 @@ here that the current compiler does not reproduce is reported as
 Run it yourself:
 
 ```sh
-bash scripts/run-analyzer.sh            # advisory
-ANALYZER_STRICT=1 bash scripts/run-analyzer.sh   # fail on an untriaged hit
+bash scripts/run-analyzer.sh                   # required, fail on an untriaged hit
+ANALYZER_STRICT=0 bash scripts/run-analyzer.sh   # local advisory investigation only
 ```
 
 The mechanism — why `-Danalyzer=true` is required, and why only the shipped
 library is analysed — is in [`SANITIZERS.md`](SANITIZERS.md).
+
+The R1 CI job explicitly sets `ANALYZER_STRICT=1` and is a dependency of the
+required `Build Check summary`. A compile failure, missing analyzed objects,
+untriaged hit, or unexpected job skip blocks it. A finding count is not an
+execution count: the runner separately verifies and reports the nonzero set of
+library translation units compiled with `-fanalyzer` and without `-w`.
 
 ## Dispositions
 
