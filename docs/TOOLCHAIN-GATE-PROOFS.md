@@ -78,12 +78,35 @@ The target arm64 package build and package contract passed locally. The complete
 arm64 QEMU build/test attempt returned **2**: `shim-contract` and `board-timing`
 hit the documented invalid-fd emulation limitation. All tests ran; no skip or
 expectation was added to make this green. Native hosted full-suite results are
-needed before merge. Shellcheck error-level validation and workflow actionlint
-passed locally.
+recorded below. Shellcheck error-level validation and workflow actionlint passed
+locally. Shell LSP diagnostics were clean; YAML LSP was unavailable (installation
+previously declined), so actionlint supplied workflow validation.
+
+## Native hosted receipt
+
+[Build Check 35077200558](https://github.com/CERALIVE/librga/actions/runs/35077200558)
+at code commit **`49d2c2f51e897cbe36e8c9c4f0c3f2e749931701`** completed
+**SUCCESS, all 17 jobs successful**. This was a non-publishing manual run of the
+gate branch, not a release or board operation.
+
+Both native arm64 full-build jobs (Bookworm and Trixie), their unit/golden/UAPI
+result jobs, analyzer, scoped werror, ASan/UBSan/TSan with the new runtime
+mutation helper, matched-debug ABI, and two-build package reproducibility all
+passed. The required summary passed. The unpackaged Cortex-A76 measurement
+build also passed, without establishing hardware timings. This resolves the
+native-build evidence gap above; it does not relabel the local QEMU failures.
+
+The workflow retains `analyzer-log`, `sanitizer-logs`, `werror-logs`,
+`abi-evidence`, `dynamic-symbol-evidence`, `reproducibility-evidence`, suite test
+results and `dist` as run artifacts. LTO remains disqualified within the passing
+ABI job; the green run qualifies only the non-LTO packaging selection.
+
+## Item boundary
 
 This change supplies gate hardening and mutation evidence. It does **not**
 approve an R1 release, merge, tag, publication/reindex, consumer/image adoption,
 two-board G-B rerun, package-install/activation/restoration, or hardware/mtune
-performance claim. Reproducibility remains an existing required job, not a new
-local two-build receipt here. Version remains **1.10.5+ceralive.1**. The live-APT
+performance claim. Reproducibility remains an existing required job, with a
+fresh hosted pass but no separate local two-build receipt here. Version remains
+**1.10.5+ceralive.1**. The live-APT
 row stays blocked; no board operation is part of these commands.
