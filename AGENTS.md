@@ -132,7 +132,7 @@ These are compatibility contracts with live consumers, not cleanup opportunities
   mode, and the default log level stay exactly as upstream ships them. Changing
   any of them silently changes behaviour for every caller, including callers
   outside CeraLive. Explicit CSC and interpolation are consumer-side calls.
-- **No new public API** beyond the opt-in environment variable already present.
+- **No new public API or runtime configuration knob.**
   Accepting `IM_SCHEDULER_DEFAULT` inside the existing `imconfig` signature is an
   argument-validation fix, not new API.
 
@@ -147,13 +147,18 @@ changes only the enumerated removal policy, never these assertions.
 
 ## The additive-only principle
 
-Quoted verbatim from the effort's plan (D29), because it is the rule most likely
-to be broken by well-meant tidying:
+The effort's additive-only rule (D29), with the strict-driver availability claim
+corrected on 2026-09-16:
 
 > Additive-only (D29): nothing existing is stripped — Android/RT-Thread/other-SoC
 > trees, legacy `RockchipRga`/`c_RkRga*` API, every exported symbol, all stay;
-> `LIBRGA_STRICT_DRIVER=1` stays as a default-off opt-in; validation changes only
-> accept MORE valid input.
+> validation changes only accept MORE valid input.
+
+`LIBRGA_STRICT_DRIVER` is not implemented; setting it has no effect. The earlier
+"stays as a default-off opt-in" and "already present" wording was false, not a
+runtime contract. `rga_check_driver()` retains the upstream version-table policy,
+without an environment-dependent branch. This documentation correction adds no
+strict mode and changes no caller's runtime behaviour.
 
 The 2026-09-14 owner decision makes one narrow exception to the quoted export
 rule: the 18 inherited R1 removals above are accepted with documentation. It is
@@ -166,6 +171,15 @@ only widen the accepted input set. Deleting any of it is merge friction against
 an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
+
+NV12 blend validation [EXISTS] runs as `blend-validation` against the real shared
+library. R1 already inherits upstream fc3f742's pattern-first ordering; the new
+two-predicate correction uses `is_rgb_format`, not the RGA-format namespace
+macro, to retain the documented background rejection controls. The regression
+is RED on R0 and uncorrected R1 for different reasons, and ordering-mutation
+proven. [Finite OPi PiP evidence](docs/NV12-BLEND.md) includes a decoded visible
+inset using the PR36 plugin via process-local overrides. The bounded run still
+errors on primary EOS: neither endurance/teardown nor release is approved.
 
 Toolchain failure proofs [EXISTS] are recorded in
 [`docs/TOOLCHAIN-GATE-PROOFS.md`](docs/TOOLCHAIN-GATE-PROOFS.md). Analyzer extraction
