@@ -99,9 +99,14 @@ if checked == 0:
 print(f'run-analyzer: {checked} analyzed library translation units produced objects')
 PY
 
+extract_rc=0
 grep -oE '^[^ ]+:[0-9]+:[0-9]+: warning: .*\[-Wanalyzer-[a-z-]+\]' "$out" \
-	| sed -E 's#^(\.\./)+##' \
-	| LC_ALL=C sort -u >"$hits" || true
+	>"$hits.raw" || extract_rc=$?
+case "$extract_rc" in
+	0|1) ;;
+	*) printf 'run-analyzer: FAIL: diagnostic extraction exit %s\n' "$extract_rc" >&2; exit "$extract_rc" ;;
+esac
+sed -E 's#^(\.\./)+##' "$hits.raw" | LC_ALL=C sort -u >"$hits"
 
 total=$(wc -l <"$hits")
 printf '\nrun-analyzer: %s unique -Wanalyzer-* hits (compile exit %s)\n' "$total" "$rc"

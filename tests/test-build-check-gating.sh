@@ -14,12 +14,14 @@ import tempfile
 import textwrap
 
 workflow = Path('.github/workflows/build-check.yml').read_text()
-sanitizers = workflow.split('  sanitizers:\n', 1)[1].split('  build-check-summary:\n', 1)[0]
+sanitizers = workflow.split('  sanitizers:\n', 1)[1].split('  abi:\n', 1)[0]
 assert 'needs: [changes, resolve-suite]' in sanitizers
 assert "if: needs.changes.outputs.code == 'true'" in sanitizers
 assert 'runs-on: ubuntu-24.04-arm' in sanitizers
 assert 'image: debian:${{ needs.resolve-suite.outputs.suite }}-slim' in sanitizers
 assert 'run: bash ci/sanitizers-steps.sh' in sanitizers
+assert 'run: bash tests/test-sanitizer-failures.sh' in sanitizers
+assert 'continue-on-error' not in sanitizers
 assert 'placeholder' not in sanitizers
 summary = workflow.split('  build-check-summary:\n', 1)[1]
 assert 'if: always()' in summary
@@ -35,6 +37,7 @@ analyzer = workflow.split('  analyzer:\n', 1)[1].split('  werror:\n', 1)[0]
 assert 'continue-on-error' not in analyzer
 assert "ANALYZER_STRICT: '1'" in analyzer
 assert 'run: bash scripts/run-analyzer.sh' in analyzer
+assert 'run: bash tests/test-analyzer-gate.sh' in analyzer
 assert 'needs: [changes, resolve-suite]' in analyzer
 assert "if: needs.changes.outputs.code == 'true'" in analyzer
 abi = workflow.split('  abi:\n', 1)[1].split('  reproducible:\n', 1)[0]
@@ -43,6 +46,7 @@ assert 'continue-on-error' not in abi
 assert 'fetch-depth: 0' in abi
 assert 'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$root"' in Path('ci/abi-steps.sh').read_text()
 abi_steps = Path('ci/abi-steps.sh').read_text()
+assert 'bash tests/test-abi-layout.sh' in abi_steps
 assert '-Db_lto=false' in abi_steps and '-Db_lto=true' in abi_steps
 assert '"$out/abidiff-lto.txt"' in abi_steps
 assert '"$out/abidiff-lto-only.txt"' in abi_steps
@@ -85,6 +89,11 @@ cases = [
     ('true', 'success failure skipped skipped skipped', False),
     ('false', 'success success failure success success', False),
     ('false', 'success cancelled skipped skipped skipped', False),
+    ('true', '', False),
+    ('false', '  ', False),
+    ('true', 'success unknown success success success', False),
+    ('', 'success success success success success', False),
+    ('unknown', 'success success success success success', False),
 ]
 for code, results, expected in cases:
     run = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
@@ -92,13 +101,13 @@ for code, results, expected in cases:
     assert (run.returncode == 0) == expected, (code, results, run.stdout, run.stderr)
 print(f'PASS: real sanitizer lane retained; summary gate {len(cases)}/{len(cases)} cases')
 for dependency in dependencies:
-    for result in ('failure', 'cancelled', 'skipped'):
+    for result in ('failure', 'cancelled', 'skipped', 'unknown'):
         results = ['success'] * len(dependencies)
         results[dependencies.index(dependency)] = result
         run = subprocess.run(['bash', '-c', script], capture_output=True, text=True,
                              env={**os.environ, 'CODE_CHANGED': 'true', 'RESULTS': ' '.join(results)})
         assert run.returncode != 0, (dependency, result, run.stdout)
-print(f'PASS: all {len(dependencies)} required dependencies reject failure/cancelled/skipped')
+print(f'PASS: all {len(dependencies)} required dependencies reject failure/cancelled/skipped/unknown')
 
 count_checker = Path('ci/check-test-count.sh').resolve()
 Path('test-results').mkdir(exist_ok=True)
