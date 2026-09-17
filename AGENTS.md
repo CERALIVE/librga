@@ -172,6 +172,16 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+The consolidated [R1 both-board results](tests/board/DRILL-RESULTS.md) are a
+**post-release record**, [PARTIAL], not evidence present on the original open PR.
+[Rows 24/26 deviations](docs/R1-RECORD-DEVIATIONS.md) retain the missing rehearsal
+and late-record findings; owner disposition is pending, not implied by a docs merge.
+The results separate candidate-byte semantic/soak/H1 evidence from the
+different released bytes proven by both-board normal-loader activation and
+rollback. Release/serving are real; whole item-47 discharge is not established.
+Read the remaining artifact-identity, R1 H7 and factory-inventory rows before
+reusing an earlier PASS. This record authorizes no new board operation.
+
 R0 infrastructure recovery [EXISTS] is inventoried commit-by-commit in
 [`docs/R0-INFRASTRUCTURE-RECOVERY.md`](docs/R0-INFRASTRUCTURE-RECOVERY.md).
 `golden-cases-dynamic` uses the real shared provider without the static golden

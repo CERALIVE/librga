@@ -54,6 +54,14 @@ documentation correction introduces no strict mode or runtime behaviour change.
 
 ## Build
 
+The [R1 both-board drill record](tests/board/DRILL-RESULTS.md) is a **post-release
+record**, [PARTIAL]. The [missing rehearsal and late-record deviations](docs/R1-RECORD-DEVIATIONS.md)
+are documented for owner disposition, not presented as historical compliance.
+R1 is released and served, and both boards proved released-byte activation and
+rollback. Earlier candidate-byte soak and package-transaction results must not
+be presented as qualification of different released bytes. The record lists
+the remaining acceptance gaps and preserves historical findings below.
+
 Recovered validation infrastructure [EXISTS] includes a shared-library golden
 client, the aarch64 CSC padding diagnostic, warmed fd census, one-hour soak and
 cross-release conversion evidence. The [43-commit recovery audit](docs/R0-INFRASTRUCTURE-RECOVERY.md)
