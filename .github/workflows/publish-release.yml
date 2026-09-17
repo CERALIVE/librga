@@ -159,7 +159,7 @@ jobs:
             echo "       Either the wrong ref was dispatched or the version file has moved." >&2
             exit 1
           fi
-          if git rev-parse -q --verify "refs/tags/${version}" >/dev/null; then
+          if ${{ !inputs.dry_run }} && git rev-parse -q --verify "refs/tags/${version}" >/dev/null; then
             echo "ERROR: tag ${version} already exists — a released version is never rebuilt" >&2
             exit 1
           fi
