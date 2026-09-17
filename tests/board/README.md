@@ -1,5 +1,12 @@
 # Board harness
 
+Current acceptance evidence: [R1 both-board drill results](DRILL-RESULTS.md),
+**post-release record**, [PARTIAL]. It was not on the original open R1 PR;
+[rows 24/26 deviations](../../docs/R1-RECORD-DEVIATIONS.md) await owner disposition.
+The record distinguishes measured candidate results, released-byte
+activation/restoration, owner supersessions and still-missing qualification.
+It is not permission to run a board drill or a live APT transaction.
+
 This is non-installed Apache-2.0 test infrastructure. It never installs packages.
 Run `bash scripts/cross-build-harness.sh` to build every available Meson fragment
 with aarch64 GCC/G++, including the inherited host shim/goldens. Unwired fragments
