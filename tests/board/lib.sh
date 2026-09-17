@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 # Source once in a drill. Never replace this library's EXIT trap.
+# Modified by CeraLive 2026-09-17: publish identity receipts only after successful cleanup.
 [[ ${_BOARD_LIB_LOADED:-0} == 1 ]] && return 0
 _BOARD_LIB_LOADED=1
 declare -a _board_cleanups=()
@@ -17,7 +18,14 @@ _board_cleanup() {
             ((status == 0)) && status=$rc
         fi
     done
+    if ((status == 0)) && [[ -n ${_board_receipt_source:-} ]]; then
+        cp -- "$_board_receipt_source" "$_board_receipt_target" || status=$?
+    fi
     exit "$status"
+}
+board_receipt_on_success() {
+    _board_receipt_source=$1
+    _board_receipt_target=$2
 }
 trap _board_cleanup EXIT
 trap 'exit 130' INT

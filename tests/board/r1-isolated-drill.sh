@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Adapted from Andres Cera's 04847992b4c8fd9cc793cefdc6e764d42100ad59.
 # No APT operations: sysext qualification permits process-local libraries only.
+# Modified by CeraLive 2026-09-17: bind qualification to the runtime/development archives.
 set -euo pipefail
 [[ ${CERALIVE_BOARD_TEST:-0} == 1 ]] || exit 77
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -8,13 +9,22 @@ here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "$here/lib.sh"
 board_require_env
 : "${BASELINE_LIB:?extracted baseline library}" "${CANDIDATE_LIB:?extracted candidate library}" \
-  "${BASELINE_SHA256:?}" "${CANDIDATE_SHA256:?}" "${HARNESS_DIR:?}" "${RESULT_DIR:?}" "${PR_RUN_ID:?}"
+  "${BASELINE_SHA256:?}" "${CANDIDATE_SHA256:?}" "${HARNESS_DIR:?}" "${RESULT_DIR:?}" "${PR_RUN_ID:?}" \
+  "${RUNTIME_DEB:?}" "${DEV_DEB:?}" "${RELEASE_VERSION:?}" "${BOARD_MODEL:?}"
+[[ $BOARD_MODEL == rock-5b-plus || $BOARD_MODEL == orange-pi-5-plus ]]
 [[ $PR_RUN_ID =~ ^[0-9]+$ && $BASELINE_SHA256 =~ ^[a-f0-9]{64}$ && $CANDIDATE_SHA256 =~ ^[a-f0-9]{64}$ ]]
 repo=$(realpath "$here/../..")
 [[ $(realpath -m "$RESULT_DIR") == "$repo/"* && ! -e $RESULT_DIR ]]
 test "$(sha256sum "$BASELINE_LIB" | cut -d' ' -f1)" = "$BASELINE_SHA256"
 test "$(sha256sum "$CANDIDATE_LIB" | cut -d' ' -f1)" = "$CANDIDATE_SHA256"
+identity=$(bash "$repo/ci/artifact-identity.sh" "$RELEASE_VERSION" "$RUNTIME_DEB" "$DEV_DEB")
+[[ ${identity##*$'\n'} == "$CANDIDATE_SHA256  librga.so.2.1.0" ]] || {
+    printf 'QUALIFICATION-IDENTITY-FAIL: candidate ELF differs from runtime archive\n' >&2
+    exit 1
+}
 mkdir -p "$RESULT_DIR"
+printf '%s\n' "$identity" >"$RESULT_DIR/artifact-inputs.sha256"
+board_receipt_on_success "$RESULT_DIR/artifact-inputs.sha256" "$RESULT_DIR/$BOARD_MODEL.sha256"
 sha256sum "$BASELINE_LIB" "$CANDIDATE_LIB" "$HARNESS_DIR/rga-convert-bench" "$HARNESS_DIR/probe-version" >"$RESULT_DIR/inputs.sha256"
 board_ssh() { board_require_env; _board_auth timeout "${SSH_LIMIT:-20}" ssh "${_board_options[@]}" "$BOARD_SSH_USER@$BOARD_IP" "$@"; }
 board_scp() { board_require_env; _board_auth timeout 30 scp "${_board_options[@]}" "$@"; }
@@ -57,5 +67,9 @@ bash "$here/score-drill.sh" psnr "$RESULT_DIR/baseline.log" "$RESULT_DIR/matrix.
 SSH_LIMIT=3700 row soak "env LD_LIBRARY_PATH=$remote/candidate timeout 3605 $remote/rga-convert-bench --soak"
 bash "$here/score-drill.sh" soak "$RESULT_DIR/soak.log" || failed=1
 SSH_LIMIT=60 row baseline-after "env LD_LIBRARY_PATH=$remote/base timeout 50 $remote/rga-convert-bench --selftest"
+# A replaced provider or archive invalidates the run, even if every scorer passed.
+board_ssh "cd $remote && printf '%s\n' '$BASELINE_SHA256  base/librga.so.2' '$CANDIDATE_SHA256  candidate/librga.so.2' | sha256sum -c -" >"$RESULT_DIR/final-identity.log"
+final_identity=$(bash "$repo/ci/artifact-identity.sh" "$RELEASE_VERSION" "$RUNTIME_DEB" "$DEV_DEB")
+[[ $final_identity == "$identity" ]] || exit 1
 printf 'Isolated rows scored; failures=%d; temporary-state cleanup follows (not package rollback)\n' "$failed"
 exit "$failed"

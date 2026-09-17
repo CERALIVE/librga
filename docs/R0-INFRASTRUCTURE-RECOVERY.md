@@ -6,6 +6,11 @@ Audit boundary: R0 `90f5ff2289b81baa72c664bf4f5b0363a33f8e04`, R1 integration
 on that combined candidate, not pushed into it. No production fix, release,
 hardware run, R0 modification, rebase or squash is part of this work.
 
+Follow-on infrastructure: the [qualification identity gate](QUALIFICATION-IDENTITY.md)
+extends the recovered isolated drill with package-bound receipts and a mandatory
+publication cross-check. It does not retroactively qualify the historical R1
+candidate or replace any measurement in this recovery record.
+
 ## Complete commit disposition
 
 The range contains 43 commits, including three merges. Each non-merge delta was
