@@ -402,6 +402,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout qualification receipts at the dispatched commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
       - name: Download the release assets
         uses: actions/download-artifact@v8
         with:
@@ -428,6 +433,12 @@ jobs:
             exit 1
           fi
           ( cd dist && sha256sum -c "${runtime}.sha256" "${dev}.sha256" )
+
+      - name: Require exact board-qualified release bytes
+        env:
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+          DEB_ARCH: ${{ needs.resolve.outputs.arch }}
+        run: bash ci/check-release-qualification.sh
 
       - name: Create the GitHub release
         uses: softprops/action-gh-release@v3
