@@ -73,14 +73,18 @@ R1's three-channel NV12-output validation now has a real-library regression and
 [decoded OPi PiP evidence](docs/NV12-BLEND.md). The R0 ordering fix was already
 inherited upstream; the new change corrects two RGB classifiers so unsupported
 backgrounds remain rejected. The decoded frame shows a visible inset with PR36's
-geometry fix. This is finite composition only: the bounded run still reports a
-primary-EOS error, and soak, teardown, package-swap and release gates remain open.
+geometry fix. This is finite composition only: the bounded run reports a
+primary-EOS error. At that investigation checkpoint, soak, teardown,
+package-swap and release gates remained open; current qualification status is
+in the post-release record above.
 
 R1's explicit BT.709-full RGB→YUV path now clears the ordinary destination
 selector instead of retaining BT.601-limited alongside full CSC. This repairs
 upstream `2aa0ab4d`, not the donor port; coefficients and other colour modes are
 unchanged. The [failing-first regression and isolated pixel evidence](docs/FULL709-SELECTOR.md)
-recover the recorded 50.689414 dB result. G-B and R1 release remain blocked.
+recover the recorded 50.689414 dB result. That investigation did not qualify G-B
+or authorize the later R1 release; current qualification gaps are in the
+post-release record above.
 
 CeraLive builds with **Meson**, targeting Debian **Trixie** on arm64. The CMake,
 Android, and RT-Thread build files upstream ships are preserved but unused.
