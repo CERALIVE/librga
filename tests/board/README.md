@@ -153,6 +153,16 @@ board ownership from the coordinator. It stages unique `/tmp` directories,
 verifies both provider hashes remotely, and sets `LD_LIBRARY_PATH` for each
 individual process. It never exports a system-wide override or restarts services.
 
+Also required: `RELEASE_VERSION`, `RUNTIME_DEB`, `DEV_DEB` and `BOARD_MODEL`
+(`rock-5b-plus` or `orange-pi-5-plus`). The archives must be that version's arm64
+runtime/development pair. The candidate's expected hash must equal the ELF **inside
+the runtime archive**; a separately rebuilt local library is rejected before SSH,
+even if its supplied hash is accurate. Inputs go in `artifact-inputs.sha256`.
+Only successful rows **and successful cleanup** produce `<BOARD_MODEL>.sha256`.
+Review/promote both receipts as described in
+[the identity contract](../../docs/QUALIFICATION-IDENTITY.md). This records package
+identity, not a package-transaction test; it does not discharge H1 or other drills.
+
 Measurements retained from R0:
 
 - `--routing --core 1|2|4`: 1000 exact NV12 copies at 128×64; selected debugfs

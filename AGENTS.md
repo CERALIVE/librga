@@ -172,6 +172,17 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+Qualification-to-release identity [EXISTS] is enforced by
+`ci/check-release-qualification.sh` immediately before GitHub publication, against
+the downloaded upload payload. The recovered isolated drill binds its candidate
+ELF to `RUNTIME_DEB`, records that archive and `DEV_DEB`, and emits a board receipt
+only after successful scoring and cleanup. Both reviewed receipts must be committed
+under `tests/board/qualification/<version>/`; missing or mismatched receipts block
+publication. Never regenerate them from a later release rebuild. Dry runs remain
+candidate producers, not qualification. See [the identity contract](docs/QUALIFICATION-IDENTITY.md)
+for the trust boundary, mutation proof and promotion procedure. No historical R1
+receipt is fabricated by this infrastructure change.
+
 The consolidated [R1 both-board results](tests/board/DRILL-RESULTS.md) are a
 **post-release record**, [PARTIAL], not evidence present on the original open PR.
 [Rows 24/26 deviations](docs/R1-RECORD-DEVIATIONS.md) retain the missing rehearsal

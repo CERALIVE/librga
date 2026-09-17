@@ -69,6 +69,11 @@ records every port and exclusion. The [board runbook](tests/board/README.md)
 describes the process-local drill: it does not install packages or qualify R1
 hardware by inheriting R0's receipts. Both-board qualification remains pending.
 
+The [qualification identity gate](docs/QUALIFICATION-IDENTITY.md) [EXISTS] binds
+that drill's measured ELF to its runtime package and requires both boards' reviewed
+package/ELF receipts to match the actual release upload. Missing receipts or a
+different rebuild block publication; matching source versions are not sufficient.
+
 R1's three-channel NV12-output validation now has a real-library regression and
 [decoded OPi PiP evidence](docs/NV12-BLEND.md). The R0 ordering fix was already
 inherited upstream; the new change corrects two RGB classifiers so unsupported

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Modified by CeraLive 2026-09-17: exercise package/ELF identity and successful-receipt lifecycle.
 set -euo pipefail
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 root=$(realpath "$here/../..")
@@ -10,7 +11,11 @@ cp "$here/mock-drill-transport.sh" "$scratch/bin/sshpass"
 chmod +x "$scratch/bin/sshpass"
 export DRILL_FIXTURES=$scratch PATH="$scratch/bin:$PATH"
 export CERALIVE_BOARD_TEST=1 BOARD_IP="recovery-fixture-$$" BOARD_SSH_USER=test BOARD_SSH_PASS=fixture
-export BASELINE_LIB="$here/lib.sh" CANDIDATE_LIB="$here/score-drill.sh" HARNESS_DIR="$scratch" PR_RUN_ID=1
+export RELEASE_VERSION=1.0+fixture BOARD_MODEL=rock-5b-plus
+bash "$here/make-artifact-fixture.sh" "$scratch" "$RELEASE_VERSION"
+export RUNTIME_DEB="$scratch/librga2-ceralive_${RELEASE_VERSION}_arm64.deb"
+export DEV_DEB="$scratch/librga-ceralive-dev_${RELEASE_VERSION}_arm64.deb"
+export BASELINE_LIB="$here/lib.sh" CANDIDATE_LIB="$scratch/runtime/usr/lib/aarch64-linux-gnu/librga.so.2.1.0" HARNESS_DIR="$scratch" PR_RUN_ID=1
 BASELINE_SHA256=$(sha256sum "$BASELINE_LIB" | cut -d' ' -f1)
 CANDIDATE_SHA256=$(sha256sum "$CANDIDATE_LIB" | cut -d' ' -f1)
 export BASELINE_SHA256 CANDIDATE_SHA256
@@ -31,7 +36,37 @@ for fault in clean routing rotation short conversion hash restored cleanup; do
     if [[ $rc != "$expected" || $(<"$scratch/order") != $'acquire\ncleanup\nrelease' ]]; then
         cat "$scratch/$fault.log" "$scratch/order" >&2; exit 1
     fi
+    if [[ $fault == clean ]]; then
+        cmp "$scratch/results-$fault/artifact-inputs.sha256" "$scratch/results-$fault/$BOARD_MODEL.sha256"
+    else
+        test ! -e "$scratch/results-$fault/$BOARD_MODEL.sha256"
+    fi
     printf 'PASS: isolated drill %s exit=%d; cleanup precedes ownership release\n' "$fault" "$rc"
+done
+cp "$CANDIDATE_LIB" "$scratch/original-elf"
+printf '\001' >>"$CANDIDATE_LIB"
+for fault in expected-hash package-elf; do
+    : >"$scratch/order"
+    if [[ $fault == package-elf ]]; then
+        CANDIDATE_SHA256=$(sha256sum "$CANDIDATE_LIB" | cut -d' ' -f1)
+    fi
+    rc=0
+    RESULT_DIR="$scratch/results-$fault" bash "$here/r1-isolated-drill.sh" >"$scratch/$fault.log" 2>&1 || rc=$?
+    [[ $rc == 1 && ! -s $scratch/order && ! -e $scratch/results-$fault ]]
+    printf 'RED: changed candidate ELF (%s), drill exit=%d before transport or receipt\n' "$fault" "$rc"
+done
+cp "$scratch/original-elf" "$CANDIDATE_LIB"
+CANDIDATE_SHA256=$(sha256sum "$CANDIDATE_LIB" | cut -d' ' -f1)
+: >"$scratch/order"
+DRILL_FAULT=clean RESULT_DIR="$scratch/results-restored-elf" bash "$here/r1-isolated-drill.sh" >"$scratch/restored-elf.log" 2>&1
+test -s "$scratch/results-restored-elf/$BOARD_MODEL.sha256"
+printf 'GREEN: restored candidate ELF, drill exit=0 and receipt emitted after cleanup\n'
+for missing in CANDIDATE_SHA256 BASELINE_SHA256 RUNTIME_DEB DEV_DEB RELEASE_VERSION BOARD_MODEL; do
+    : >"$scratch/order"
+    rc=0
+    env -u "$missing" RESULT_DIR="$scratch/results-missing-$missing" bash "$here/r1-isolated-drill.sh" >"$scratch/missing-$missing.log" 2>&1 || rc=$?
+    [[ $rc == 1 && ! -s $scratch/order && ! -e $scratch/results-missing-$missing ]]
+    printf 'PASS: missing %s exits 1 before transport or receipt\n' "$missing"
 done
 for mode in empty nan duplicate drift missing fd; do
     cp "$scratch/matrix" "$scratch/candidate"
@@ -49,3 +84,4 @@ for mode in empty nan duplicate drift missing fd; do
     if bash "$here/score-drill.sh" psnr "$scratch/matrix" "$scratch/candidate"; then exit 1; fi
     printf 'PASS: PSNR scorer rejects %s mutation\n' "$mode"
 done
+bash "$here/test-release-qualification.sh"
