@@ -9,6 +9,8 @@ trap 'rm -rf "$scratch"' EXIT
 export RELEASE_VERSION=1.0+fixture DEB_ARCH=arm64
 mkdir -p "$scratch/ci" "$scratch/dist" "$scratch/tests/board/qualification/$RELEASE_VERSION"
 cp "$root/ci/artifact-identity.sh" "$root/ci/check-release-qualification.sh" "$scratch/ci/"
+# Record/API rejection is exercised separately by test-release-record.sh.
+printf 'exit 0\n' >"$scratch/ci/check-release-record.sh"
 bash "$here/make-artifact-fixture.sh" "$scratch/dist" "$RELEASE_VERSION"
 runtime="$scratch/dist/librga2-ceralive_${RELEASE_VERSION}_arm64.deb"
 dev="$scratch/dist/librga-ceralive-dev_${RELEASE_VERSION}_arm64.deb"
