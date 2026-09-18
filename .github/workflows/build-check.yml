@@ -47,6 +47,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read
     outputs:
       # The filter runs on pull requests only. On a push or a tag the step is
       # skipped and the fallback keeps `code` true, so those events keep their
@@ -57,6 +58,17 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Require release records even for documentation-only PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source ci/target-suite.env
+          RELEASE_VERSION="$(sed -e 's/#.*//' -e 's/[[:space:]]//g' packaging/version | sed -n '/./{p;q;}')"
+          export RELEASE_VERSION DEB_ARCH="$TARGET_ARCH"
+          bash tests/board/test-release-record.sh
+          bash ci/check-release-qualification.sh --records-only
 
       - name: Detect non-documentation changes
         id: filter

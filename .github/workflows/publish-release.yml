@@ -50,6 +50,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 # A container job's default shell is `sh -e`, and dash has no `pipefail`. Every
 # `run:` block here is bash; say so once rather than degrading each one.
@@ -168,6 +169,14 @@ jobs:
             echo "tag=${version}"
           } >> "$GITHUB_OUTPUT"
           echo "releasing ${version} into the ${{ inputs.channel }} channel"
+
+      - name: Require release records before a live build
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          DEB_ARCH: ${{ steps.suite.outputs.arch }}
+        run: bash ci/check-release-qualification.sh --records-only
 
       - name: Run summary
         run: |
@@ -401,6 +410,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - name: Checkout qualification receipts at the dispatched commit
         uses: actions/checkout@v7
@@ -436,6 +446,7 @@ jobs:
 
       - name: Require exact board-qualified release bytes
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
           DEB_ARCH: ${{ needs.resolve.outputs.arch }}
         run: bash ci/check-release-qualification.sh
