@@ -1,4 +1,4 @@
-# R1 record deviations — 2026-09-17 [PARTIAL]
+# R1 record deviations — 2026-09-17 [Discharged by remediation]
 
 This is a **post-release record**, not pre-release approval. It addresses rows
 24 and 26 of the [R1 both-board report](../tests/board/DRILL-RESULTS.md), carrying
@@ -7,6 +7,10 @@ summary in this repository at `tests/board/DRILL-RESULTS.md` and requires it on
 the open R1 PR before merge. No acceptance criterion or plan checkbox changes.
 
 ## Row 24 — R1 redo receipts
+
+**Disposition: Discharged by remediation.** PR #23 supplied the post-redo
+receipts below. The recurrence gate now requires that evidence rather than
+treating a live publish as a rehearsal. Original chronology is not rewritten.
 
 **Finding:** the previously stale row-24 status is corrected by POST-REDO receipts
 produced on 2026-09-17. The required sequence was executed after the R1 release
@@ -63,9 +67,10 @@ open R1 PR or change the separate row-26 disposition.
 
 ### Bounded impact on the shipped release
 
-The gap removes advance evidence for dispatch readiness, publish rehearsal and
-artifact-identity review, and leaves the R1 duplicate-tag rejection path without
-an execution receipt. It is not evidence that the shipped package is wrong.
+The original gap removed advance evidence for dispatch readiness, publish rehearsal
+and artifact-identity review. The post-redo sequence supplies the missing execution
+receipts, including duplicate-tag rejection, without backdating them. The omission
+is not evidence that the shipped package is wrong.
 Independently retained observations remain valid:
 
 - Both R1 packages are served on the stable arm64 index. The saved
@@ -85,13 +90,20 @@ Independently retained observations remain valid:
   [operational record](../tests/board/DRILL-RESULTS.md#released-byte-operational-acceptance-and-restoration)
   preserves maps/cache identity, capture output and subsequent rollback.
 
-Those facts are not put in doubt by the missing rehearsal receipts. What remains
-unproven is the omitted process assurance and, separately, transfer of earlier
-candidate-byte qualification to the different released bytes (report row 19).
-The capture is not a released-byte full G-B soak, D24 matrix or H1 package
-transaction. This record neither closes nor enlarges those separate gaps.
+Those facts are not put in doubt by the original missing rehearsal receipts.
+The capture alone is not a released-byte full G-B soak, D24 matrix or H1 package
+transaction. Rows 8, 18 and 19 now cite their separate released-byte rerun;
+this process remediation neither substitutes for nor enlarges that evidence.
 
 ## Row 26 — late both-board record
+
+**Disposition: Discharged by remediation.** The consolidated record is now
+committed and presented for review with an executable recurrence gate. It requires
+the complete matrix, both matching board receipts and verified R1 rehearsals on
+PRs (including documentation-only changes), before a live release build, and again
+before publication. Missing/unreadable evidence is failure. These concrete repairs
+discharge the outstanding record obligation without making the original order
+compliant. No owner acceptance or waiver is claimed.
 
 **Required order:** both-board record → review → merge → release.
 
@@ -128,14 +140,49 @@ measurement passed, that every measured artifact was the release artifact, or
 that Rock completed a capture. The missing consolidation and ordering remain
 real even though measurements exist.
 
-## Owner decision — pending, not inferred from this PR
+## Recurrence gate and discharge basis
 
-The records are supplied; their acceptance disposition is not.
+`ci/check-release-record.sh` requires this receipt table, the complete 26-row
+`tests/board/DRILL-RESULTS.md`, and both versioned three-line qualification
+receipts matching its **released**, not candidate, artifact column. The table's
+`Relevance` keys `Duplicate-tag negative receipt`, `Cross-repository dispatch
+preflight` and `Pre-publication ordering rehearsal` are machine-consumed keys:
+exactly one linked run is required for each.
 
-The owner must decide **whether to accept the row-24 process gap and row-26
-late-record deviation for item-47 closure, or keep either outstanding with an
-explicitly stated follow-up requirement**. These are separable decisions. No
-choice is made or recommended by this record. Merging this documentation
-publishes the facts; it does not accept a deviation, waive a criterion, tick a
-plan checkbox or declare item 47 complete. Separate measurement/qualification
-rows retain their existing dispositions and are outside this record-keeping PR.
+The checker reads the real GitHub runs, requires completed dispatches of the
+expected workflows/results, and reads `packaging/version` at each source commit.
+Preflight and dry run must name the intended release; the duplicate-tag control
+may name an already-released version, because requiring a new tag to exist before
+its first publication would deadlock the release path. The negative needs that
+source version's actual existing-tag error log, not merely failure; the
+dry-run report must succeed while live publication is skipped. Negative and
+preflight must finish before the final rehearsal. Missing/empty/unreadable files,
+API metadata or logs, malformed identities and mismatched versions fail closed.
+Read-only `actions: read` access is required; log expiry blocks rather than skips.
+
+`ci/check-release-qualification.sh --records-only` performs this preflight without
+a package payload. The no-argument publication invocation also retains the exact
+downloaded-archive/ELF comparison. `publish-release.yml` consults the preflight
+before a **live** build and the full gate before release creation. Dry runs still
+produce candidates without this prerequisite. `build-check.yml` runs the mutation
+suite and real preflight inside `changes`, which the required summary depends on,
+even for documentation-only PRs. Administrators must retain branch protection;
+publishing outside the workflow is outside this gate's authority.
+
+Non-vacuity uses the same new checker against untouched Git snapshots: `674d879`
+(PR #22 merged, before PR #23) rejects with `missing/duplicate/malformed
+Duplicate-tag negative receipt`; `04acb47` (PR #23 merged) passes against actual
+GitHub evidence. The checker does not require these new disposition paragraphs.
+`tests/board/test-release-record.sh` additionally removes each document, board
+receipt and required run, corrupts the released column, simulates unreadable API
+evidence, substitutes a wrong failure/workflow or live publish, and reverses the
+rehearsal ordering. The real release entry must exit 1; restoration must exit 0.
+
+The standing rule applies literally: **rejecting or remediating a deviation needs
+no owner acceptance; accepting one would.** Neither row is owner-accepted, waived
+or deferred. Historical lateness remains recorded; no run is fabricated, artifact
+changed or plan checkbox ticked. The check proves documentary completeness, run
+provenance and artifact identity, not cryptographic board attestation, approval of
+every disposition, or new measurements. Installation alone proves neither
+`ldconfig` execution nor normal-loader use of R1; those claims retain their own
+maps/cache and consumer evidence.

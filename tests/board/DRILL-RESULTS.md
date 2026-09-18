@@ -3,14 +3,16 @@
 **Recorded after release, 2026-09-17 UTC; measurements dated 2026-09-16/17.**
 This consolidation was not on the open R1 PR before its merge. Required order:
 both-board record → review → merge → release. Actual order: merge → release →
-record. Publishing this document does not repair that historical ordering or
-decide the owner's acceptance disposition. See the
+record. The historical ordering is not repaired or relabelled. Rows 24 and 26
+are now **Discharged by remediation**, not owner acceptance. See the
 [rows 24/26 deviation record](../../docs/R1-RECORD-DEVIATIONS.md).
 
-**Item 47 is not fully dischargeable on the retained evidence.** R1 is released
+**Outstanding numbered obligations: 2 → 0 in this remediation.** R1 is released
 and served, and both boards proved released-byte activation, the released-byte
-qualification rows recorded below, and genuine rollback. Rows 24 and 26 remain
-historical process deviations pending owner disposition. This is an offline
+qualification rows recorded below, and genuine rollback. Rows 24 and 26 retain
+their historical deviations but are discharged by the recorded repairs and
+recurrence gate. The stale closing checklist counted five; the reconciliation
+below explains why the honest final count is zero, not three. This is an offline
 consolidation, not another hardware run or permission to change either board.
 
 This record covers convergence item 47 and its inherited librga todos 41–43,
@@ -62,11 +64,11 @@ Released R0 control ELF throughout the final acceptance records:
 Recovered bench used for both R6 runs:
 `4800fe29a6f0a9a48e6098c4606e2838b8e09019b0bcf84c312e966be53063b6`.
 
-IMAGE explicitly records that even the runtime ELF changed and forbids transferring
-old H1 as artifact-bound proof. Its procedure states that H1 has not been repeated
-against the released bytes. No cause of the byte difference, executable equivalence
-proof, owner waiver of exact identity, or released-byte full G-B rerun was located.
-This is an **evidence-transfer gap**, not a demonstrated defect in the release.
+IMAGE recorded that even the runtime ELF changed and correctly forbade transferring
+old H1 as artifact-bound proof. At that historical checkpoint H1 and full G-B had
+not been repeated against the release. Rows 8, 18 and 19 now retain the separate
+released-byte rerun that discharges that gap; candidate and release identities
+remain distinct. No executable-equivalence claim or identity waiver is inferred.
 
 Other older R1 receipts also retain their own identities:
 
@@ -107,13 +109,13 @@ that the old test passed.
 | 17 | G-A R7 baseline recovery | Discharged for replacement's stated scope | ROCK/OPI fresh process-local R0 copy positives; actual operational byte/package rollback is separately discharged by row 11, not inferred from temporary-provider cleanup. |
 | 18 | H7 R1 4/6/8-thread escalation on both boards | Discharged on RELEASED ELF | Q/rock/h7-verdict.log and Q/opi/h7-verdict.log. Released R1 one-thread controls and 4/6/8-thread full dwells passed on both boards with every worker `status=1/OK`, released-provider maps, and clean kernel collection controls. The earlier Rock failure and Radxa-only follow-up remain historical and are not relabelled as this result. |
 | 19 | Board-tested artifact identity with released archives | Discharged by released-artifact rerun | Q/QUALIFICATION-RESULTS.md, EVIDENCE-SHA256SUMS, RESUMPTION-VERIFICATION.log and both recovered drill bundles bind the measurements to the published runtime `.deb` SHA-256 `5f8ea1f259b95d5bf6fbe68edf03bf08820ab7bc8d4d17bfc1fc4a00344c7bb3` and ELF SHA-256 `07b6b6c466c6bddbcf7006e5b678d68de372b44686e6eb8ea3fcf00ce1cb6b74`. Released R5 nine-cell, D24 exact expected-FAIL, R6 one-hour and H7 results pass on both boards; Rock R6 was 3600.025585 s / 139,050 iterations and OPi 3600.002195 s / 140,229, with every iteration at 66.378836 dB and `bgr-709-full` at exactly 50.689414 dB. The earlier candidate ELF `361ab931…` is kept as historical evidence only. |
-| 20 | D24 fork matrix and exact nonempty expected-FAIL list | Discharged for named measured tuples; final release transfer remains | ROCK local candidate and D24-OPI earlier fixed R1: all 48 submissions/provider quartets complete; six exact expected failures, no new FAIL/FIXED. Latest OPi nine-cell R5 is not a new twelve-cell D24 on final ELF. See row 19. |
+| 20 | D24 fork matrix and exact nonempty expected-FAIL list | Discharged for named measured tuples; released-byte rerun in row 19 | ROCK local candidate and D24-OPI earlier fixed R1: all 48 submissions/provider quartets complete; six exact expected failures, no new FAIL/FIXED. The later released-byte D24 evidence is separately recorded in row 19; the older nine-cell R5 is not substituted for it. |
 | 21 | OPi literal `>60 fps` / Rock source-less HDMI | Superseded-by-owner-decision; replacement measurement discharged | RATE: R0 and R1 each 600 decoded frames/10.010034 s = 59.939856 fps. Rock `NOT-RUN: no source` is an allowed disposition, backed by ENOLINK. Not both-board cadence measurement or an hour of media streaming. |
 | 22 | Synthetic 10-bit conversion/PSNR vs receiver-depth observation | Superseded by convergence scope; observation discharged | GB15: Rock no signal/depth unknown; OPi capture NV16 8-bit, wire depth not exported/unknown in that query. Convergence 47 explicitly requires receiver-reported observation only. No Main10, 10-bit preservation or synthetic 10-bit PASS. |
 | 23 | Independent review and merge-commit of R1 work | Discharged for code/review/merge record | CI15/CI17 and PRs #15/#17, merge SHAs below. This is not independent approval of this later consolidated acceptance record. |
-| 24 | R1 dispatch preflight, publish dry-run identity rehearsal and duplicate-tag negative receipt | Executed post-redo; receipts recorded, not historical pre-release compliance | POST-REDO receipts produced on 2026-09-17: existing-tag negative `35275108125` failed as designed; publish dry-run `35275168751` passed; dispatch preflight `35275427000` passed; pre-publication publish dry-run `35275456552` passed; first live publish `35275669851` then failed at the qualification gate because the Rock receipt did not yet exist. After PR #22 committed the real receipts, publish run `35276804263` passed and restored R1. These receipts establish execution after the redo, not that the original release met the required pre-release order. [Post-redo record and limits](../../docs/R1-RECORD-DEVIATIONS.md#row-24--r1-redo-receipts). |
+| 24 | R1 dispatch preflight, publish dry-run identity rehearsal and duplicate-tag negative receipt | Discharged by remediation | POST-REDO receipts produced on 2026-09-17: existing-tag negative `35275108125` failed as designed; publish dry-run `35275168751` passed; dispatch preflight `35275427000` passed; pre-publication publish dry-run `35275456552` passed; first live publish `35275669851` then failed at the qualification gate because the Rock receipt did not yet exist. After PR #22 committed the real receipts, publish run `35276804263` passed and restored R1. PR #23 supplied these receipts; the recurrence gate now requires them. This is not historical pre-release compliance. [Post-redo record and limits](../../docs/R1-RECORD-DEVIATIONS.md#row-24--r1-redo-receipts). |
 | 25 | R1 release, four assets, reindex and stable serving | Discharged | PUB/APT: release at `d57bc86…`, both `.deb`/`.sha256` pairs, GitHub/APT byte equality. Publication does not imply row 19 passed. |
-| 26 | Final both-board record on the open R1 PR before merge | Post-release record supplied; owner disposition pending | This file supplies the consolidation after merge and release, not on the original open PR. [Late-record deviation](../../docs/R1-RECORD-DEVIATIONS.md#row-26--late-both-board-record) records what the ordering cost and preserves the measurements and their limits. A documentation merge is not owner acceptance of this deviation. |
+| 26 | Final both-board record on the open R1 PR before merge | Discharged by remediation | This committed consolidation and the release-record gate repair the record gap and prevent its silent recurrence at PR/release boundaries. [Remediation and historical limits](../../docs/R1-RECORD-DEVIATIONS.md#row-26--late-both-board-record). Required order is not backdated; this is remediation, not owner acceptance or waiver. |
 
 ## Both-board R6 and pixel evidence
 
@@ -258,38 +260,35 @@ enable SSH fleet-wide. These are last recorded states, not fresh board probes.
   stable-arm64 stanzas and GitHub/APT byte equality at the release digests above.
   Runtime is 84,552 bytes; development is 24,684 bytes.
 
-The 2026-09-17 read-only receipt search found no R1-specific dispatch-preflight,
-publish `dry_run=true` identity rehearsal or existing-tag rejection receipt.
-The [deviation record](../../docs/R1-RECORD-DEVIATIONS.md) enumerates the retained
-history and local evidence scope, the omitted rehearsal and its limits. The
-located R0 runs `34735326263` and `34735383567` are not R1 evidence. A live
-publish (`dry_run=false`) and image-pipeline DRY_RUN cannot supply those receipts.
-This process gap does not invalidate the independently established serving,
-GitHub/APT byte equality or normal-loader capture observations. It also does
-not discharge row 19's separate candidate-to-release identity requirement.
+The initial September 17 receipt search found no R1-specific rehearsal receipts.
+PR #23 subsequently committed the real post-redo runs now cited by row 24 and the
+[deviation record](../../docs/R1-RECORD-DEVIATIONS.md). The recurrence gate checks
+those actual R1 runs, not R0 history, a live publish or image-pipeline DRY_RUN.
+That remediation does not backdate the original process or replace row 19's
+separate released-byte qualification evidence.
 
-## What remains before a defensible item-47 closure
+## Outstanding-count reconciliation
 
-1. Resolve **released-artifact qualification**. The explicit identity condition
-   failed; the released ELF is not the R6/H1-tested ELF. Locate a matching
-   released-byte record or obtain an owner disposition of the required rerun.
-   A rerun would need the full applicable G-B scope, including R6 on both boards,
-   final-provider D24 (OPi currently has an older fixed provider), controls and
-   proved ownership. Separately qualify H1 with the actual released package pair,
-   or obtain a specific amendment. No rerun is authorized by this report.
-2. Resolve **Rock R1 H7**, not Radxa H7: retain the real fixed-kernel Radxa PASS,
-   but obtain the required R1 4/6/8 result or an explicit acceptance amendment.
-3. Resolve **R2 `mppjpegenc` inventory**: correct the hardware-conditional
-   expectation with owner approval, or supply the required inventory proof.
-   Its same-baseline absence establishes no R1 regression, not a waiver.
-4. Owner disposition of the recorded **R1 preflight/dry-run/duplicate-tag QA**
-   process gap and **late report/pre-release-order deviation** remains pending.
-   The receipt search and post-release consolidation are now documented in
-   [R1 record deviations](../../docs/R1-RECORD-DEVIATIONS.md); neither records a
-   historical PASS. Do not fabricate a run, re-tag R1, or treat this post-release
-   document as having been on the original open PR.
+**Before → after: stale closing checklist 5 → 0; current-main row table 2 → 0.**
+The requested 5 → 3 would retain three obligations already discharged on `main`
+at `04acb47`. No new measurement or owner disposition is invented to change them:
+
+| Former outstanding obligation | Before this remediation on current main | After |
+|---|---|---|
+| Released-artifact qualification, including H1 (8/19) | Already discharged by released-byte rerun | Unchanged |
+| R1 H7 (18) | Already discharged on released ELF | Unchanged |
+| `mppjpegenc` expectation (12) | Already discharged by recorded owner disposition | Unchanged |
+| Rehearsal receipts/process gap (24) | Post-redo receipts supplied, disposition still open | Discharged by remediation: PR #23 receipts + recurrence gate |
+| Late consolidated record (26) | Record supplied, disposition still open | Discharged by remediation: committed matrix + PR/live-release enforcement |
+
+The old checklist's fourth bullet combined rows 24 and 26, hence four bullets
+described five obligations. The numbered table now has no outstanding status.
+Zero is the count under the **bounded obligations and existing scope decisions**,
+not a claim that every historical run passed, every hardware path is qualified,
+or item 47's external plan has automatically been signed off. Review of this
+remediation remains required; the PR is not self-merged.
 
 No additional tuning adoption, synthetic Main10 test, Rock HDMI source, original
 BGR input reconstruction or arbitrary live-APT upgrade is silently added to the
-remaining work. The measured successes above stand; they simply do not justify
+work. The measured successes above stand; they simply do not justify
 a blanket both-boards-green release-qualification claim.
