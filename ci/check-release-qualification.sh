@@ -2,8 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Modified by CeraLive 2026-09-17: refuse publication of bytes absent from board receipts.
 set -euo pipefail
+[[ $# == 0 || ( $# == 1 && $1 == --records-only ) ]] || {
+    printf 'usage: %s [--records-only]\n' "$0" >&2
+    exit 1
+}
 : "${RELEASE_VERSION:?}" "${DEB_ARCH:?}"
 [[ $DEB_ARCH == arm64 && $RELEASE_VERSION =~ ^[0-9][a-zA-Z0-9.+~-]*$ ]] || exit 1
+bash ci/check-release-record.sh
+[[ $# == 0 ]] || exit 0
 runtime="dist/librga2-ceralive_${RELEASE_VERSION}_${DEB_ARCH}.deb"
 dev="dist/librga-ceralive-dev_${RELEASE_VERSION}_${DEB_ARCH}.deb"
 actual=$(bash ci/artifact-identity.sh "$RELEASE_VERSION" "$runtime" "$dev")

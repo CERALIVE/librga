@@ -185,13 +185,17 @@ receipt is fabricated by this infrastructure change.
 
 The consolidated [R1 both-board results](tests/board/DRILL-RESULTS.md) are a
 **post-release record**, [PARTIAL], not evidence present on the original open PR.
-[Rows 24/26 deviations](docs/R1-RECORD-DEVIATIONS.md) retain the missing rehearsal
-and late-record findings; owner disposition is pending, not implied by a docs merge.
+[Rows 24/26 deviations](docs/R1-RECORD-DEVIATIONS.md) retain the historical findings
+but are discharged by remediation, not owner acceptance. The release-record gate
+requires the full matrix, matching board identities and readable real rehearsal
+runs on PRs (including docs-only) and before live publication. Missing evidence
+fails closed; tests exercise the actual release preflight entry.
 The results separate candidate-byte semantic/soak/H1 evidence from the
 different released bytes proven by both-board normal-loader activation and
 rollback. Release/serving are real; whole item-47 discharge is not established.
-Read the remaining artifact-identity, R1 H7 and factory-inventory rows before
-reusing an earlier PASS. This record authorizes no new board operation.
+Read the released-artifact rerun, R1 H7 and factory-inventory dispositions before
+reusing an earlier PASS; those three rows were already discharged before this
+record remediation. This record authorizes no new board operation.
 
 R0 infrastructure recovery [EXISTS] is inventoried commit-by-commit in
 [`docs/R0-INFRASTRUCTURE-RECOVERY.md`](docs/R0-INFRASTRUCTURE-RECOVERY.md).

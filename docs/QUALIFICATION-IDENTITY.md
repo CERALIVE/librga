@@ -69,6 +69,14 @@ RELEASE_VERSION=1.10.5+ceralive.1 DEB_ARCH=arm64 \
 
 ## Proof boundary
 
+The R1 record preflight now runs through this same entry before archive comparison;
+`--records-only` checks the committed matrix, both identity receipts and the actual
+GitHub rehearsal runs without a local payload. It runs on documentation-only PRs
+as well as live publication. See [the remediation contract](R1-RECORD-DEVIATIONS.md#recurrence-gate-and-discharge-basis)
+for required table keys, read-only API access, fail-closed log expiry and the
+pre-fix/current-snapshot proof. It does not turn an installation receipt into
+`ldconfig` or normal-loader evidence, nor approve every matrix disposition.
+
 This is an artifact-identity gate, not cryptographic board attestation or a new
 acceptance framework. Operators/reviewers remain responsible for board identity,
 trustworthy receipts and any loader/proc-maps evidence in the acceptance record.
