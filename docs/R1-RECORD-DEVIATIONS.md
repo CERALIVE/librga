@@ -6,70 +6,60 @@ convergence item 47 and inherited librga todos 41–43. The plan requires the bo
 summary in this repository at `tests/board/DRILL-RESULTS.md` and requires it on
 the open R1 PR before merge. No acceptance criterion or plan checkbox changes.
 
-## Row 24 — missing R1 rehearsal receipts
+## Row 24 — R1 redo receipts
 
-**Finding:** no R1 dispatch-preflight, publish `dry_run=true` identity rehearsal,
-or existing-tag negative receipt was found. The retained sequence went from R1
-merge to live publication without a recorded R1 rehearsal. Record that as an
-omitted R1 rehearsal/process gap, not as a successful test and not as proof that
-an unretained execution could never have occurred.
+**Finding:** the previously stale row-24 status is corrected by POST-REDO receipts
+produced on 2026-09-17. The required sequence was executed after the R1 release
+was deleted and re-published: an existing-tag negative, a successful publish
+dry-run, dispatch preflight, a second successful pre-publication dry-run, and a
+live publication attempt. The first live publication failed at the qualification
+gate because the Rock receipt did not yet exist; PR #22 then committed the real
+receipts and the retry succeeded. This establishes post-redo execution, not
+historical pre-release compliance for the original R1 release.
 
-### Search performed
+### Post-redo receipt verification
 
-Read-only search on 2026-09-17 UTC covered:
+The retained GitHub workflow runs and final release state were re-verified on
+2026-09-17 UTC:
 
-- GitHub's retained histories for `dispatch-preflight.yml` and
-  `publish-release.yml`, including run jobs, available logs/metadata, artifact
-  listings, workflow definitions, release assets, tags and PRs #15/#17 with
-  their review/comment history. Paginated workflow-run API queries with
-  `per_page=100` returned `total_count=1` and `total_count=3`, respectively;
-  the complete returned inventory is below. The workflow list was also checked.
-- The local evidence tree and librga-related scratch/worktrees: item-47 results,
-  R1 readiness/recovery/build-gate evidence, review artifacts, R1 release and
-  image evidence, task-48 package assets, and task-51 APT-serving evidence.
-  Searches used R1/version identifiers, `preflight`, `dry_run`, dry-run,
-  duplicate/existing-tag rejection terms and the known R0/R1 run IDs. Local
-  host locations are indexed in the workspace notepad, not repository path
-  dependencies. No credentials or unrelated private contents are reproduced.
+- `publish-release.yml` and `dispatch-preflight.yml` run metadata and failed
+  logs, including the qualification-gate failure and the successful retry.
+- The restored release's tag, four assets and asset digests.
+- PR #22, which committed the two board qualification receipts required by the
+  release gate.
 
 | UTC start | Run | Observed execution | Relevance |
 |---|---|---|---|
-| 2026-09-13 03:22:36 | [34735326263](https://github.com/CERALIVE/librga/actions/runs/34735326263) | Dispatch preflight, `release/1.10.1`, success | R0 preflight only |
-| 2026-09-13 03:24:03 | [34735383567](https://github.com/CERALIVE/librga/actions/runs/34735383567) | Publish dry-run, `release/1.10.1`, success; publish job skipped | R0 rehearsal only |
-| 2026-09-13 03:28:05 | [34735552582](https://github.com/CERALIVE/librga/actions/runs/34735552582) | Live R0 publish, success; dry-run job skipped | Not an R1 rehearsal |
-| 2026-09-16 22:00:29 | [35155428515](https://github.com/CERALIVE/librga/actions/runs/35155428515) | Live R1 publish from `main`, success; dry-run job skipped | `dry_run=false`, not the missing rehearsal |
+| 2026-09-17 21:09:55 | [35275108125](https://github.com/CERALIVE/librga/actions/runs/35275108125) | Non-dry-run publish against the existing tag, failed by design at the existing-tag guard | Duplicate-tag negative receipt |
+| 2026-09-17 21:10:31 | [35275168751](https://github.com/CERALIVE/librga/actions/runs/35275168751) | Publish `dry_run=true`, success | Post-redo identity rehearsal |
+| 2026-09-17 21:13:17 | [35275427000](https://github.com/CERALIVE/librga/actions/runs/35275427000) | Dispatch preflight, success | Cross-repository dispatch preflight |
+| 2026-09-17 21:13:36 | [35275456552](https://github.com/CERALIVE/librga/actions/runs/35275456552) | Publish `dry_run=true`, success; live publish job skipped | Pre-publication ordering rehearsal |
+| 2026-09-17 21:15:50 | [35275669851](https://github.com/CERALIVE/librga/actions/runs/35275669851) | First live publish attempt, failed at `ci/check-release-qualification.sh`: missing `rock-5b-plus.sha256` | Failed honestly before receipts existed |
+| 2026-09-17 21:27:52 | [35276804263](https://github.com/CERALIVE/librga/actions/runs/35276804263) | Retried live publish after PR #22 committed both receipts, success | R1 restored |
 
-The R1 run retained a `release-assets` artifact and the release has exactly
-the runtime/development `.deb` files and their two `.sha256` sidecars. Those
-are live-release artifacts, not extra preflight or negative-test receipts.
-All four listed runs succeeded; none records an existing-tag rejection.
-The workflow's existing-tag guard is source code, not proof its rejection path
-was exercised for R1.
+PR #22 merged the real qualification receipts before the successful retry. The
+restored release has exactly the runtime/development `.deb` files and their two
+`.sha256` sidecars. The first live attempt is retained as a failed attempt, not
+omitted from the sequence.
 
-Local lookalikes were rejected as substitutes: image-builder DRY_RUN tests a
-different pipeline; controlled two-build reproducibility is not a publish
-identity rehearsal; task-48's stale-checksum rejection is not duplicate-tag QA.
-R0's preflight/rehearsal is evidence for R0, not a per-release R1 receipt.
+The final release verification records tag target
+`d57bc86e65b331948953442449618cadd3b0c7bc`, runtime package SHA-256
+`5f8ea1f259b95d5bf6fbe68edf03bf08820ab7bc8d4d17bfc1fc4a00344c7bb3`, and
+development package SHA-256
+`8dd35334ed1022ff8e64a86b3ac426abb847bf36f3ccff2746a658ccc0d8577a`.
 
-**Search limit:** retained GitHub and local evidence cannot establish the absence
-of deleted runs, deleted logs/artifacts or unretained executions. No R1 receipt
-was recovered; no historical execution is asserted on the strength of a script
-or the successful live release. Nothing was re-dispatched, re-tagged or
-re-released to manufacture a receipt, and no board was contacted for this record.
+These are post-redo receipts. They do not backdate the sequence into the original
+open R1 PR or change the separate row-26 disposition.
 
-### What was omitted, and what it would have proved
+### What the post-redo sequence proves
 
-| Missing R1 step/receipt | Intended assurance | What the actual record establishes instead |
+| R1 step/receipt | Intended assurance | What the post-redo record establishes |
 |---|---|---|
-| Dispatch preflight | Cross-repository token/API path works before attempting live publication | R1 live publication subsequently dispatched reindex and the release is served; the separate pre-publication check is not recorded |
-| Publish dry-run identity rehearsal | Rehearse R1 branch/version, build and install-smoke path without publishing; compare its asset hashes to board-tested PR artifacts before deciding whether G-B must be repeated | The live run built/published R1 and ran install-smoke; no R1 dry-run comparison or pre-publication identity decision is evidenced |
-| Existing-tag negative QA | A dispatch using the same valid version inputs refuses an already-existing tag, rather than overwriting/re-publishing it | The guard exists, but no R1 rejection execution receipt was found; successful first publication does not exercise it |
+| Dispatch preflight | Cross-repository token/API path works before attempting live publication | Run `35275427000` passed before the post-redo publication sequence continued |
+| Publish dry-run identity rehearsal | Rehearse R1 branch/version, build and install-smoke path without publishing | Runs `35275168751` and `35275456552` passed; the latter was the pre-publication ordering rehearsal |
+| Existing-tag negative QA | A dispatch using the same valid version inputs refuses an already-existing tag, rather than overwriting/re-publishing it | Run `35275108125` refused the existing tag as designed |
+| Live publication and retry | Require the release gate to accept the exact board-qualified bytes | Run `35275669851` failed because the Rock receipt was not yet present; after PR #22 committed the receipts, run `35276804263` passed and restored R1 |
 
-The duplicate-tag negative scenario was a separate QA obligation, not evidence
-that could have existed before the tag's first creation. The release was cut
-without the recorded R1 rehearsal R0 had, and the later negative QA receipt is
-also absent. These are process omissions; neither a retrospective successful
-test nor this document can turn them into historical compliance.
 
 ### Bounded impact on the shipped release
 
