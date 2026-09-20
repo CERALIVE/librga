@@ -3495,22 +3495,24 @@ int generate_blit_req(struct rga_req *ioc_req, rga_info_t *src, rga_info_t *dst,
             if (dst && dstFd == dst->fd)
                 dstMmuFlag = dst->mmuFlag ? 1 : 0;
 
+            // Modified by CeraLive 2026-09-19: handle-mode plane fields are IDs,
+            // not byte offsets. One imported allocation uses yrgb_addr only.
             NormalRgaSetSrcVirtualInfo(&rgaReg, srcFd != -1 ? srcFd : 0,
                                     (uintptr_t)srcBuf,
-                                    (uintptr_t)srcBuf + srcVirW * srcVirH,
+                                    (rgaReg.handle_flag & 1) ? 0 : (uintptr_t)srcBuf + srcVirW * srcVirH,
                                     srcVirW, srcVirH,
                                     RkRgaGetRgaFormat(relSrcRect.format),0);
             /* src1 */
             if (src1)
                 NormalRgaSetPatVirtualInfo(&rgaReg, src1Fd != -1 ? src1Fd : 0,
                                         (uintptr_t)src1Buf,
-                                        (uintptr_t)src1Buf + src1VirW * src1VirH,
+                                        (rgaReg.handle_flag & 1) ? 0 : (uintptr_t)src1Buf + src1VirW * src1VirH,
                                         src1VirW, src1VirH, &clip,
                                         RkRgaGetRgaFormat(relSrc1Rect.format),0);
             /*dst*/
             NormalRgaSetDstVirtualInfo(&rgaReg, dstFd != -1 ? dstFd : 0,
                                     (uintptr_t)dstBuf,
-                                    (uintptr_t)dstBuf + dstVirW * dstVirH,
+                                    (rgaReg.handle_flag & 1) ? 0 : (uintptr_t)dstBuf + dstVirW * dstVirH,
                                     dstVirW, dstVirH, &clip,
                                     RkRgaGetRgaFormat(relDstRect.format),0);
 
