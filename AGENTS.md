@@ -172,6 +172,14 @@ an upstream we intend to keep syncing from, for no shipped benefit.
 
 ## Test and board-drill contract
 
+**Handle-mode blit planes:** `generate_blit_req` must not synthesize a byte
+offset in `v_addr` when `handle_flag & 1`. The single imported allocation is
+identified by `yrgb_addr`; the island interprets nonzero additional plane fields
+as handle IDs, not offsets. `handle-planes` inspects both im2d entry points
+against the real shared library, retaining FD/virtual-address controls. Rock
+repro/fix/toggle evidence and the unqualified OPi boundary are in
+[`docs/HANDLE-PLANES.md`](docs/HANDLE-PLANES.md). This is not cache adoption or a release.
+
 Qualification-to-release identity [EXISTS] is enforced by
 `ci/check-release-qualification.sh` immediately before GitHub publication, against
 the downloaded upload payload. The recovered isolated drill binds its candidate
