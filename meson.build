@@ -319,6 +319,16 @@ endforeach
 # inspection below needs), fake_rga and golden_dl from that fragment. Declaring
 # them again would collide on the target names.
 unit_warnings = ['-Wall', '-Wextra', '-Werror', '-Wno-pedantic']
+# Modified by CeraLive 2026-09-19: inspect real shared-library handle request bytes.
+handle_planes = executable('handle-planes', 'tests/unit/handle_planes.c',
+    include_directories : incdir, link_with : librga_so,
+    dependencies : golden_dl, c_args : unit_warnings, install : false)
+handle_planes_env = environment()
+handle_planes_env.set('LD_PRELOAD', fake_rga.full_path())
+handle_planes_env.set('FAKE_RGA_LOG', meson.current_build_dir() / 'handle-planes.log')
+handle_planes_env.set('FAKE_RGA_DUMP', meson.current_build_dir() / 'handle-planes.bin')
+test('handle-planes', handle_planes, env : handle_planes_env,
+    depends : fake_rga, timeout : 30)
 unit_incdir = include_directories('im2d_api/src')
 unit_pure = executable('unit-pure', 'tests/unit/unit_pure.cpp',
     include_directories : [incdir, unit_incdir],

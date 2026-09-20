@@ -54,6 +54,12 @@ documentation correction introduces no strict mode or runtime behaviour change.
 
 ## Build
 
+The handle-mode blit request repair prevents a synthesized plane byte offset
+from being interpreted as an imported handle ID. The request-byte regression
+and Rock repro/fix/original-provider toggle are documented in
+[`docs/HANDLE-PLANES.md`](docs/HANDLE-PLANES.md). No defaults or ABI change;
+OPi qualification and consumer cache adoption remain separate.
+
 The [R1 both-board drill record](tests/board/DRILL-RESULTS.md) is a **post-release
 record**, [PARTIAL]. The [missing rehearsal and late-record deviations](docs/R1-RECORD-DEVIATIONS.md)
 are discharged by remediation, not owner acceptance or historical compliance.
