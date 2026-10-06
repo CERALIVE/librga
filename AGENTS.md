@@ -1,576 +1,79 @@
-# librga
+# librga — agent routing
 
-CeraLive's public fork of Rockchip's RGA userspace library, imported from
-JeffyCN's `mirrors` repository, branch `linux-rga-multi`, pinned at
-`57a1067a246c71fa6c9a355d1668884fda155dd5` (im2d API `1.10.5_[11]`). The import
-coordinate, the `1.10.1_[4]` release window used for R0, and the file-level
-licence census all live in [`docs/PROVENANCE.md`](docs/PROVENANCE.md); this file
-is the working contract that sits on top of them.
+Parent: [CeraLive workspace rules](https://github.com/CERALIVE/ceralive/blob/master/AGENTS.md).
 
-## Role
+<!-- workspace-hard-rules:begin -->
+## Workspace hard rules (identical in every CeraLive AGENTS.md)
+- Commits and PRs carry the human author only: no Co-authored-by, no AI attribution.
+- Start from the updated canonical branch; rebase to update; never `reset --hard` or discard others' work.
+- One focused PR per repo, opened against CERALIVE/<repo>; the root policy PR merges first.
+- A repo is self-contained: no path above its root; consume @ceralive packages from the registry, never link:/file:.
+- Never delete, skip or weaken a test; every behavior change ships with a test.
+- A user-visible change updates docs.ceralive.tv in English and Spanish (es-419), and any ceralive.tv claim it touches, in the same release.
+- AGENTS.md holds rules and routing only, within budget; contracts and history live in docs/agents/.
+- Full canon: https://github.com/CERALIVE/ceralive/blob/master/AGENTS.md
+<!-- workspace-hard-rules:end -->
 
-This repository is the **sole userspace bridge** between GStreamer and the RK3588
-media island's `/dev/rga` character device. Everything the streaming stack asks
-the 2D hardware to do arrives here first:
+## ROLE
+CeraLive's additive-only Rockchip RGA userspace fork bridges GStreamer to the RK3588 island's `/dev/rga`.
+Canonical branch: `main`; releases retain upstream-style versioning.
 
-```text
-gstreamer-rockchip  rgaconvert / rgacompositor      -> im2d API -> ioctl -> /dev/rga
-gstreamer-rockchip  MPP-path colour/scale conversions -> im2d API -> ioctl -> /dev/rga
-```
+## STRUCTURE
+- `core/`, `im2d_api/`, `include/`: driver bridge and public API.
+- `tests/`: host shim, goldens, unit tests and board drills.
+- `ci/`, `scripts/`, `.github/`: gates and workflow tooling.
+- `packaging/`: first-party runtime/development packages.
+- `docs/`: contracts, provenance and evidence.
+- `samples/`, `debian/`, `cmake/`: retained upstream trees.
 
-There is no second path. A caller that wants RGA acceleration links
-`librga.so.2`, and the kernel side is reached only through this library's
-`ioctl` layer. That is why the request bytes this library builds are treated as
-the regression-preservation contract: they are the entire observable surface
-between the plugin and the island driver.
-
-Two releases exist, versioned upstream-style rather than CalVer:
-
-| Release | Base | What it is |
-|---|---|---|
-| **R0** `1.10.1+ceralive.1` | `5a97e650a30b7c7036eb5aa26e39f2d09f18fcc9` | A rebuild of the API release the bench boards ran before the fork (Radxa `librga2 2.2.0-1`, `rga_api 1.10.1_[4]`), with packaging and CI commits only. Its neutrality claim is **bounded** to export-set containment, request-byte goldens on the CeraLive call set, and both-board gate rows. Never "byte-identical source". |
-| **R1** `1.10.5+ceralive.1` | `57a1067a246c71fa6c9a355d1668884fda155dd5` | The pinned fork point plus the fix series that Wave 0 actually turned RED. |
-
-Shipped reality, recorded 2026-09-21. Both releases are published and both package
-pairs are served by `apt.ceralive.tv`. `image-building-pipeline` master pins **R1**
-(`librga2-ceralive_1.10.5+ceralive.1`, image PR #172, the R0 row commented above it
-as the rollback), and that pin is what the boards run: on 2026-09-21 the Rock 5B+ and
-the Orange Pi 5+ each promoted the image built from it to RAUC slot A, booted it with
-`systemctl --failed` empty and `ceralive-healthcheck.service` self-marking the slot
-good, and read `librga2-ceralive 1.10.5+ceralive.1` back through `dpkg-query` on the
-booted slot, alongside `gstreamer1.0-rockchip-ceralive 1.14.4+ceralive.7`, `cerastream
-2026.9.6` and the island `v2026.9.5` kernel. "The bench boards run today" therefore
-means R1. That boot is an installed-library receipt and nothing more: the
-[R1 both-board results](tests/board/DRILL-RESULTS.md) stay a post-release record with
-the acceptance gaps they list, and no row below is closed by it.
-
-## Repository map
-
-| Area | Location |
-|---|---|
-| im2d public API and implementation | `im2d_api/` |
-| RGA userspace driver core | `core/` |
-| Public headers installed under `include/rga/` | `include/` |
-| Upstream sample programs | `samples/` |
-| Upstream Rockchip developer guides and FAQ | `docs/Rockchip_*` |
-| Import coordinate, licence census, credits | `docs/PROVENANCE.md` |
-| API usability traps every caller trips over | `docs/API-TRAPS.md` |
-| Per-fix evidence ledger | `docs/fix-audit.md` |
-| R1 donor semantic verdicts and constrained CSC port | `docs/DONORS.md` |
-| Sanitizer/analyzer recipes and their proof boundary | `docs/SANITIZERS.md` |
-| Disposition of every `-Wanalyzer-*` finding | `docs/ANALYZER-TRIAGE.md` |
-| Debian package build and contract | `packaging/` |
-| Island-UAPI parity, host shim, goldens, unit tests | `tests/` |
-| Board-gated drills | `tests/board/` |
-| Target suite, toolchain and dependency pins | `ci/` |
-| Upstream JeffyCN packaging, preserved and unused | `debian/` |
-| Android / CMake / RT-Thread build trees, preserved | `Android.*`, `CMakeLists.txt`, `cmake/`, `SConscript` |
-
-## Commit strategy
-
-Three tiers, exactly as in `gstreamer-rockchip`, and for the same reason:
-provenance and reviewability survive only if the first two tiers keep their own
-commits.
-
-1. **Tier (a), ported upstream or donor fixes.** Clean ports use
-   `git cherry-pick -x`, preserving the original Author, message, and the
-   `(cherry picked from commit …)` line the flag writes. Adapted ports carry the
-   adapter's authorship and credit the original owner plus the full source SHA in
-   the message body. **Never squashed, in either form.**
-2. **Tier (b), first-party bug fixes.** One commit per defect, titled for the
-   mechanism rather than implementation trivia. **Never squashed.**
-3. **Tier (c), CI, packaging, docs, and mechanical work.** These may be squashed
-   under the normal CeraLive Rule C convention.
-
-Merge method follows from that. A PR carrying tier-(a) or tier-(b) history merges
-with **Create a merge commit** or **Rebase and merge** — **never squash**, because
-a squash collapses the whole PR into one new commit and destroys the per-fix
-history those tiers exist to keep. The same rule covers upstream-sync PRs: a
-squash discards the second parent, the merge-base stops advancing, and every
-later sync replays already-merged commits as phantom conflicts.
-
-`integration/1.10.5-ceralive.1` is integrated by **merge, never rebase**. It carries
-eight two-parent Wave-D investigation merges; rebasing linearizes that history
-and replays conflicts in `tests/shim/contract.c` and `tests/shim/fake_rga.c` that
-were already resolved by union. Do not apply the generic pre-work rebase rule to
-this branch. The fix-audit structural repair is authorized directly on
-`0011d44f074508dd5d8533a77496a593211b9e85`, without any pre-work branch sync.
-
-No commit in this repository may carry a `Co-authored-by:` trailer or any AI or
-tool attribution. Such trailers are **forbidden**. A clean cherry-pick's
-preserved upstream Author field and its `-x` provenance line are not trailers;
-they are the record of where the change came from, and they stay.
-
-Remotes: `origin` is `CERALIVE/librga` and nothing else. There is never a remote
-literally named `upstream`. When a source comparison against JeffyCN is genuinely
-needed, add a transient remote named `jeffycn`, fetch an explicit refspec, verify
-the fetched SHA against the pin, and remove the remote **before** any push or PR.
-
-## PR-TARGETING
-
-Every PR targets `CERALIVE/librga`, never the fork parent:
-
+## COMMANDS
+Run in Debian arm64 containers matching `ci/target-suite.env`; build checks run on both trixie and bookworm.
 ```bash
-gh pr create --repo CERALIVE/librga --base main
+bash ci/build-check-steps.sh
+bash tests/test-analyzer-gate.sh
+ANALYZER_STRICT=1 bash scripts/run-analyzer.sh
+bash scripts/analyzer-summary.sh
+bash ci/werror-steps.sh
+bash ci/sanitizers-steps.sh
+bash tests/test-sanitizer-failures.sh
+bash ci/abi-steps.sh
+SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" bash packaging/package-contract.sh --repro
 ```
+Release-record preflight also runs on documentation-only PRs; see the test contract for exact workflow context and evidence boundaries.
 
-Release PRs target their release branch instead (`--base release/1.10.1` for R0),
-but the repository argument never changes. Before handoff, confirm the PR URL
-starts with `https://github.com/CERALIVE/librga/`.
-
-A PR carrying tier-(a) or tier-(b) commits is **never self-merged**. An
-independent reviewer — a different agent and a different model from the author,
-dispatched by the orchestrator — confirms the evidence and the merge method
-first, and the reviewer's session id is written into the `docs/fix-audit.md` row.
-A missing id is recorded as a gap, never explained away.
-
-## Frozen contracts
-
-These are compatibility contracts with live consumers, not cleanup opportunities:
-
-- **SONAME:** `librga.so.2`, unchanged. The device already loads that soname from
-  Radxa's build; the whole swap works because the name is identical.
-- **Package names:** `librga2-ceralive` (runtime, `Provides: librga2`,
-  `Conflicts`/`Replaces: librga2`) and `librga-ceralive-dev` (development).
-- **pkg-config:** the file is `librga.pc` and keeps its name and its variables.
-- **Header install path:** public headers install under `include/rga/`.
-- **No unexpected symbol removals.** R1 accepts exactly the 18 inherited upstream
-  removals in `packaging/baseline-symbols-upstream-delta.txt`, without shims. Both
-  extra removals and absent expected removals fail the ABI gate. This explicit
-  owner decision supersedes strict R0-superset wording for those entries only;
-  see [R1 ABI acceptance](docs/R1-ABI-ACCEPTANCE.md) for each disposition and the
-  private-binary/writable-data risks. No new public-layout, visibility or
-  version-script change is authorized. R0 neutrality is unchanged.
-- **Defaults are frozen.** The default colour matrix, the default interpolation
-  mode, and the default log level stay exactly as upstream ships them. Changing
-  any of them silently changes behaviour for every caller, including callers
-  outside CeraLive. Explicit CSC and interpolation are consumer-side calls.
-- **No new public API or runtime configuration knob.**
-  Accepting `IM_SCHEDULER_DEFAULT` inside the existing `imconfig` signature is an
-  argument-validation fix, not new API.
-
-Linux LP64 `rga_info_t` and `im_opt_t` retain the R0 sizes (696 and 304 bytes),
-locked by C/C++ header assertions. Gaussian configuration consumes existing
-reserve space including its alignment gap; no preceding field moves. Non-LP64
-and Android layouts are not changed by this repair. `unit-pure` guards an exact
-304-byte R0 option allocation with an inaccessible page and checks Gaussian
-setter/copy round-trips. The [reserve repair](docs/R1-ABI-REPAIR.md) records the
-measurements; the later [accepted-removal decision](docs/R1-ABI-ACCEPTANCE.md)
-changes only the enumerated removal policy, never these assertions.
-
-## The additive-only principle
-
-The effort's additive-only rule (D29), with the strict-driver availability claim
-corrected on 2026-09-16:
-
-> Additive-only (D29): nothing existing is stripped — Android/RT-Thread/other-SoC
-> trees, legacy `RockchipRga`/`c_RkRga*` API, every exported symbol, all stay;
-> validation changes only accept MORE valid input.
-
-`LIBRGA_STRICT_DRIVER` is not implemented; setting it has no effect. The earlier
-"stays as a default-off opt-in" and "already present" wording was false, not a
-runtime contract. `rga_check_driver()` retains the upstream version-table policy,
-without an environment-dependent branch. This documentation correction adds no
-strict mode and changes no caller's runtime behaviour.
-
-The 2026-09-14 owner decision makes one narrow exception to the quoted export
-rule: the 18 inherited R1 removals above are accepted with documentation. It is
-not authorization to remove any other symbol or source/platform tree.
-
-In practice: the Android and RT-Thread build files stay even though CeraLive
-builds with Meson, the CMake tree stays even though we do not use it, chips we
-will never ship stay in the format and scheduler tables, and a validation fix may
-only widen the accepted input set. Deleting any of it is merge friction against
-an upstream we intend to keep syncing from, for no shipped benefit.
-
-## Test and board-drill contract
-
-**Handle-mode blit planes:** `generate_blit_req` must not synthesize a byte
-offset in `v_addr` when `handle_flag & 1`. The single imported allocation is
-identified by `yrgb_addr`; the island interprets nonzero additional plane fields
-as handle IDs, not offsets. `handle-planes` inspects both im2d entry points
-against the real shared library, retaining FD/virtual-address controls. Rock
-repro/fix/toggle evidence and the unqualified OPi boundary are in
-[`docs/HANDLE-PLANES.md`](docs/HANDLE-PLANES.md). This is not cache adoption or a release.
-
-Qualification-to-release identity [EXISTS] is enforced by
-`ci/check-release-qualification.sh` immediately before GitHub publication, against
-the downloaded upload payload. The recovered isolated drill binds its candidate
-ELF to `RUNTIME_DEB`, records that archive and `DEV_DEB`, and emits a board receipt
-only after successful scoring and cleanup. Both reviewed receipts must be committed
-under `tests/board/qualification/<version>/`; missing or mismatched receipts block
-publication. Never regenerate them from a later release rebuild. Dry runs remain
-candidate producers, not qualification. See [the identity contract](docs/QUALIFICATION-IDENTITY.md)
-for the trust boundary, mutation proof and promotion procedure. No historical R1
-receipt is fabricated by this infrastructure change.
-
-The consolidated [R1 both-board results](tests/board/DRILL-RESULTS.md) are a
-**post-release record**, [PARTIAL], not evidence present on the original open PR.
-[Rows 24/26 deviations](docs/R1-RECORD-DEVIATIONS.md) retain the historical findings
-but are discharged by remediation, not owner acceptance. The release-record gate
-requires the full matrix, matching board identities and readable real rehearsal
-runs on PRs (including docs-only) and before live publication. Missing evidence
-fails closed; tests exercise the actual release preflight entry.
-The results separate candidate-byte semantic/soak/H1 evidence from the
-different released bytes proven by both-board normal-loader activation and
-rollback. Release/serving are real; whole item-47 discharge is not established.
-Read the released-artifact rerun, R1 H7 and factory-inventory dispositions before
-reusing an earlier PASS; those three rows were already discharged before this
-record remediation. This record authorizes no new board operation.
-
-R0 infrastructure recovery [EXISTS] is inventoried commit-by-commit in
-[`docs/R0-INFRASTRUCTURE-RECOVERY.md`](docs/R0-INFRASTRUCTURE-RECOVERY.md).
-`golden-cases-dynamic` uses the real shared provider without the static golden
-instrumentation. The recovered aarch64 padding probe is diagnostic (exit 1 is a
-finding), never a padding-waiver gate. The bench warms BOTH legacy and im2d
-sessions before its strict fd census. R6 retains 3600/3605/3700-second bench,
-process and transport bounds and rejects empty/short execution. Host mutation
-tests do not qualify hardware. `r1-isolated-drill.sh` selects extracted providers
-per process; it never APT-manages or remounts sysext `/usr`. Package-swap/rollback
-qualification remains a separate, unported hardware gate under current policy.
-Analyzer completion requires a real planted-diagnostic probe using the configured
-library compile command, nonzero objects and successful triage. The always-run
-summary refuses missing completion evidence rather than reporting a clean zero.
-
-NV12 blend validation [EXISTS] runs as `blend-validation` against the real shared
-library. R1 already inherits upstream fc3f742's pattern-first ordering; the new
-two-predicate correction uses `is_rgb_format`, not the RGA-format namespace
-macro, to retain the documented background rejection controls. The regression
-is RED on R0 and uncorrected R1 for different reasons, and ordering-mutation
-proven. [Finite OPi PiP evidence](docs/NV12-BLEND.md) includes a decoded visible
-inset using the PR36 plugin via process-local overrides. The bounded run still
-errors on primary EOS: neither endurance/teardown nor release is approved.
-
-Toolchain failure proofs [EXISTS] are recorded in
-[`docs/TOOLCHAIN-GATE-PROOFS.md`](docs/TOOLCHAIN-GATE-PROOFS.md). Analyzer extraction
-must propagate tool failures rather than treating them as zero findings. Required
-CI runs its process-boundary controls, copied-header 696/304 mutations and real
-ASan/UBSan/TSan test-executable mutations with restoration. The terminal summary
-rejects empty/unknown results and invalid change verdicts. These are host-only
-gates; the frozen dynsym mismatch still disqualifies packaged LTO.
-
-Explicit RGB/BGR full709 selector repair [EXISTS] is guarded by
-`donor-full-csc`, including unchanged 601/limited709 controls and retained source
-Y2R in combined CSC. It repairs upstream `2aa0ab4d` without coefficient changes.
-The [isolated OPi receipt](docs/FULL709-SELECTOR.md) proves the 8↔0 pixel effect;
-it does not pass G-B or authorize R1 release. For this sysext-backed qualification,
-**never APT-manage librga or remount `/usr`**: use extracted artifacts through
-per-process `LD_LIBRARY_PATH`. The historical package-swap instructions below
-do not authorize an install on a read-only merged `/usr`.
-
-R1 toolchain gates: analyzer, scoped werror and host-shim sanitizers are blocking
-dependencies of the required `Build Check summary`. Code changes cannot skip
-them; documentation-only skips remain explicit. Analyzer rejects untriaged
-findings and proves nonzero analyzed objects. Sanitizer result guards require
-11 baseline ASan/UBSan tests, six H10 tests and six TSan concurrency tests, all
-executed successfully. `tests/test-build-check-gating.sh` exercises failure,
-cancellation, skip and empty-result controls without adding Meson registrations.
-`Build Check` may be manually dispatched on a branch; it never publishes.
-The summary also requires matched-debug R0→R1 `abi` and two-build `reproducible`
-jobs. Packaged LTO is disabled by `ci/package-lto.env`; see
-[`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md). `mtune-measurement` is explicitly
-non-blocking and unpackaged, and cannot establish board H4 timings.
-The experimental LTO target retains names with linker roots but changes WEAK and
-GNU_UNIQUE bindings. `ci/check-dynsym.py` requires exact exported name/type/binding/
-visibility equality, independently of abidiff. The required ABI job always records
-the LTO comparison and its explicit FAIL qualification, forbids packaging LTO on
-that result, and requires exact equality for a separate build using the selected
-packaging LTO setting. Tool errors are fatal regardless of that setting. The
-`dynamic-symbol-evidence` artifact retains inventories, raw readelf output, diffs,
-policy and real-ELF mutation controls. All three abidiff comparisons remain required;
-non-LTO R1→LTO R1 accepts no removals. Do not widen the upstream removal list.
-The historical todo-41 result is [`docs/R1-BUILD-GATES.md`](docs/R1-BUILD-GATES.md).
-Current removal policy and verification are in
-[`docs/R1-ABI-ACCEPTANCE.md`](docs/R1-ABI-ACCEPTANCE.md). Green under the accepted
-list does not mean an empty diff or board/release approval.
-
-Legacy `ALOGI`/`ALOGD` diagnostics [EXISTS] remain unconditional at the macro
-boundary: only their existing call sites select emission. Do not add im2d's
-global enable or severity gate there. Constructor notices must survive disabled
-logging. Gaussian framing and values share `IM_LOG_ENABLED`, including force and
-error bypasses. Tests capture output, not just return codes. The public
-`RkRgaSetLogOnceFlag` / `RkRgaSetAlwaysLogFlag` setters are deliberately deprecated
-compatibility no-ops for logging [EXISTS]. Their instance members are not Android's
-separate `rgaContext` palette members; preserve both sets and their layouts.
-The owner-directed [D29 decision](docs/LEGACY-LOG-SETTERS.md) retains runtime
-behavior and adds no compiler/runtime warning. The historical RED probes in
-`docs/fix-audit.d/logging-round-five.md` become mandatory deprecation-contract
-assertions with positive diagnostic controls, not deferred wiring failures.
-Do not claim these setters were repaired by removing the macro gate or by this
-documentation change. Linux callers use `ROCKCHIP_RGA_LOG=1` instead.
-
-`bash scripts/check-ledger-reviews.sh` [EXISTS] validates the generated D21 table,
-also through Meson and `ci/build-check-steps.sh`. Every row has an explicit
-`status=... fix=...;` disposition and current review receipt. GREEN requires a
-fix commit and different author/reviewer agent names AND model IDs; observations,
-SKIPPED, NOT-REPRODUCED and WITHDRAWN carry `fix=none`. Historical review text
-follows the current receipt and never substitutes for it. Evidence-only review
-does not approve a fix or retroactively claim a hardware run. Receipt history is
-in `docs/fix-audit.d/coordinator-review.md`; edit fragments, then regenerate.
-The checker independently compares the complete rendered row multiset against
-the fragments, so a truncated, duplicated or altered ledger fails even when
-every surviving receipt is syntactically valid. The row count is derived from
-the inputs, never frozen to one release's count.
-
-The R1 `werror` CI leg [EXISTS] runs `bash ci/werror-steps.sh` on trixie/arm64.
-It strictly compiles the fork-modified `im2d_context.cpp` and CeraLive test and
-reproducer TUs without suppressions; inherited library TUs outside this scope
-still emit warnings in normal builds. The exact exclusions and warning canaries
-are documented in [`docs/BUILD-FLAGS.md`](docs/BUILD-FLAGS.md).
-
-H10 bookkeeping/lifetime regressions [EXISTS] run in the `h10` Meson suite;
-the two 2000-iteration races also belong to `concurrency`. CONFIG holds the job
-manager mutex through ioctl task copying; cancellation decrements only for a
-removed job. H10c duplicate release is driver-owned, not a librga defect:
-`FAKE_RGA_REIMPORT` is a test-only one-buffer refcount/reuse model, never a
-production released-handle tombstone. Details and host-only evidence are in
-[`docs/fix-audit.d/todo-38.md`](docs/fix-audit.d/todo-38.md).
-CI discovery matches Meson's project-prefixed `:concurrency` suite suffix;
-`tests/test-build-check-gating.sh` checks the actual predicate against fixtures.
-H10 passes the shim path as `H10_SHIM` through Bash and sets `LD_PRELOAD` only
-immediately before the test binary's `exec`. Preloading the instrumented shim
-into uninstrumented Bash crashes during arm64 ASan startup before any H10 code.
-The gating contract checks both registration and launcher, including unchanged
-sanitizer options, log/fault reset and child exit status; see `docs/SANITIZERS.md`.
-
-Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
-It adds direct exported-init coverage to H1 and H3; build both sanitizer trees
-first. Results and the unproven subclaims are in `docs/fix-audit.d/candidate-a.md`.
-Exit 1 records a finding; Wave E promotes its fixed cases as described below.
-
-Candidate B's host-only R1 probe [EXISTS], `tests/repro/run-candidate-b.sh`,
-runs H2 with an additional owned-reference control after both sanitizer trees
-are built. Its RED findings and ownership limits are recorded in
-`docs/fix-audit.d/candidate-b.md`; Wave-E results are in `docs/fix-audit.d/wave-e-b.md`.
-
-Candidate C's scheduler-default assertion [EXISTS] is
-`bash tests/repro/run-candidate-c.sh`. It uses the existing unit helper but
-expects legitimate zero input to succeed, separately from H5's
-unchanged characterization assertions. Evidence: `docs/fix-audit.d/candidate-c.md`.
-
-Candidate D's isolated H6/C4 mode [EXISTS] is
-`bash tests/repro/run-candidate-d.sh`, after the ASan tree is built. It keeps
-the default H6 cases unchanged and measures only positive-fd `imsync` wait-error
-cleanup under host instrumentation; see `docs/fix-audit.d/candidate-d.md`.
-
-Candidates A–D were expected-RED characterization probes on the pre-fix R1 base.
-Wave E promotes the fixed cases into Meson; the canary-verified repeated-process
-runners remain explicit host-only QA and now expect exit 0. Exit 1 still means a
-finding, never an expected-pass inversion. The historical combined R1 run is in
-[`docs/fix-audit.d/r1-consolidation.md`](docs/fix-audit.d/r1-consolidation.md).
-
-Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
-It preserves the shared-library alias before the static-library reassignment and
-appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
-after editing a fragment; a second invocation changes nothing. It also assembles
-`docs/fix-audit.d/*.md` into one continuous six-field D21 table in
-`docs/fix-audit.md`, with verbatim supporting prose in fragment-labelled appendices.
-Fragments may begin with bare D21 rows or introduce them with the canonical D21
-header. Duplicate ledger headers/separators are omitted from the generated file;
-the source fragments remain unchanged. Subsidiary tables, fenced transcripts and
-comments stay with the prose, not in the ledger. Malformed D21 rows fail assembly
-without overwriting the ledger. Edit evidence in the fragments, then regenerate;
-do not hand-edit the generated table or appendices. The generator migrates the
-historical introduction to distinguish upstream characterization from fix evidence.
-`bash tests/test-wire-bootstrap.sh` checks preservation, structure and idempotency
-in an isolated repo-local fixture; it also runs as the Meson `wire-bootstrap` test.
-
-Two environments, and they prove different things. Keeping them apart is the
-point of this section.
-
-QEMU user-mode has a measured invalid-fd RGA ioctl limitation, not a shim bug.
-The two narrowly scoped, opt-in emulation skips and native mandatory coverage
-are documented in [`docs/KNOWN-LIMITS.md`](docs/KNOWN-LIMITS.md).
-
-H6 fence ownership reproduction [EXISTS] runs separately from the green baseline
-suite: `bash tests/repro/run-h6.sh` builds the unchanged shared library and runs
-200 iterations each of C2/C3/C4, with controls and fd census under
-`test-results/h6/`. Exit 1 records RED, not a harness success hidden as a green
-test. H6a is WITHDRAWN because no real positive-success submit path exists on
-the island. The test-only fence/poll knobs are documented in
-[`tests/golden/README`](tests/golden/README); the findings are in
-[`docs/fix-audit.d/h6.md`](docs/fix-audit.d/h6.md). No hardware or sanitizer
-coverage is claimed by this reproducer.
-
-| Environment | What runs there |
+## WHERE TO LOOK
+| Code path or task | Contract |
 |---|---|
-| **Host shim** | Island-UAPI parity gate (struct sizes, member offsets, ioctl numbers against the island's pinned `rga.h`), request-byte goldens, hardware-independent unit tests, TSan/ASan/UBSan legs, GCC-14 `-fanalyzer`, `nm` containment and `abidiff`. |
-| **Board** | Package install/removal, library-level PSNR and colour oracle, DMA-BUF behaviour, fd census, and the A/B rows against the Radxa package. Both boards: Orange Pi 5+ and Rock 5B+. |
+| Before changing anything else here, open docs/agents/README.md and read the contract for the subsystem you touch | [Contract index](docs/agents/README.md) |
+| Import coordinate and provenance | [Overview](docs/agents/overview.md) |
+| Role, releases and installed truth | [Role](docs/agents/role.md) |
+| Repository areas and subsystem paths | [Repository map](docs/agents/repository-map.md) |
+| Commit provenance, history and remotes | [Commit strategy](docs/agents/commit-strategy.md) |
+| PR targets and independent review | [PR-TARGETING](docs/agents/pr-targeting.md) |
+| Public headers, ABI, packages and defaults | [Frozen contracts](docs/agents/frozen-contracts.md) |
+| Retained platforms, validation and strict-driver truth | [The additive-only principle](docs/agents/the-additive-only-principle.md) |
+| tests/, ci/, scripts/, fix ledger and board qualification | [Test and board-drill contract](docs/agents/test-and-board-drill-contract.md) |
+| Licensing, notices and packaging exclusions | [Licensing](docs/agents/licensing.md) |
+| Prohibited changes and scope boundaries | [Anti-patterns](docs/agents/anti-patterns.md) |
 
-The sanitizer and analyzer recipes, the flags that are load-bearing, the canaries
-that prove a runtime is intercepting rather than merely linked, and the discovery
-contracts a new reproducer registers itself through are in
-[`docs/SANITIZERS.md`](docs/SANITIZERS.md). Every `-Wanalyzer-*` finding carries a
-disposition in [`docs/ANALYZER-TRIAGE.md`](docs/ANALYZER-TRIAGE.md).
-
-Release-export comparisons must use matched shipping compiler/flags. The Wave-E
-GCC 16 debug-vs-GCC 14 release comparison's three extra missing weak `std::`
-symbols were measurement artifacts; the shipping comparison has exactly the 18
-documented upstream removals and no Wave-E removal. See
-[`docs/fix-audit.d/wave-e-abi-reconciliation.md`](docs/fix-audit.d/wave-e-abi-reconciliation.md).
-That historical receipt did not waive R0 containment. The later owner decision
-accepts only the enumerated delta; see `docs/R1-ABI-ACCEPTANCE.md`.
-The main-merge gating contract is `bash tests/test-build-check-gating.sh`, also
-run by `ci/build-check-steps.sh`: real sanitizer coverage must survive docs-only
-gating, and skipped code lanes must fail the terminal summary.
-
-Candidate C's scheduler-default regression [EXISTS] is now the green Meson
-`candidate-c` test, linked against the ordinary shared library. `imconfig` accepts
-the documented zero default as well as every previously accepted scheduler value;
-no default or public signature changes. Historical RED evidence remains in the ledger.
-
-Candidate D's `imsync` wait-error regression [EXISTS] is the green Meson
-`candidate-d` test (`h6_polarity_fence.cpp sync-only`). Positive fences are consumed
-on success and wait failure; the existing `fence_fd <= 0` rejection is unchanged.
-The full H6 characterization remains opt-in because its other rows are not fixed.
-
-Candidate A's direct-init and hardware-version-failure regressions [EXISTS] are
-green Meson tests (`candidate-a-init` in `concurrency`, plus one fd census per
-API). Context creation and publication share the legacy mutex; refcount operations
-are atomic without changing the exported integer's storage or type. Failed legacy
-and im2d initialization closes its device fd. `run-candidate-a.sh 200` runs the
-long host-only race acceptance batch; the default remains 20 fresh processes.
-
-Candidate B's borrowed-last-reference and process-exit regressions [EXISTS] are
-green Meson `concurrency` tests, alongside the unchanged owned-reference control.
-Final legacy close rejects new operations, drains active operations, then closes
-and frees under the context mutex. The already process-lifetime Linux singleton
-now uses a process-lifetime lookup mutex; the old static lock stays exported for
-ABI compatibility but is unused by lookup. No singleton destructor is newly run.
-This fixes the demonstrated borrowed-reference/exit patterns, not a refcounting
-defect in the passing owned-reference path. Full batches: `run-candidate-b.sh`.
-
-The manual H2 teardown probe [EXISTS] is `tests/repro/run-h2.sh`: 200 fresh
-processes per scenario and sanitizer, with its six-field ledger fragment in
-`docs/fix-audit.d/h2.md`. Invocation and diagnostic-output settings are documented
-in [`docs/SANITIZERS.md`](docs/SANITIZERS.md#h2-concurrent-teardown-probe).
-
-### The suite proves
-
-- That the request bytes this library writes for the CeraLive call set are
-  unchanged against the recorded goldens.
-- That compared ioctl numbers and layouts match the pinned island UAPI on
-  aarch64, except the four exact OSD flag-offset divergences pinned by the
-  comparator. [The OSD limitation](docs/OSD-LAYOUT-LIMITATION.md) is librga-side,
-  unreachable in the current CeraLive call set, and deferred to a major version.
-- That removals equal the explicitly accepted R1 set and `abidiff` reports no
-  remaining incompatible change against R0. This does not prove ELF binding
-  equivalence: the separate dynsym check rejects the experimental LTO build,
-  and the selected non-LTO configuration must preserve every exported tuple.
-- On the board, only what the transcript for that run names: the exact package,
-  the exact kernel, the exact island tag, and the finite observations that run
-  scored.
-
-### The suite does NOT prove
-
-- **Sanitizer cleanliness on the board. TSan runs on the host shim only**, as do
-  ASan and UBSan. No board drill claims sanitizer coverage, and no ledger row may
-  imply one. A host-shim sanitizer report is evidence about the shim's model of
-  the driver, not about silicon.
-  TSan is host-only **permanently** — it cannot be statically linked reliably, so
-  no board-side equivalent can exist. ASan *could* reach a board via
-  `-static-libasan`, and `scripts/cross-build-harness.sh --asan` gates that on a
-  preflight. As of 2026-09-05 the verdict is **NOT-AVAILABLE**:
-  `aarch64-linux-gnu-gcc -print-file-name=libasan.a` echoes the bare name, so the
-  cross toolchain carries no static ASan runtime and the board-ASan leg does not
-  exist. Reproducer rows record `host-shim-only` until a toolchain that has it is
-  in use.
-- That the host shim reproduces RGA hardware. It models ioctl return values; it
-  does not execute a blit, does not produce pixels, and cannot detect a
-  hardware-side correctness fault.
-- Anything about hardware the transcript does not name, including the other board
-  when only one was reachable.
-- Long-term thermal, suspend/resume, or OTA behaviour.
-- A result from an unreachable board. That run is `SKIPPED-unreachable` with its
-  attempt transcript, never PASS.
-
-Board scripts require `CERALIVE_BOARD_TEST=1` and otherwise exit 77. Board
-identity arrives only through `BOARD_IP`, `BOARD_SSH_USER`, and `BOARD_SSH_PASS`.
-No repository file names a credential path, and no repository file resolves a path
-above the repository root. Drills write only under `/tmp` and install or remove
-only the librga package under test, always via `apt-get install ./<deb>` and never
-a bare `dpkg -i` across the `Conflicts: librga2` boundary; the Radxa rollback deb
-is staged on the board before the first install.
-
-## Licensing
-
-The librga code proper is **Apache-2.0** (`COPYING`, retained byte-for-byte at the
-repository root), **with documented third-party exceptions**. The exceptions are
-not a formality: the todo-7 file-level census in
-[`docs/PROVENANCE.md`](docs/PROVENANCE.md) classifies all 278 tracked files and
-fails closed on anything unclassified. Three findings from that census govern how
-this repository is packaged:
-
-- **The vendored libdrm headers are MIT/X11-style and keep their own notices.**
-  Seven files under `core/3rdparty/libdrm/include/drm/` and
-  `samples/utils/3rdparty/libdrm/include/`, held by Precision Insight, VA Linux
-  Systems, Intel, Dave Airlie, Jakob Bornecrantz, Red Hat and Tungsten Graphics.
-  `core/3rdparty/libdrm/include/drm` is on the shipped library's include path, so
-  this is a build input, not sample scaffolding. Alongside them sit four prebuilt
-  `libdrm.so` binaries under `samples/utils/3rdparty/libdrm/lib/` with no source
-  in tree; they are sample-only and are **never packaged**.
-- **`Android.mk` at the repository root is GPL-3.0-or-later** (Fuzhou Rockchip
-  Electronics, Putin Li and Bin Li) and therefore conflicts with the Apache-2.0
-  `COPYING`. This is an upstream inconsistency, imported as-is and not resolved
-  here. It is safe only because it is an Android NDK build file that CeraLive
-  never invokes — so it must be **excluded from every distributed artifact** and
-  must never land under a `Files: *` Apache-2.0 stanza in `packaging/copyright`.
-- **`core/rga_sync.cpp` and `core/rga_sync.h` are held by AOSP and Google**, not
-  Rockchip. Same licence as the root, different copyright holder, so they need
-  their own DEP-5 stanza.
-
-`packaging/copyright` is generated from that census rather than from `COPYING`,
-because a repository-level licence claim is false at file granularity.
-
-CeraLive modifications remain Apache-2.0. Per Apache-2.0 §4(b), every modified
-file carries a notice line of the form:
-
-```c
-// Modified by CeraLive <YYYY-MM-DD>: <why>
-```
-
-**Do not invent a `NOTICE` file.** Upstream ships none, §4(b) does not require one
-where there is nothing to propagate, and the per-file notice line above is the
-whole convention.
-
-The upstream `debian/` directory is JeffyCN's, is preserved byte-for-byte, and is
-**unused**: CeraLive packages are built by `packaging/build-deb.sh` alone, with no
-debhelper, no `debian/patches/`, and no DEP-3 patch headers. Do not build from
-`debian/`, do not fix it, do not delete it.
-
-Credits for Rockchip, Jeffy Chen, tsukumijima and nyanmisaka are in
-[`README.md`](README.md) and, in full, in `docs/PROVENANCE.md`.
-
-## Anti-patterns
-
-- Do not change the default colour matrix, the default interpolation mode, or the
-  default log level. Both are behaviour divergence for every caller.
-- Do not remove an exported symbol, change a public struct's layout, or touch the
-  SONAME, the pkg-config name, or symbol visibility.
-- Do not delete the Android, RT-Thread, CMake, or other-SoC trees, and do not
-  delete the legacy `RockchipRga` / `c_RkRga*` API. Additive-only means additive.
-- Do not write a fix without a RED reproducer transcript **on the base being
-  fixed**. A RED only on the Radxa or R0 rows does not authorize a change to R1.
-  A harness that will not build is `NOT-REPRODUCED` and becomes a ledger note,
-  never a fix.
-- Do not merge a fix without an `APPROVE` receipt from an independent reviewer
-  carrying a session id. `GAP:` is not an acceptable ledger value for a landed
-  fix.
-- Do not claim sanitizer coverage on the board. TSan, ASan and UBSan are
-  host-shim-only.
-- Do not squash a fix-series or upstream-sync PR, and do not self-merge one.
-- Do not add CeraLive packaging under `debian/`, and do not execute it.
-- Do not add a consumer stopgap for the thread-local `imconfig` behaviour. The
-  plugin already reconfigures on the calling streaming thread before every
-  `improcess`; patching it is patching a non-defect.
-- Do not take "while I'm here" fixes from the audit ledgers — over-strict format
-  tables, size math, allocation rows, task-API rows — unless that row's own
-  reproducer is RED.
-- Do not reformat, do not modernize to `#pragma once` or C++17, and do not run a
-  whitespace sweep. Every one of those is merge friction against an upstream we
-  keep syncing from.
-- Do not do 10-bit work here, and do not touch the kernel, the media island,
-  `rk3588-kernel-patches`, `cerastream`, or `CeraUI`. A librga row that needs a
-  driver change is STOP-and-surface to the island track.
-- Do not name a credentials path, a workspace-parent path, or any path above the
-  repository root in a tracked file.
+## HARD RULES
+- ADDITIVE-ONLY: strip no platform tree or legacy API; preserve every exported symbol except the recorded 18 inherited R1 removals.
+- No SONAME (`librga.so.2`), public-struct layout, visibility or version-script changes; retain LP64 sizes 696/304.
+- Validation changes only accept MORE valid input; defaults for colour, interpolation and logging remain frozen.
+- `LIBRGA_STRICT_DRIVER=1` stays a default-off opt-in policy, not implemented functionality; setting it currently has no effect.
+- No new public API or runtime knob; preserve `librga.pc`, its variables and `include/rga/` installation.
+- The package pair uses an image platform-layer URL+SHA pin swap, NEVER a REPOS entry or FIRST_PARTY_APT_PKGS layer move.
+- Version as `1.10.x+ceralive.N`, not CalVer; `packaging/version` is the release source of truth.
+- PRs here merge-commit merge under fork history rules; never squash fix-series/upstream-sync history or self-merge a fix.
+- Integrate `integration/1.10.5-ceralive.1` by merge, never rebase; read the historical branch exception before syncing.
+- A fix needs a RED reproducer on its actual base and an independent APPROVE receipt with reviewer session identity.
+- Never widen the accepted removal list; packaged LTO must pass exact exported name/type/binding/visibility equality.
+- Required gates reject missing execution, failed tools, untriaged findings and unauthorized skips; no clean-zero substitutes.
+- Host-shim sanitizer results never qualify silicon; unreachable boards are SKIPPED-unreachable, never PASS.
+- Publication requires both-board reviewed receipts binding the exact runtime/dev archives; never recreate them from a rebuild.
+- Sysext drills use extracted process-local providers: never APT-manage librga or remount `/usr` on that qualification path.
+- Board access needs explicit enable and environment identity; stage rollback first, use apt across Conflicts, write only under `/tmp`.
+- Generate the D21 ledger from fragments; never hand-edit it or substitute historical review for current receipts.
+- Preserve legacy log macro emission and deprecated setter no-ops with layouts intact; do not claim the setters were repaired.
+- Preserve notices; exclude root `Android.mk` and sample prebuilt libdrm from artifacts; never build or edit `debian/`.
+- Driver changes are STOP-and-surface to the island track; no opportunistic cleanup, 10-bit implementation or consumer stopgap here.
