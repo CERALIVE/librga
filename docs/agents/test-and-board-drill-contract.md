@@ -1,0 +1,311 @@
+<!-- Moved verbatim from AGENTS.md on 2026-10-05 by lean-rules-docs-landing-latam -->
+
+## Test and board-drill contract
+
+**Handle-mode blit planes:** `generate_blit_req` must not synthesize a byte
+offset in `v_addr` when `handle_flag & 1`. The single imported allocation is
+identified by `yrgb_addr`; the island interprets nonzero additional plane fields
+as handle IDs, not offsets. `handle-planes` inspects both im2d entry points
+against the real shared library, retaining FD/virtual-address controls. Rock
+repro/fix/toggle evidence and the unqualified OPi boundary are in
+[`docs/HANDLE-PLANES.md`](../HANDLE-PLANES.md). This is not cache adoption or a release.
+
+Qualification-to-release identity [EXISTS] is enforced by
+`ci/check-release-qualification.sh` immediately before GitHub publication, against
+the downloaded upload payload. The recovered isolated drill binds its candidate
+ELF to `RUNTIME_DEB`, records that archive and `DEV_DEB`, and emits a board receipt
+only after successful scoring and cleanup. Both reviewed receipts must be committed
+under `tests/board/qualification/<version>/`; missing or mismatched receipts block
+publication. Never regenerate them from a later release rebuild. Dry runs remain
+candidate producers, not qualification. See [the identity contract](../QUALIFICATION-IDENTITY.md)
+for the trust boundary, mutation proof and promotion procedure. No historical R1
+receipt is fabricated by this infrastructure change.
+
+The consolidated [R1 both-board results](../../tests/board/DRILL-RESULTS.md) are a
+**post-release record**, [PARTIAL], not evidence present on the original open PR.
+[Rows 24/26 deviations](../R1-RECORD-DEVIATIONS.md) retain the historical findings
+but are discharged by remediation, not owner acceptance. The release-record gate
+requires the full matrix, matching board identities and readable real rehearsal
+runs on PRs (including docs-only) and before live publication. Missing evidence
+fails closed; tests exercise the actual release preflight entry.
+The results separate candidate-byte semantic/soak/H1 evidence from the
+different released bytes proven by both-board normal-loader activation and
+rollback. Release/serving are real; whole item-47 discharge is not established.
+Read the released-artifact rerun, R1 H7 and factory-inventory dispositions before
+reusing an earlier PASS; those three rows were already discharged before this
+record remediation. This record authorizes no new board operation.
+
+R0 infrastructure recovery [EXISTS] is inventoried commit-by-commit in
+[`docs/R0-INFRASTRUCTURE-RECOVERY.md`](../R0-INFRASTRUCTURE-RECOVERY.md).
+`golden-cases-dynamic` uses the real shared provider without the static golden
+instrumentation. The recovered aarch64 padding probe is diagnostic (exit 1 is a
+finding), never a padding-waiver gate. The bench warms BOTH legacy and im2d
+sessions before its strict fd census. R6 retains 3600/3605/3700-second bench,
+process and transport bounds and rejects empty/short execution. Host mutation
+tests do not qualify hardware. `r1-isolated-drill.sh` selects extracted providers
+per process; it never APT-manages or remounts sysext `/usr`. Package-swap/rollback
+qualification remains a separate, unported hardware gate under current policy.
+Analyzer completion requires a real planted-diagnostic probe using the configured
+library compile command, nonzero objects and successful triage. The always-run
+summary refuses missing completion evidence rather than reporting a clean zero.
+
+NV12 blend validation [EXISTS] runs as `blend-validation` against the real shared
+library. R1 already inherits upstream fc3f742's pattern-first ordering; the new
+two-predicate correction uses `is_rgb_format`, not the RGA-format namespace
+macro, to retain the documented background rejection controls. The regression
+is RED on R0 and uncorrected R1 for different reasons, and ordering-mutation
+proven. [Finite OPi PiP evidence](../NV12-BLEND.md) includes a decoded visible
+inset using the PR36 plugin via process-local overrides. The bounded run still
+errors on primary EOS: neither endurance/teardown nor release is approved.
+
+Toolchain failure proofs [EXISTS] are recorded in
+[`docs/TOOLCHAIN-GATE-PROOFS.md`](../TOOLCHAIN-GATE-PROOFS.md). Analyzer extraction
+must propagate tool failures rather than treating them as zero findings. Required
+CI runs its process-boundary controls, copied-header 696/304 mutations and real
+ASan/UBSan/TSan test-executable mutations with restoration. The terminal summary
+rejects empty/unknown results and invalid change verdicts. These are host-only
+gates; the frozen dynsym mismatch still disqualifies packaged LTO.
+
+Explicit RGB/BGR full709 selector repair [EXISTS] is guarded by
+`donor-full-csc`, including unchanged 601/limited709 controls and retained source
+Y2R in combined CSC. It repairs upstream `2aa0ab4d` without coefficient changes.
+The [isolated OPi receipt](../FULL709-SELECTOR.md) proves the 8↔0 pixel effect;
+it does not pass G-B or authorize R1 release. For this sysext-backed qualification,
+**never APT-manage librga or remount `/usr`**: use extracted artifacts through
+per-process `LD_LIBRARY_PATH`. The historical package-swap instructions below
+do not authorize an install on a read-only merged `/usr`.
+
+R1 toolchain gates: analyzer, scoped werror and host-shim sanitizers are blocking
+dependencies of the required `Build Check summary`. Code changes cannot skip
+them; documentation-only skips remain explicit. Analyzer rejects untriaged
+findings and proves nonzero analyzed objects. Sanitizer result guards require
+11 baseline ASan/UBSan tests, six H10 tests and six TSan concurrency tests, all
+executed successfully. `tests/test-build-check-gating.sh` exercises failure,
+cancellation, skip and empty-result controls without adding Meson registrations.
+`Build Check` may be manually dispatched on a branch; it never publishes.
+The summary also requires matched-debug R0→R1 `abi` and two-build `reproducible`
+jobs. Packaged LTO is disabled by `ci/package-lto.env`; see
+[`docs/BUILD-FLAGS.md`](../BUILD-FLAGS.md). `mtune-measurement` is explicitly
+non-blocking and unpackaged, and cannot establish board H4 timings.
+The experimental LTO target retains names with linker roots but changes WEAK and
+GNU_UNIQUE bindings. `ci/check-dynsym.py` requires exact exported name/type/binding/
+visibility equality, independently of abidiff. The required ABI job always records
+the LTO comparison and its explicit FAIL qualification, forbids packaging LTO on
+that result, and requires exact equality for a separate build using the selected
+packaging LTO setting. Tool errors are fatal regardless of that setting. The
+`dynamic-symbol-evidence` artifact retains inventories, raw readelf output, diffs,
+policy and real-ELF mutation controls. All three abidiff comparisons remain required;
+non-LTO R1→LTO R1 accepts no removals. Do not widen the upstream removal list.
+The historical todo-41 result is [`docs/R1-BUILD-GATES.md`](../R1-BUILD-GATES.md).
+Current removal policy and verification are in
+[`docs/R1-ABI-ACCEPTANCE.md`](../R1-ABI-ACCEPTANCE.md). Green under the accepted
+list does not mean an empty diff or board/release approval.
+
+Legacy `ALOGI`/`ALOGD` diagnostics [EXISTS] remain unconditional at the macro
+boundary: only their existing call sites select emission. Do not add im2d's
+global enable or severity gate there. Constructor notices must survive disabled
+logging. Gaussian framing and values share `IM_LOG_ENABLED`, including force and
+error bypasses. Tests capture output, not just return codes. The public
+`RkRgaSetLogOnceFlag` / `RkRgaSetAlwaysLogFlag` setters are deliberately deprecated
+compatibility no-ops for logging [EXISTS]. Their instance members are not Android's
+separate `rgaContext` palette members; preserve both sets and their layouts.
+The owner-directed [D29 decision](../LEGACY-LOG-SETTERS.md) retains runtime
+behavior and adds no compiler/runtime warning. The historical RED probes in
+`docs/fix-audit.d/logging-round-five.md` become mandatory deprecation-contract
+assertions with positive diagnostic controls, not deferred wiring failures.
+Do not claim these setters were repaired by removing the macro gate or by this
+documentation change. Linux callers use `ROCKCHIP_RGA_LOG=1` instead.
+
+`bash scripts/check-ledger-reviews.sh` [EXISTS] validates the generated D21 table,
+also through Meson and `ci/build-check-steps.sh`. Every row has an explicit
+`status=... fix=...;` disposition and current review receipt. GREEN requires a
+fix commit and different author/reviewer agent names AND model IDs; observations,
+SKIPPED, NOT-REPRODUCED and WITHDRAWN carry `fix=none`. Historical review text
+follows the current receipt and never substitutes for it. Evidence-only review
+does not approve a fix or retroactively claim a hardware run. Receipt history is
+in `docs/fix-audit.d/coordinator-review.md`; edit fragments, then regenerate.
+The checker independently compares the complete rendered row multiset against
+the fragments, so a truncated, duplicated or altered ledger fails even when
+every surviving receipt is syntactically valid. The row count is derived from
+the inputs, never frozen to one release's count.
+
+The R1 `werror` CI leg [EXISTS] runs `bash ci/werror-steps.sh` on trixie/arm64.
+It strictly compiles the fork-modified `im2d_context.cpp` and CeraLive test and
+reproducer TUs without suppressions; inherited library TUs outside this scope
+still emit warnings in normal builds. The exact exclusions and warning canaries
+are documented in [`docs/BUILD-FLAGS.md`](../BUILD-FLAGS.md).
+
+H10 bookkeeping/lifetime regressions [EXISTS] run in the `h10` Meson suite;
+the two 2000-iteration races also belong to `concurrency`. CONFIG holds the job
+manager mutex through ioctl task copying; cancellation decrements only for a
+removed job. H10c duplicate release is driver-owned, not a librga defect:
+`FAKE_RGA_REIMPORT` is a test-only one-buffer refcount/reuse model, never a
+production released-handle tombstone. Details and host-only evidence are in
+[`docs/fix-audit.d/todo-38.md`](../fix-audit.d/todo-38.md).
+CI discovery matches Meson's project-prefixed `:concurrency` suite suffix;
+`tests/test-build-check-gating.sh` checks the actual predicate against fixtures.
+H10 passes the shim path as `H10_SHIM` through Bash and sets `LD_PRELOAD` only
+immediately before the test binary's `exec`. Preloading the instrumented shim
+into uninstrumented Bash crashes during arm64 ASan startup before any H10 code.
+The gating contract checks both registration and launcher, including unchanged
+sanitizer options, log/fault reset and child exit status; see `docs/SANITIZERS.md`.
+
+Candidate A's host-only R1 extension [EXISTS] is `tests/repro/run-candidate-a.sh`.
+It adds direct exported-init coverage to H1 and H3; build both sanitizer trees
+first. Results and the unproven subclaims are in `docs/fix-audit.d/candidate-a.md`.
+Exit 1 records a finding; Wave E promotes its fixed cases as described below.
+
+Candidate B's host-only R1 probe [EXISTS], `tests/repro/run-candidate-b.sh`,
+runs H2 with an additional owned-reference control after both sanitizer trees
+are built. Its RED findings and ownership limits are recorded in
+`docs/fix-audit.d/candidate-b.md`; Wave-E results are in `docs/fix-audit.d/wave-e-b.md`.
+
+Candidate C's scheduler-default assertion [EXISTS] is
+`bash tests/repro/run-candidate-c.sh`. It uses the existing unit helper but
+expects legitimate zero input to succeed, separately from H5's
+unchanged characterization assertions. Evidence: `docs/fix-audit.d/candidate-c.md`.
+
+Candidate D's isolated H6/C4 mode [EXISTS] is
+`bash tests/repro/run-candidate-d.sh`, after the ASan tree is built. It keeps
+the default H6 cases unchanged and measures only positive-fd `imsync` wait-error
+cleanup under host instrumentation; see `docs/fix-audit.d/candidate-d.md`.
+
+Candidates A–D were expected-RED characterization probes on the pre-fix R1 base.
+Wave E promotes the fixed cases into Meson; the canary-verified repeated-process
+runners remain explicit host-only QA and now expect exit 0. Exit 1 still means a
+finding, never an expected-pass inversion. The historical combined R1 run is in
+[`docs/fix-audit.d/r1-consolidation.md`](../fix-audit.d/r1-consolidation.md).
+
+Bootstrap registration is assembled by `bash scripts/wire-bootstrap.sh` [EXISTS].
+It preserves the shared-library alias before the static-library reassignment and
+appends UAPI parity, goldens, unit and board fragments in dependency order. Run it
+after editing a fragment; a second invocation changes nothing. It also assembles
+`docs/fix-audit.d/*.md` into one continuous six-field D21 table in
+`docs/fix-audit.md`, with verbatim supporting prose in fragment-labelled appendices.
+Fragments may begin with bare D21 rows or introduce them with the canonical D21
+header. Duplicate ledger headers/separators are omitted from the generated file;
+the source fragments remain unchanged. Subsidiary tables, fenced transcripts and
+comments stay with the prose, not in the ledger. Malformed D21 rows fail assembly
+without overwriting the ledger. Edit evidence in the fragments, then regenerate;
+do not hand-edit the generated table or appendices. The generator migrates the
+historical introduction to distinguish upstream characterization from fix evidence.
+`bash tests/test-wire-bootstrap.sh` checks preservation, structure and idempotency
+in an isolated repo-local fixture; it also runs as the Meson `wire-bootstrap` test.
+
+Two environments, and they prove different things. Keeping them apart is the
+point of this section.
+
+QEMU user-mode has a measured invalid-fd RGA ioctl limitation, not a shim bug.
+The two narrowly scoped, opt-in emulation skips and native mandatory coverage
+are documented in [`docs/KNOWN-LIMITS.md`](../KNOWN-LIMITS.md).
+
+H6 fence ownership reproduction [EXISTS] runs separately from the green baseline
+suite: `bash tests/repro/run-h6.sh` builds the unchanged shared library and runs
+200 iterations each of C2/C3/C4, with controls and fd census under
+`test-results/h6/`. Exit 1 records RED, not a harness success hidden as a green
+test. H6a is WITHDRAWN because no real positive-success submit path exists on
+the island. The test-only fence/poll knobs are documented in
+[`tests/golden/README`](../../tests/golden/README); the findings are in
+[`docs/fix-audit.d/h6.md`](../fix-audit.d/h6.md). No hardware or sanitizer
+coverage is claimed by this reproducer.
+
+| Environment | What runs there |
+|---|---|
+| **Host shim** | Island-UAPI parity gate (struct sizes, member offsets, ioctl numbers against the island's pinned `rga.h`), request-byte goldens, hardware-independent unit tests, TSan/ASan/UBSan legs, GCC-14 `-fanalyzer`, `nm` containment and `abidiff`. |
+| **Board** | Package install/removal, library-level PSNR and colour oracle, DMA-BUF behaviour, fd census, and the A/B rows against the Radxa package. Both boards: Orange Pi 5+ and Rock 5B+. |
+
+The sanitizer and analyzer recipes, the flags that are load-bearing, the canaries
+that prove a runtime is intercepting rather than merely linked, and the discovery
+contracts a new reproducer registers itself through are in
+[`docs/SANITIZERS.md`](../SANITIZERS.md). Every `-Wanalyzer-*` finding carries a
+disposition in [`docs/ANALYZER-TRIAGE.md`](../ANALYZER-TRIAGE.md).
+
+Release-export comparisons must use matched shipping compiler/flags. The Wave-E
+GCC 16 debug-vs-GCC 14 release comparison's three extra missing weak `std::`
+symbols were measurement artifacts; the shipping comparison has exactly the 18
+documented upstream removals and no Wave-E removal. See
+[`docs/fix-audit.d/wave-e-abi-reconciliation.md`](../fix-audit.d/wave-e-abi-reconciliation.md).
+That historical receipt did not waive R0 containment. The later owner decision
+accepts only the enumerated delta; see `docs/R1-ABI-ACCEPTANCE.md`.
+The main-merge gating contract is `bash tests/test-build-check-gating.sh`, also
+run by `ci/build-check-steps.sh`: real sanitizer coverage must survive docs-only
+gating, and skipped code lanes must fail the terminal summary.
+
+Candidate C's scheduler-default regression [EXISTS] is now the green Meson
+`candidate-c` test, linked against the ordinary shared library. `imconfig` accepts
+the documented zero default as well as every previously accepted scheduler value;
+no default or public signature changes. Historical RED evidence remains in the ledger.
+
+Candidate D's `imsync` wait-error regression [EXISTS] is the green Meson
+`candidate-d` test (`h6_polarity_fence.cpp sync-only`). Positive fences are consumed
+on success and wait failure; the existing `fence_fd <= 0` rejection is unchanged.
+The full H6 characterization remains opt-in because its other rows are not fixed.
+
+Candidate A's direct-init and hardware-version-failure regressions [EXISTS] are
+green Meson tests (`candidate-a-init` in `concurrency`, plus one fd census per
+API). Context creation and publication share the legacy mutex; refcount operations
+are atomic without changing the exported integer's storage or type. Failed legacy
+and im2d initialization closes its device fd. `run-candidate-a.sh 200` runs the
+long host-only race acceptance batch; the default remains 20 fresh processes.
+
+Candidate B's borrowed-last-reference and process-exit regressions [EXISTS] are
+green Meson `concurrency` tests, alongside the unchanged owned-reference control.
+Final legacy close rejects new operations, drains active operations, then closes
+and frees under the context mutex. The already process-lifetime Linux singleton
+now uses a process-lifetime lookup mutex; the old static lock stays exported for
+ABI compatibility but is unused by lookup. No singleton destructor is newly run.
+This fixes the demonstrated borrowed-reference/exit patterns, not a refcounting
+defect in the passing owned-reference path. Full batches: `run-candidate-b.sh`.
+
+The manual H2 teardown probe [EXISTS] is `tests/repro/run-h2.sh`: 200 fresh
+processes per scenario and sanitizer, with its six-field ledger fragment in
+`docs/fix-audit.d/h2.md`. Invocation and diagnostic-output settings are documented
+in [`docs/SANITIZERS.md`](../SANITIZERS.md#h2-concurrent-teardown-probe).
+
+### The suite proves
+
+- That the request bytes this library writes for the CeraLive call set are
+  unchanged against the recorded goldens.
+- That compared ioctl numbers and layouts match the pinned island UAPI on
+  aarch64, except the four exact OSD flag-offset divergences pinned by the
+  comparator. [The OSD limitation](../OSD-LAYOUT-LIMITATION.md) is librga-side,
+  unreachable in the current CeraLive call set, and deferred to a major version.
+- That removals equal the explicitly accepted R1 set and `abidiff` reports no
+  remaining incompatible change against R0. This does not prove ELF binding
+  equivalence: the separate dynsym check rejects the experimental LTO build,
+  and the selected non-LTO configuration must preserve every exported tuple.
+- On the board, only what the transcript for that run names: the exact package,
+  the exact kernel, the exact island tag, and the finite observations that run
+  scored.
+
+### The suite does NOT prove
+
+- **Sanitizer cleanliness on the board. TSan runs on the host shim only**, as do
+  ASan and UBSan. No board drill claims sanitizer coverage, and no ledger row may
+  imply one. A host-shim sanitizer report is evidence about the shim's model of
+  the driver, not about silicon.
+  TSan is host-only **permanently** — it cannot be statically linked reliably, so
+  no board-side equivalent can exist. ASan *could* reach a board via
+  `-static-libasan`, and `scripts/cross-build-harness.sh --asan` gates that on a
+  preflight. As of 2026-09-05 the verdict is **NOT-AVAILABLE**:
+  `aarch64-linux-gnu-gcc -print-file-name=libasan.a` echoes the bare name, so the
+  cross toolchain carries no static ASan runtime and the board-ASan leg does not
+  exist. Reproducer rows record `host-shim-only` until a toolchain that has it is
+  in use.
+- That the host shim reproduces RGA hardware. It models ioctl return values; it
+  does not execute a blit, does not produce pixels, and cannot detect a
+  hardware-side correctness fault.
+- Anything about hardware the transcript does not name, including the other board
+  when only one was reachable.
+- Long-term thermal, suspend/resume, or OTA behaviour.
+- A result from an unreachable board. That run is `SKIPPED-unreachable` with its
+  attempt transcript, never PASS.
+
+Board scripts require `CERALIVE_BOARD_TEST=1` and otherwise exit 77. Board
+identity arrives only through `BOARD_IP`, `BOARD_SSH_USER`, and `BOARD_SSH_PASS`.
+No repository file names a credential path, and no repository file resolves a path
+above the repository root. Drills write only under `/tmp` and install or remove
+only the librga package under test, always via `apt-get install ./<deb>` and never
+a bare `dpkg -i` across the `Conflicts: librga2` boundary; the Radxa rollback deb
+is staged on the board before the first install.
+

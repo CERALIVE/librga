@@ -20,7 +20,7 @@ set -euo pipefail
 # HOST SHIM ONLY. Every binary here talks to tests/shim/fake_rga.c, not to
 # /dev/rga. A clean report is evidence about this library's behaviour against the
 # shim's model of the driver — it is not evidence about silicon, and no board
-# drill or ledger row may cite it as such. See AGENTS.md, "The suite does NOT
+# drill or ledger row may cite it as such. See docs/agents/test-and-board-drill-contract.md, "The suite does NOT
 # prove", and docs/SANITIZERS.md.
 #
 # The canaries are not decoration. `ldd` proves a runtime is LINKED; only a
